@@ -25,6 +25,7 @@ in
     packages = with pkgs; [
       fastfetch
       eza
+      mpc
       ffmpeg
 
       python3
@@ -62,15 +63,46 @@ in
           yatline;
       };
 
+    settings = {
+      opener = {
+        play_ncmpcpp = [
+          {
+            run = "mpc clear && mpc add \"file://$@\" && mpc play && ncmpcpp";
+            block = true;
+          }
+        ];
+      };
+
+      open = {
+        rules = [
+          { mime = "audio/*"; use = [ "play_ncmpcpp" ]; }
+          { url = "*.mp3";    use = [ "play_ncmpcpp" ]; }
+        ];
+      };
+    };
+      
       theme = {
         mgr = {
           border_style = { fg = "black"; };
         };
-        header = {
-          overall = { fg = "white"; bg = "black"; };
+        indicator = {
+          padding = {
+          open = "█";   # Dejar vacío elimina el medio círculo izquierdo
+          close = "█";  # Dejar vacío elimina el medio círculo derecho
         };
-        status = {
-          overall = { fg = "white"; bg = "black"; };
+        # Desactivamos 'reversed' para que no use el azul por defecto de tu terminal
+        current = { 
+          reversed = false; 
+          fg = "blue";   # Texto blanco para que resalte
+          bg = "black";   # ¡El fondo ROJO que buscamos!
+        };
+        
+        # Opcional: El indicador de la columna izquierda (el "padre")
+        parent = {
+          reversed = false;
+          fg = "blue";
+          bg = "black";   # Un rojo más oscuro para la navegación previa
+          };
         };
       };
 
@@ -80,50 +112,78 @@ in
           type = ui.Border.ROUNDED,
         }
 
-        -- Configuramos Yatline para encapsular el Header y el Status
-        require("yatline"):setup {
-        	section_separator = { open = "", close = "" },
-	        part_separator = { open = "", close = "" },
-	        inverse_separator = { open = "", close = "" },
-          -- DISEÑO DEL HEADER (Parte Superior)
-          header = {
-            -- Ponemos la sección de la ruta (header_a) dentro de una cápsula
-            header_a = {
-              components = { "colored_path" },
-              fg = "cyan",
-              bg = "black",
-              style = "bold",
-            },
-            -- Las pestañas al lado de forma sutil
-            header_b = {
-              components = { "tabs" },
-              fg = "darkgray",
-              bg = "black",
-            }
-          },
+require("yatline"):setup({
+	section_separator = { open = "", close = "" },
+	part_separator = { open = "", close = "" },
+	inverse_separator = { open = "", close = "" },
 
-          -- DISEÑO DEL STATUS (Parte Inferior)
-          status = {
-            status_a = {
-              components = { "mode" },
-              fg = "cyan",
-              bg = "black",
-              style = "bold",
-            },
-            status_b = {
-              components = { "permissions" },
-              fg = "green",
-              bg = "black",
-              style = "bold",
-            },
-            status_c = {
-              components = { "percentage" },
-              fg = "magenta",
-              bg = "black",
-              style = "bold",
-            }
-          }
-        }
+	padding = { inner = 1, outer = 1 },
+
+	style_a = {
+		bg = "white",
+		fg = "black",
+		bg_mode = {
+			normal = "white",
+			select = "brightyellow",
+			un_set = "brightred",
+		},
+	},
+	style_b = { bg = "brightblack", fg = "brightwhite" },
+	style_c = { bg = "black", fg = "brightwhite" },
+
+	permissions_t_fg = "green",
+	permissions_r_fg = "yellow",
+	permissions_w_fg = "red",
+	permissions_x_fg = "cyan",
+	permissions_s_fg = "white",
+
+	tab_width = 20,
+
+	selected = { icon = "󰻭", fg = "yellow" },
+	copied = { icon = "", fg = "green" },
+	cut = { icon = "", fg = "red" },
+
+	files = { icon = "", fg = "blue" },
+	filtereds = { icon = "", fg = "magenta" },
+
+	total = { icon = "󰮍", fg = "yellow" },
+	success = { icon = "", fg = "green" },
+	failed = { icon = "", fg = "red" },
+
+	show_background = true,
+
+	display_header_line = false,
+	display_status_line = true,
+
+	component_positions = { "tab", "status" },
+
+	status_line = {
+		left = {
+			section_a = {
+				{ type = "string", name = "tab_mode" },
+			},
+			section_b = {
+				{ type = "string", name = "hovered_size" },
+			},
+			section_c = {
+				{ type = "string", name = "hovered_path" },
+				{ type = "coloreds", name = "count" },
+			},
+		},
+		right = {
+			section_a = {
+				{ type = "string", name = "cursor_position" },
+			},
+			section_b = {
+				{ type = "string", name = "cursor_percentage" },
+			},
+			section_c = {
+				{ type = "string", name = "hovered_file_extension", params = { true } },
+				{ type = "coloreds", name = "permissions" },
+			},
+		},
+	},
+})
       '';
     };
 

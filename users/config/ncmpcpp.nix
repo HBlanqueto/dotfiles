@@ -5,7 +5,7 @@
         mpd_host = "127.0.0.1";
         mpd_port = 6600; 
         mpd_connection_timeout = 60;
-    
+
         visualizer_data_source = "127.0.0.1:5555";
         visualizer_output_name = "Mopidy UDP";
         visualizer_in_stereo = "yes";
@@ -13,7 +13,7 @@
         visualizer_fps = "30";
         visualizer_look = "●●";
         visualizer_color = "33,39,63,75,81,99,117,153,189";
-    
+
         playlist_display_mode = "columns";
         browser_display_mode = "columns";
         user_interface = "classic";

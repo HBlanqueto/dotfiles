@@ -13,7 +13,7 @@ rec {
   c3 = "cfb984";
   c4 = "7498e8";
   c5 = "aa96c2";
-  c6 = "88c29b";
+  c6 = "cfe9fa";
   c7 = "cdd9e5";
 
   c8 = "2c3b54";
@@ -22,7 +22,7 @@ rec {
   c11 = "dfca9b";
   c12 = "97b7ff";
   c13 = "bda9d6";
-  c14 = "9dd4af";
+  c14 = "cee8ff"; 
   c15 = "eef4fa";
 
   primary = c4;

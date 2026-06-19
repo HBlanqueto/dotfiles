@@ -7,11 +7,10 @@ in
 with theme.colors;
 
 {
-  # 1. Ajustes principales (yazi.toml)
   settings = {
-
     mgr = {
       ratio = [ 0 1 1 ];
+
     };
 
     opener = {
@@ -72,7 +71,7 @@ with theme.colors;
         }
 
 require("yatline"):setup({
-    section_separator = { open = "​", close = "​" },
+  section_separator = { open = "​", close = "​" },
 	part_separator = { open = "​", close = "​" },
 	inverse_separator = { open = "​", close = "​" },
 

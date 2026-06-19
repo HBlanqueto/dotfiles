@@ -12,6 +12,7 @@ in
     sessionVariables = {
       BROWSER = "${pkgs.firefox}/bin/firefox";
       TERMINAL = "wezterm";
+      EDITOR = "nvim";
 
       SDL_VIDEODRIVER = "wayland";
       QT_WAYLAND_DISABLE_WINDOWDECORATION = "1";
@@ -67,11 +68,6 @@ in
       enable = true;
       package = pkgs.ncmpcpp.override { visualizerSupport = true; };
       settings = import ./config/ncmpcpp.nix;
-    };
-
-    rmpc = {
-      enable = true;
-      config = import ./config/rmpc.nix;
     };
 
     bat = {

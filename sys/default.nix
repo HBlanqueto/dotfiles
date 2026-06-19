@@ -50,9 +50,9 @@ nixpkgs.lib.nixosSystem rec {
           verbose = false;
           systemd = {
             initrdBin = with pkgs; [ coreutils btrfs-progs findutils ];
-        
+
+            # The BTRFS snapshot
             services.rollback = {
-              description = "Limpieza de la raiz efimera de Btrfs";
               wantedBy = [ "initrd.target" ];
               before = [ "sysroot.mount" ];
               unitConfig.DefaultDependencies = "no";

@@ -35,9 +35,9 @@
         centered_cursor = "yes";
         mouse_support = "yes";
 
-        progressbar_look = "━●";
+        progressbar_look = "━●󰨓";
         progressbar_color = "black";
-        progressbar_elapsed_color = "blue";
+        progressbar_elapsed_color = "white";
 
         empty_tag_marker = " ";
         window_border_color = "black";

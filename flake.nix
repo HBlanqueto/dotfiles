@@ -22,7 +22,6 @@
   with nixpkgs.lib;
   let
     config = {
-      allowBroken = true;
       allowUnfree = true;
     };
 
@@ -47,12 +46,12 @@
   {
     nixosConfigurations = {
 
-      utm-aarch64 = import ./system {
+      utm-aarch64 = import ./sys {
         inherit config home inputs nixpkgs overlays ;
         system = "aarch64-linux";
       };
     };
 
-    utm-aarch64 = self.nixosConfigurations.utm.config.system.build.toplevel;
+    utm-aarch64 = self.nixosConfigurations.utm-aarch64.config.system.build.toplevel;
   };
 }

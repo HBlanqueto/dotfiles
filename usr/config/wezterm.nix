@@ -118,9 +118,9 @@ with theme.colors;
       colors = {
           foreground = "#${fg}",
           background = "#${bg}",
-          cursor_bg = "#${c4}",
-          cursor_fg = "#${c4}",
-          cursor_border = "#${c4}",
+          cursor_bg = "#${fg}",
+          cursor_fg = "#${fg}",
+          cursor_border = "#${fg}",
           split = "#${lbg}",
 
           ansi = {
@@ -144,7 +144,6 @@ with theme.colors;
 
       },
 
-
     disable_default_key_bindings = true,
 
     keys = {
@@ -162,7 +161,7 @@ with theme.colors;
         } 
       },
 
-      { mods = "CTRL", key = "t", action = wezterm.action { 
+      { mods = "CTRL", key = "m", action = wezterm.action { 
         SpawnTab = "CurrentPaneDomain" 
         } 
       },

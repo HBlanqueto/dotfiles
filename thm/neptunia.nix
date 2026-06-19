@@ -11,7 +11,7 @@ rec {
   c1 = "d47d7a";
   c2 = "8ecb94";
   c3 = "cfb984";
-  c4 = "9bb9c4";
+  c4 = "7498e8";
   c5 = "aa96c2";
   c6 = "88c29b";
   c7 = "cdd9e5";
@@ -20,7 +20,7 @@ rec {
   c9 = "e59592";
   c10 = "a3dcb1";
   c11 = "dfca9b";
-  c12 = "b2cbd4";
+  c12 = "97b7ff";
   c13 = "bda9d6";
   c14 = "9dd4af";
   c15 = "eef4fa";

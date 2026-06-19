@@ -1,3 +1,5 @@
+# This file allows ncmpcpp or cava to display audio spectrum bars or visualizers.
+
 {}:
 
 {

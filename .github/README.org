@@ -1,0 +1,28 @@
+#+begin_quote
+*NOTE*
+
+I am not an expert, so don't trust my decisions 100%.
+#+end_quote
+
+** Details
+
+- *Host:* Mac Mini M4
+- *Architecture:* aarch64
+- *Virtual Machine:* UTM
+- *Desktop Environment:* GNOME
+- *Branch:* Unstable
+- *Shell:* Fish
+- *Terminal:* Wezterm
+- *Editor:* Neovim
+
+** Roadmap
+
+- [X] Migrate to Nix Flakes
+- [X] Integrate Home Manager
+- [X] Implement Impermanence file system setup
+- [ ] Set up Agenix for secrets management
+- [ ] Implement ZFS as the primary filesystem instead of Btrfs
+- [ ] Set up drive encryption and decryption using Lanzaboote (Secure Boot & Measured Boot)
+- [ ] Simplify & optimize code.
+
+** 

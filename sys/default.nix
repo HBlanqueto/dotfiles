@@ -11,7 +11,7 @@ nixpkgs.lib.nixosSystem rec {
       home-manager = {
         backupFileExtension = "backup";
         sharedModules = [ ];
-        users.humbe = nixpkgs.lib.mkMerge [ ../users ];
+        users.humbe = nixpkgs.lib.mkMerge [ ../usr ];
       };
 
       nixpkgs = { inherit config overlays; };
@@ -19,7 +19,7 @@ nixpkgs.lib.nixosSystem rec {
 
     ({ config, pkgs, lib, ... }: 
     
-    let theme = import ../theme { };
+    let theme = import ../thm { };
       in
     {
       imports = [
@@ -57,22 +57,7 @@ nixpkgs.lib.nixosSystem rec {
               before = [ "sysroot.mount" ];
               unitConfig.DefaultDependencies = "no";
               serviceConfig.Type = "oneshot";
-              script = ''
-                mkdir -p /btrfs_tmp
-                mount /dev/vda2 /btrfs_tmp
-
-                if [ -e /btrfs_tmp/@rootfs ]; then
-                  mkdir -p /btrfs_tmp/old_roots
-                  timestamp=$(date "+%Y-%m-%d_%H:%M:%S")
-                  mv /btrfs_tmp/@rootfs /btrfs_tmp/old_roots/$timestamp
-                fi
-
-                mkdir -p /btrfs_tmp/old_roots
-                find /btrfs_tmp/old_roots/ -maxdepth 1 -mtime +30 -exec btrfs subvolume delete {} \; 2>/dev/null || true
-                btrfs subvolume snapshot /btrfs_tmp/rootfs-blank /btrfs_tmp/@rootfs
-            
-                umount /btrfs_tmp
-              '';
+              script = import ./libs/snapshot.nix {};
             };
           };
         };

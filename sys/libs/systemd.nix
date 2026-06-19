@@ -39,7 +39,6 @@
       bpftune.enable = true;
   };
   
-
   nix = {
     gc = {
       automatic = true;

@@ -6,6 +6,9 @@ I am not an expert, so don't trust my decisions 100%.
 
 ** Details
 
+#+ATTR_HTML: :style float: right; margin: 0px 0px 15px 15px; width: 300px;
+[[file:.github/assets/mac-mini.png]]
+
 - *Host:* Mac Mini M4
 - *Architecture:* aarch64
 - *Virtual Machine:* UTM
@@ -17,12 +20,12 @@ I am not an expert, so don't trust my decisions 100%.
 
 ** Roadmap
 
-- [X] Migrate to Nix Flakes
-- [X] Integrate Home Manager
-- [X] Implement Impermanence file system setup
+- [x] Migrate to Nix Flakes
+- [x] Integrate Home Manager
+- [x] Implement Impermanence file system setup
 - [ ] Set up Agenix for secrets management
 - [ ] Implement ZFS as the primary filesystem instead of Btrfs
 - [ ] Set up drive encryption and decryption using Lanzaboote (Secure Boot & Measured Boot)
 - [ ] Simplify & optimize code.
 
-** 
+** ```

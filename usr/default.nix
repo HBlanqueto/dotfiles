@@ -69,6 +69,11 @@ in
       settings = import ./config/ncmpcpp.nix;
     };
 
+    rmpc = {
+      enable = true;
+      config = import ./config/rmpc.nix;
+    };
+
     bat = {
       enable = true;
       config = {

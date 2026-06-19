@@ -1,5 +1,5 @@
 #+begin_quote
-*NOTE*
+*NOTE!*
 
 I am not an expert, so don't trust my decisions 100%.
 #+end_quote
@@ -29,4 +29,9 @@ I am not an expert, so don't trust my decisions 100%.
 - [ ] Set up drive encryption and decryption using Lanzaboote (Secure Boot & Measured Boot)
 - [ ] Simplify & optimize code.
 
-** ```
+** Credits
+
+Special thanks to these individuals whose work greatly inspired and guided the configuration of these files.
+
+- [[https://github.com/SergioRibera/dotfiles][SergioRibera's dotfiles]]
+- [[https://github.com/chxp82q/nix-config][chxp82q's nix-config]]

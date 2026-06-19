@@ -6,17 +6,18 @@ I am not an expert, so don't trust my decisions 100%.
 
 ** Details
 
-#+ATTR_HTML: :style float: right; margin: 0px 0px 15px 15px; width: 300px;
-[[file:.github/assets/mac-mini.png]]
+#+HTML: <img align="right" width="400" src="https://raw.githubusercontent.com/HBlanqueto/dotfiles/refs/heads/main/.github/assets/mac-mini.png">
 
 - *Host:* Mac Mini M4
 - *Architecture:* aarch64
-- *Virtual Machine:* UTM
-- *Desktop Environment:* GNOME
 - *Branch:* Unstable
-- *Shell:* Fish
-- *Terminal:* Wezterm
-- *Editor:* Neovim
+- *Virtual Machine:* [[https://mac.getutm.app/][UTM]]
+- *Desktop Environment:* [[https://www.gnome.org/][GNOME]]
+- *Shell:* [[https://fishshell.com/][Fish]]
+- *Terminal:* [[https://wezfurlong.org/wezterm/][Wezterm]]
+- *Editor:* [[https://neovim.io/][Neovim]]
+- *Music:* [[https://rybczak.net/ncmpcpp/][ncmpcpp]]
+- *File Manager:* [[https://yazi-rs.github.io/][yazi]]
 
 ** Roadmap
 

@@ -1,4 +1,4 @@
-{ config, pkgs, inputs, lib, ... }:
+{ config, pkgs, lib, ... }:
 
 {
     home.packages = with pkgs; [
@@ -35,14 +35,14 @@
             plugins = {
                 inherit (pkgs.yaziPlugins) yatline;
             };
-            initLua = builtins.readFile ./config/yazi/init.lua;
-            settings = { };
+            initLua = builtins.readFile ../config/yazi/init.lua;
+            #settings = { };
         };
 
         ncmpcpp = {
             enable = true;
             package = pkgs.ncmpcpp.override { visualizerSupport = true; };
-            settings = import ./config/ncmpcpp.nix;
+            settings = import ../config/ncmpcpp.nix;
         };
 
         bat = {
@@ -56,7 +56,7 @@
 
         wezterm = {
             enable = true;
-            extraConfig = builtins.readFile ./config/wezterm.lua;
+            extraConfig = builtins.readFile ../config/wezterm.lua;
         };
 
         fish = {
@@ -83,7 +83,7 @@
 
         starship = {
             enable = true;
-            settings = import ./config/starship.nix;
+            settings = import ../config/starship.nix;
         };
 
         home-manager.enable = true;
@@ -96,7 +96,7 @@
                 mopidy-local
                 mopidy-mpd
             ];
-            settings = import ./config/mopidy.nix {};
+            settings = import ../config/mopidy.nix {};
         };
     };
 }

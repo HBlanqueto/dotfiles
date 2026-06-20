@@ -21,11 +21,23 @@
             CLUTTER_BACKEND = "wayland";
             NO_AT_BRIDGE = "1";
         };
+    }; # <--- Faltaba cerrar el bloque 'home'
 
     fonts.fontconfig.enable = true;
 
     xdg = {
         enable = true;
+
+        userDirs = {
+            enable = true;
+            desktop = "${config.home.homeDirectory}/Escritorio";
+            documents = "${config.home.homeDirectory}/Documentos";
+            music = "${config.home.homeDirectory}/Música";
+            pictures = "${config.home.homeDirectory}/Imágenes";
+            videos = "${config.home.homeDirectory}/Videos";
+            download = "${config.home.homeDirectory}/Descargas";
+        };
+
         configFile = {
             "lua-module-color/theme.lua".text = ''
                 return {
@@ -51,16 +63,6 @@
                     c15 = "#${theme.colors.c15}",
                 }
             '';
-        };
-
-        userDirs = {
-            enable = true;
-            desktop = "${config.home.homeDirectory}/Escritorio";
-            documents = "${config.home.homeDirectory}/Documentos";
-            music = "${config.home.homeDirectory}/Música";
-            pictures = "${config.home.homeDirectory}/Imágenes";
-            videos = "${config.home.homeDirectory}/Videos";
-            download = "${config.home.homeDirectory}/Descargas";
         };
     };
 

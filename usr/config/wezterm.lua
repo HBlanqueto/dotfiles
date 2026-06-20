@@ -1,8 +1,5 @@
-{theme}:
+  local colors = dofile(os.getenv("HOME") .. "/.config/lua-module-color/theme.lua")
 
-with theme.colors;
-
-''
   local wezterm = require('wezterm')
 
   local font_normal = {  
@@ -116,30 +113,30 @@ with theme.colors;
       bold_brightens_ansi_colors = false,
 
       colors = {
-          foreground = "#${fg}",
-          background = "#${bg}",
-          cursor_bg = "#${fg}",
-          cursor_fg = "#${fg}",
-          cursor_border = "#${fg}",
-          split = "#${lbg}",
+          foreground = colors.fg,
+          background = colors.bg,
+          cursor_bg = colors.fg,
+          cursor_fg = colors.fg,
+          cursor_border = colors.fg,
+          split = colors.lbg,
 
           ansi = {
-              "#${c0}", "#${c1}", "#${c2}", "#${c3}", "#${c4}", "#${c5}",
-              "#${c6}", "#${c7}"
+              colors.c0, colors.c1, colors.c2, colors.c3, colors.c4, colors.c5,
+              colors.c6, colors.c7
           },
           brights = {
-              "#${c8}", "#${c9}", "#${c10}", "#${c11}", "#${c12}", "#${c13}",
-              "#${c14}", "#${c15}"
+              colors.c8, colors.c9, colors.c10, colors.c11, colors.c12, colors.c13,
+              colors.c14, colors.c15
           },
 
           tab_bar = {
               active_tab = {
-                  bg_color = "#${bg}",
-                  fg_color = "#${c8}",
+                  bg_color = colors.bg,
+                  fg_color = colors.c8,
                   italic = true
               },
-              inactive_tab = {bg_color = "#${dbg}", fg_color = "#${c8}"},
-              inactive_tab_hover = {bg_color = "#${c0}", fg_color = "#${bg}"}
+              inactive_tab = {bg_color = colors.dbg, fg_color = colors.c8},
+              inactive_tab_hover = {bg_color = colors.c0, fg_color = colors.bg}
           }
 
       },
@@ -196,4 +193,3 @@ with theme.colors;
   }
 
   return config
-''

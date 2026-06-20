@@ -1,6 +1,6 @@
 {}:
 
 rec {
-  colors =
-    import ./neptunia.nix { };
+    colors =
+        import ./neptunia.nix { };
 }

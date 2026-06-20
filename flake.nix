@@ -1,57 +1,60 @@
 {
-  description = "NixOS";
+    description = "Welcome ~/*. Watch your step, it vanishes on boot.";
 
-  inputs = { 
-    unstable.url = "github:nixos/nixpkgs/nixos-unstable";
-    home.url = "github:nix-community/home-manager";
-    impermanence.url = "github:nix-community/impermanence";
+    inputs = {
+        unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
-    mac-style.url = "github:SergioRibera/s4rchiso-plymouth-theme";
-    # brave-origin.url = "github:Daniel-42-z/brave-origin-flake"; # amd64 only
+        home.url = "github:nix-community/home-manager";
+        parts.url = "github:hercules-ci/flake-parts";
+        impermanence.url = "github:nix-community/impermanence";
 
-    nixpkgs.follows = "unstable";
-  };
+        mac-style.url = "github:SergioRibera/s4rchiso-plymouth-theme";
 
-  outputs = { 
-    self, 
-    nixpkgs, 
-    home,
-    impermanence,
-    ... 
-  }@inputs:
-  with nixpkgs.lib;
-  let
-    config = {
-      allowUnfree = true;
+        nixpkgs.follows = "unstable";
     };
 
-  filterNixFiles = k: v: v == "regular" && hasSuffix ".nix" k;
+    outputs = inputs: inputs.parts.lib.mkFlake { inherit inputs; } {
 
-  importNixFiles = path:
-    (lists.forEach (mapAttrsToList (name: _: path + ("/" + name))
-      (filterAttrs filterNixFiles (builtins.readDir path)))) import;
+    systems = [ "aarch64-linux" "x86_64-linux" ];
 
-  overlays = with inputs;
-          [
-            (final: _:
-              let system = final.stdenv.hostPlatform.system;
-              in {
-              # Packages provided by flake inputs
-              mac-style-plymouth = mac-style.packages.${system}.default;
-              #brave-origin = brave-origin.${system}.default;
-            }
-          )
-        ];
-  in
-  {
-    nixosConfigurations = {
+    flake = {
+      nixosConfigurations = {
+        nixos = 
+          let
+            username = "humbe";
 
-      utm-aarch64 = import ./sys {
-        inherit config home inputs nixpkgs overlays ;
-        system = "aarch64-linux";
+            currentSystem = builtins.currentSystem; 
+
+            hostName = if currentSystem == "aarch64-linux" then "utm-aarch64" else "desktop-x86_64";
+          in
+          inputs.nixpkgs.lib.nixosSystem {
+            system = currentSystem;
+
+            specialArgs = {
+              inherit inputs username hostName;
+            };
+
+            modules = [
+              ./etc
+
+              inputs.impermanence.nixosModules.impermanence
+              inputs.home.nixosModules.home-manager
+
+              {
+                nixpkgs.config.allowUnfree = true;
+                networking.hostName = hostName;
+
+                nixpkgs.overlays = [
+                  (final: prev: {
+                    mac-style-plymouth = inputs.mac-style.packages.${currentSystem}.default;
+                  })
+                ];
+              }
+            ];
+          };
       };
-    };
 
-    utm-aarch64 = self.nixosConfigurations.utm-aarch64.config.system.build.toplevel;
+      nixos = inputs.self.nixosConfigurations.nixos.config.system.build.toplevel;
+    };
   };
 }

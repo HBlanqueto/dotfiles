@@ -1,4 +1,4 @@
-  local colors = dofile(os.getenv("HOME") .. "/.config/lua-module-color/theme.lua")
+  local colors = dofile(os.getenv("HOME") .. "/.config/lua-theme/theme.lua")
 
   local wezterm = require('wezterm')
 

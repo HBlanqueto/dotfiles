@@ -21,9 +21,7 @@
             CLUTTER_BACKEND = "wayland";
             NO_AT_BRIDGE = "1";
         };
-    }; # <--- Faltaba cerrar el bloque 'home'
-
-    fonts.fontconfig.enable = true;
+    };
 
     xdg = {
         enable = true;
@@ -39,7 +37,7 @@
         };
 
         configFile = {
-            "lua-module-color/theme.lua".text = ''
+            "lua-theme/theme.lua".text = ''
                 return {
                     dbg = "#${theme.colors.dbg}",
                     lbg = "#${theme.colors.lbg}",
@@ -65,6 +63,8 @@
             '';
         };
     };
+
+    fonts.fontconfig.enable = true;
 
     nixpkgs.config = {
         allowUnfree = true;

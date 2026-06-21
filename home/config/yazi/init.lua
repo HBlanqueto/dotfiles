@@ -1,6 +1,6 @@
 -- 1. LLAMAMOS AL TEMA
 -- Esto lee el archivo theme.lua que Nix genera dinámicamente
-local colors = dofile(os.getenv("HOME") .. "/.config/lua-module-color/theme.lua")
+local colors = dofile(os.getenv("HOME") .. "/.config/lua-theme/theme.lua")
 
 -- require("full-border"):setup {
 --   type = ui.Border.ROUNDED,

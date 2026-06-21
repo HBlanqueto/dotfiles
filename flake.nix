@@ -2,10 +2,12 @@
     description = "Welcome ~/*. Watch your step, it vanishes on boot.";
 
     inputs = {
+
         unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
         home.url = "github:nix-community/home-manager";
         parts.url = "github:hercules-ci/flake-parts";
+
         impermanence.url = "github:nix-community/impermanence";
 
         mac-style.url = "github:SergioRibera/s4rchiso-plymouth-theme";
@@ -15,46 +17,45 @@
 
     outputs = inputs: inputs.parts.lib.mkFlake { inherit inputs; } {
 
+
     systems = [ "aarch64-linux" "x86_64-linux" ];
 
     flake = {
-      nixosConfigurations = {
+        nixosConfigurations = {
+
         nixos = 
-          let
-            username = "humbe";
-
-            currentSystem = builtins.currentSystem; 
-
-            hostName = if currentSystem == "aarch64-linux" then "utm-aarch64" else "desktop-x86_64";
-          in
-          inputs.nixpkgs.lib.nixosSystem {
-            system = currentSystem;
+            let
+                settings = import ./settings.nix;
+            in
+            inputs.nixpkgs.lib.nixosSystem {
+            system = settings.system;
 
             specialArgs = {
-              inherit inputs username hostName;
+                inherit inputs;
+                username = settings.username;
+                hostName = settings.hostName;
             };
 
             modules = [
-              ./etc
-
-              inputs.impermanence.nixosModules.impermanence
-              inputs.home.nixosModules.home-manager
-
-              {
+                ./etc
+                    inputs.impermanence.nixosModules.impermanence
+                    inputs.home.nixosModules.home-manager
+                {
                 nixpkgs.config.allowUnfree = true;
-                networking.hostName = hostName;
+                
+                networking.hostName = settings.hostName;
+
 
                 nixpkgs.overlays = [
-                  (final: prev: {
-                    mac-style-plymouth = inputs.mac-style.packages.${currentSystem}.default;
-                  })
-                ];
-              }
+                    (final: prev: {
+                        mac-style-plymouth = inputs.mac-style.packages.${settings.system}.default;
+                        })
+                    ];
+                }
             ];
-          };
-      };
-
-      nixos = inputs.self.nixosConfigurations.nixos.config.system.build.toplevel;
+        };
     };
-  };
+    nixos = inputs.self.nixosConfigurations.nixos.config.system.build.toplevel;
+        };
+    };
 }

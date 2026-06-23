@@ -33,7 +33,7 @@ mount -o subvol=@log,noatime,compress=zstd,space_cache=v2 /dev/[your partition] 
 
 #+begin_src shell
 # Clone this dotfiles repository
-git clone https://github.com/MrHBlanqueto/dotfiles.git --depth 1
+git clone https://github.com/HBlanqueto/dotfiles.git --depth 1
 cd dotfiles
 
 # Generate the initial hardware layout configuration from the mounted target system

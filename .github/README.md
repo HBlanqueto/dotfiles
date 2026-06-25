@@ -25,7 +25,6 @@
 - [x] Migrate to Nix Flakes
 - [x] Integrate Home Manager
 - [x] Implement Impermanence file system setup
-- [ ] Master the basics of **Lua** 🌙
 - [ ] Develop and publish a small Lua project/script that interacts with NixOS
 - [ ] Set up Agenix for secrets management
 - [ ] Implement ZFS as the primary filesystem instead of Btrfs

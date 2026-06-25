@@ -7,6 +7,7 @@ in
 {
     imports = [
         ./systemd.nix
+        ./uutils.nix
         ./environment.nix
         ./fonts.nix
         ../hardware-configuration.nix

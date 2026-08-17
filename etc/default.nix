@@ -55,7 +55,7 @@ in
         mutableUsers = false;
         users.${username} = {
             isNormalUser = true;
-            description = "Humberto B.";
+            description = "H. Blanqueto";
             extraGroups = [ "networkmanager" "wheel" ];
             createHome = true;
             hashedPassword = "$6$rvI2ZNaKpc69XPeZ$R6iSUJ3l7iYlFc6eJz4pue1cl51d0H0dBNYkJcTm5BddRohQkdCC7sHmS50UczcPKESV//lw0CpO071roxsB21";

@@ -32,7 +32,7 @@ with theme.colors;
   
   theme = {
     mgr = {
-      #border_style = { fg = "black"; };
+      border_style = { fg = "black"; };
       border_symbol = " ";
     };
     indicator = {

@@ -11,6 +11,7 @@
         nautilus
         telegram-desktop
         morewaita-icon-theme
+        onlyoffice-desktopeditors
     ];
 
     home.stateVersion = "26.05";
@@ -37,7 +38,9 @@
                 inherit (pkgs.yaziPlugins) yatline;
             };
             initLua = builtins.readFile ../config/yazi/init.lua;
-            #settings = { };
+            
+            settings = (import ../config/yazi {}).settings;
+            theme = (import ../config/yazi {}).theme;
         };
 
         ncmpcpp = {

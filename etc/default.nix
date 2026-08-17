@@ -76,11 +76,24 @@ in
         ];
     };
 
-    nixpkgs.config.allowUnfree = true;
+    nixpkgs = {
+        config = {
+            allowUnfree = true;
+        };
+        overlays = [ inputs.nix-cachyos-kernel.overlays.pinned ];
+    };
 
-    nix.settings.experimental-features = [ "nix-command" "flakes" ];
+    nix = {
+        settings = {
+            experimental-features = [ "nix-command" "flakes" ];
+            substituters = [ "https://attic.xuyh0120.win/lantian" ];
+            trusted-public-keys = [ "lantian:EeAUQ+W+6r7EtwnmYjeVwx5kOGEBpjlBfPlzGlTNvHc="];
+        };
+    };
 
     documentation.nixos.enable = false;
+
+    hardware.enableRedistributableFirmware = true;
 
     system.stateVersion = "26.05";
 }

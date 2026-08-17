@@ -10,6 +10,7 @@
         vscode
         nautilus
         telegram-desktop
+        morewaita-icon-theme
     ];
 
     home.stateVersion = "26.05";
@@ -21,7 +22,7 @@
 
         git = {
             enable = true;
-            extraConfig = {
+            settings = {
                 user = {
                     email = "mc4w6wmkrv@privaterelay.appleid.com";
                     name = "H. Blanqueto";

@@ -1,22 +1,23 @@
-{ config, pkgs, ... }:
+{ config, pkgs, inputs, ... }:
 
 {
     boot = {
-        kernelPackages = pkgs.linuxPackages_latest;
+        #kernelPackages = pkgs.linuxPackages_latest;
+        kernelPackages = pkgs.cachyosKernels.linuxPackages-cachyos-latest-lto-x86_64-v3;
         tmp.cleanOnBoot = true;
 
-        loader = { 
+        loader = {
             systemd-boot.enable = true;
             efi.canTouchEfiVariables = true;
         };
 
-        plymouth = { 
-            enable = true; 
+        plymouth = {
+            enable = true;
             theme = "mac-style";
             themePackages = [ pkgs.mac-style-plymouth ];
         };
 
-        consoleLogLevel = 3; 
+        consoleLogLevel = 3;
 
         initrd = {
             verbose = false;
@@ -33,7 +34,7 @@
                 };
             };
         };
-        
+
         kernelParams = [ "quiet" "splash" "rd.udev.log_level=3" "rd.systemd.show_status=auto" ];
 
         kernel.sysctl = {

@@ -2,7 +2,7 @@
 
 ''
     mkdir -p /btrfs_tmp
-    mount /dev/vda2 /btrfs_tmp
+    mount /dev/nvme0n1p2 /btrfs_tmp
 
     if [ -e /btrfs_tmp/@rootfs ]; then
       mkdir -p /btrfs_tmp/old_roots

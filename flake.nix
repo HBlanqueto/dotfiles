@@ -9,6 +9,8 @@
         parts.url = "github:hercules-ci/flake-parts";
         impermanence.url = "github:nix-community/impermanence";
 
+        nix-cachyos-kernel.url = "github:xddxdd/nix-cachyos-kernel/release";
+
         mac-style.url = "github:SergioRibera/s4rchiso-plymouth-theme";
 
         nixpkgs.follows = "unstable";

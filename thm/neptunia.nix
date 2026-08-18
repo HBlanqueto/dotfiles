@@ -5,7 +5,7 @@ rec {
     lbg = "1f272e"; # Lighter BG
 
     fg = "adbac7";
-    bg = "050a13";
+    bg = "13171d";
 
     c0 = "142238";
     c1 = "d47d7a";

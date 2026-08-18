@@ -2,7 +2,6 @@
     description = "Welcome ~/*. Watch your step, it vanishes on boot.";
 
     inputs = {
-
         unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
         home.url = "github:nix-community/home-manager";
@@ -20,42 +19,44 @@
 
         systems = [ "aarch64-linux" "x86_64-linux" ];
 
-        flake = {
+        flake = let
+            settings = import ./settings.nix;
+        in {
             nixosConfigurations = {
+                
+                "${settings.hostName}" = inputs.nixpkgs.lib.nixosSystem {
+                    system = settings.system;
 
-                nixos = 
-                    let
-                        settings = import ./settings.nix;
-                        currentSystem = builtins.currentSystem; 
-                    in
-                    inputs.nixpkgs.lib.nixosSystem {
-                        system = currentSystem;
+                    specialArgs = {
+                        inherit inputs;
+                        username = settings.username;
+                        userdescription = settings.userdescription;
+                        hashedpassword = settings.hashedpassword;
 
-                        specialArgs = {
-                            inherit inputs;
-                            username = settings.username;
-                            hostName = settings.hostName;
-                        };
-
-                        modules = [
-                            ./etc
-                            inputs.impermanence.nixosModules.impermanence
-                            inputs.home.nixosModules.home-manager
-                            {
-                                nixpkgs.config.allowUnfree = true;
-                                
-                                networking.hostName = settings.hostName;
-
-                                nixpkgs.overlays = [
-                                    (final: prev: {
-                                        mac-style-plymouth = inputs.mac-style.packages.${currentSystem}.default;
-                                    })
-                                ];
-                            }
-                        ];
+                        hostName = settings.hostName;
+                        system = settings.system;
                     };
+
+                    modules = [
+                        ./etc
+                        inputs.impermanence.nixosModules.impermanence
+                        inputs.home.nixosModules.home-manager
+                        {
+                            nixpkgs.config.allowUnfree = true;
+                            
+                            networking.hostName = settings.hostName;
+
+                            nixpkgs.overlays = [
+                                (final: prev: {
+                                    mac-style-plymouth = inputs.mac-style.packages.${prev.stdenv.hostPlatform.system}.default;
+                                })
+                            ];
+                        }
+                    ];
                 };
-            nixos = inputs.self.nixosConfigurations.nixos.config.system.build.toplevel;
+            };
+            
+            "${settings.hostName}" = inputs.self.nixosConfigurations."${settings.hostName}".config.system.build.toplevel;
         };
     };
 }

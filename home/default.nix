@@ -28,6 +28,9 @@
 
         userDirs = {
             enable = true;
+            createDirectories = true;
+
+            projects = "${config.home.homeDirectory}/Proyectos";
             desktop = "${config.home.homeDirectory}/Escritorio";
             documents = "${config.home.homeDirectory}/Documentos";
             music = "${config.home.homeDirectory}/Música";

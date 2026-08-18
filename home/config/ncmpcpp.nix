@@ -13,6 +13,12 @@
   visualizer_look = "󱓻󱓻";
   visualizer_color = "8,4,12,6,14,13,7,15";
 
+  colors_enabled = "yes";
+  state_line_color = "default";
+  alternative_ui_separator_color = "default";
+  window_border_color = "default";
+  active_window_border = "default";
+
   playlist_display_mode = "columns";
   browser_display_mode = "columns";
   user_interface = "classic";
@@ -20,12 +26,10 @@
   startup_screen = "playlist";
   startup_slave_screen = "visualizer"; 
   locked_screen_width_part = "50";
-  state_line_color = "red";
 
   startup_slave_screen_focus = "no";
   header_window_color = "red";
-  alternative_ui_separator_color = "red";
-  titles_visibility = "yes";
+  titles_visibility = "no";
 
   ask_before_clearing_playlists = "no";
   ask_for_locked_screen_width_part = "yes";

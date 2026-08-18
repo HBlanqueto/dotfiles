@@ -30,6 +30,8 @@
         spice-vdagentd.enable = true;
         upower.enable = true;
 
+        trezord.enable = true;
+
         pipewire = {
             enable = true;
             alsa = {

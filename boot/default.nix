@@ -1,9 +1,15 @@
-{ config, pkgs, inputs, ... }:
+{ config, pkgs, inputs, system, ... }:
+
+let
+    isAarch64 = system == "aarch64-linux";
+in
 
 {
     boot = {
-        #kernelPackages = pkgs.linuxPackages_latest;
-        kernelPackages = pkgs.cachyosKernels.linuxPackages-cachyos-latest-lto-x86_64-v3;
+        kernelPackages = if isAarch64 
+                            then pkgs.linuxPackages_latest     
+                        else pkgs.cachyosKernels.linuxPackages-cachyos-latest-lto-x86_64-v3;
+
         tmp.cleanOnBoot = true;
 
         loader = {

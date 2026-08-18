@@ -7,10 +7,15 @@
         mpc
         ffmpeg
         python3
+        trezor-suite
         vscode
         nautilus
+
+        karere
         telegram-desktop
+        
         morewaita-icon-theme
+
         onlyoffice-desktopeditors
     ];
 

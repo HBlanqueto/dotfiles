@@ -1,4 +1,4 @@
-{ config, pkgs, lib, inputs, hostName, username, ... }:
+{ config, pkgs, lib, inputs, hostName, username, description, userdescription, hashedpassword, system, ... }:
 
 let
     theme = import ../thm { };
@@ -10,6 +10,9 @@ in
         ./uutils.nix
         ./environment.nix
         ./fonts.nix
+        
+        ./desktop/gnome.nix
+
         ../hardware-configuration.nix
         ../boot
     ];
@@ -55,10 +58,10 @@ in
         mutableUsers = false;
         users.${username} = {
             isNormalUser = true;
-            description = "H. Blanqueto";
+            description = userdescription;
             extraGroups = [ "networkmanager" "wheel" ];
             createHome = true;
-            hashedPassword = "$6$rvI2ZNaKpc69XPeZ$R6iSUJ3l7iYlFc6eJz4pue1cl51d0H0dBNYkJcTm5BddRohQkdCC7sHmS50UczcPKESV//lw0CpO071roxsB21";
+            hashedPassword = hashedpassword;
         };
     };
 
@@ -68,9 +71,11 @@ in
             git 
             wget 
             curl 
+
             polkit_gnome 
             gsettings-desktop-schemas 
-            libnotify 
+            libnotify
+
             firefox
             wezterm
         ];

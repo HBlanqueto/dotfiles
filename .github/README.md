@@ -1,5 +1,5 @@
 > **NOTE!**  
-> I am not an expert, so don't trust my decisions 100%.
+> I am not an expert...
 
 ---
 
@@ -7,8 +7,8 @@
 
 <img align="right" width="300" src="https://raw.githubusercontent.com/HBlanqueto/dotfiles/refs/heads/main/.github/assets/mac-mini.png">
 
-* **Host:** Mac Mini M4
-* **Architecture:** `aarch64`
+* **Host 1:** Mac Mini M4
+* **Host 2:** ThinkPad L14 Gen2
 * **Branch:** Unstable
 * **Virtual Machine:** [UTM](https://mac.getutm.app/)
 * **Desktop Environment:** [GNOME](https://www.gnome.org/)

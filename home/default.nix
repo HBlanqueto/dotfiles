@@ -10,7 +10,7 @@
         homeDirectory = "/home/${username}";
 
         sessionVariables = {
-            BROWSER = "${pkgs.firefox}/bin/firefox";
+            BROWSER = "${pkgs.firefox}/bin/brave-origin-beta";
             TERMINAL = "wezterm";
             EDITOR = "nvim";
 

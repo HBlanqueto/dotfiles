@@ -23,11 +23,11 @@
 
     home.stateVersion = "26.05";
 
-    programs = {
+programs = {
         brave = {
             enable = true;
 
-            package = inputs.brave-previews.packages.${pkgs.system}.brave-origin-beta;
+            package = inputs.brave-previews.packages.${pkgs.stdenv.hostPlatform.system}.brave-origin-beta;
         };
 
         git = {

@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, inputs, ... }:
 
 {
     home.packages = with pkgs; [
@@ -6,6 +6,7 @@
         eza
         mpc
         ffmpeg
+        efibootmgr
         python3
         trezor-suite
         vscode
@@ -13,6 +14,7 @@
 
         karere
         telegram-desktop
+        bitwarden-desktop
         
         morewaita-icon-theme
 
@@ -24,6 +26,8 @@
     programs = {
         brave = {
             enable = true;
+
+            package = inputs.brave-previews.packages.${pkgs.system}.brave-origin-beta;
         };
 
         git = {
@@ -95,7 +99,9 @@
             settings = import ../config/starship.nix;
         };
 
-        home-manager.enable = true;
+        home-manager = {
+            enable = true;
+        };
     };
 
     services = {

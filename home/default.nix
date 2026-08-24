@@ -31,6 +31,8 @@
             createDirectories = true;
 
             projects = "${config.home.homeDirectory}/Proyectos";
+            publicShare = "${config.home.homeDirectory}/Público";
+            templates = "${config.home.homeDirectory}/Plantillas";
             desktop = "${config.home.homeDirectory}/Escritorio";
             documents = "${config.home.homeDirectory}/Documentos";
             music = "${config.home.homeDirectory}/Música";
@@ -69,7 +71,13 @@
 
     fonts.fontconfig.enable = true;
 
-    nixpkgs.config = {
-        allowUnfree = true;
+    nixpkgs = {
+        config = {
+            allowUnfree = true;
+
+            permittedInsecurePackages = [
+                "electron-39.8.10"
+            ];
+        };
     };
 }

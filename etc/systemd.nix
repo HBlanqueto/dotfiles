@@ -1,17 +1,34 @@
-{ config, pkgs, ... }:
+{ config, pkgs, system, ... }:
+
+let
+    isAarch64 = system == "aarch64-linux";
+in
 
 {
     networking = {
         networkmanager.enable = true;
     };
 
-    security = { 
+    security = {
+
         sudo-rs = { 
+            enable = true;
+        };
+
+        polkit = {
             enable = true;
         };
 
         rtkit = {
             enable = true;
+        };
+
+        pam = {
+            services = {
+                login = { 
+                    enableGnomeKeyring = true;
+                };
+            };
         };
     };
 
@@ -26,11 +43,12 @@
         libinput.enable = true;
         openssh.enable = true;
         printing.enable = true;
-        qemuGuest.enable = true;
-        spice-vdagentd.enable = true;
         upower.enable = true;
-
         trezord.enable = true;
+
+        # UTM
+        # qemuGuest.enable = false;
+        # spice-vdagentd.enable = false;
 
         pipewire = {
             enable = true;

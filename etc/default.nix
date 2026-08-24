@@ -38,33 +38,6 @@ in
 
     programs.fish.enable = true;
 
-    environment.persistence."/persist" = {
-        hideMounts = true;
-        directories = [
-            "/var/log"
-            "/var/lib/bluetooth"
-            "/var/lib/nixos"
-            "/etc/NetworkManager/system-connections"
-            "/var/lib/AccountsService"
-            "/etc/nixos"
-        ];
-        files = [
-            "/etc/machine-id"
-        ];
-    };
-
-    users = { 
-        defaultUserShell = pkgs.fish;
-        mutableUsers = false;
-        users.${username} = {
-            isNormalUser = true;
-            description = userdescription;
-            extraGroups = [ "networkmanager" "wheel" ];
-            createHome = true;
-            hashedPassword = hashedpassword;
-        };
-    };
-
     environment = {
         binsh = "${pkgs.dash}/bin/dash";
         systemPackages = with pkgs; [
@@ -79,6 +52,33 @@ in
             firefox
             wezterm
         ];
+
+        persistence."/persist" = {
+            hideMounts = true;
+            directories = [
+                "/var/log"
+                "/var/lib/bluetooth"
+                "/var/lib/nixos"
+                "/etc/NetworkManager/system-connections"
+                "/var/lib/AccountsService"
+                "/etc/nixos"
+            ];
+            files = [
+                "/etc/machine-id"
+            ];
+        };
+    };
+
+    users = { 
+        defaultUserShell = pkgs.fish;
+        mutableUsers = false;
+        users.${username} = {
+            isNormalUser = true;
+            description = userdescription;
+            extraGroups = [ "networkmanager" "wheel" ];
+            createHome = true;
+            hashedPassword = hashedpassword;
+        };
     };
 
     nixpkgs = {
@@ -98,7 +98,14 @@ in
 
     documentation.nixos.enable = false;
 
-    hardware.enableRedistributableFirmware = true;
+    hardware = {
+        enableRedistributableFirmware = true;
 
+        bluetooth = {
+            enable = true;
+            powerOnBoot = true;
+        };
+    };
+    
     system.stateVersion = "26.05";
 }

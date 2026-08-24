@@ -10,6 +10,8 @@
 
         nix-cachyos-kernel.url = "github:xddxdd/nix-cachyos-kernel/release";
 
+        brave-previews.url = "github:drishal/brave-browser-flake";
+
         mac-style.url = "github:SergioRibera/s4rchiso-plymouth-theme";
 
         nixpkgs.follows = "unstable";
@@ -41,6 +43,7 @@
                         ./etc
                         inputs.impermanence.nixosModules.impermanence
                         inputs.home.nixosModules.home-manager
+                        inputs.brave-previews.nixosModules.default
                         {
                             nixpkgs.config.allowUnfree = true;
                             

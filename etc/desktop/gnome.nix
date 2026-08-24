@@ -3,7 +3,9 @@
 {
     services = {
         desktopManager = {
-            gnome.enable = true;
+            gnome = {
+                enable = true;
+            };
         };
 
         gnome = {

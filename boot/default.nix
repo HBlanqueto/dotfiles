@@ -28,7 +28,7 @@ in
         initrd = {
             verbose = false;
             systemd = {
-            initrdBin = with pkgs; [ coreutils btrfs-progs findutils ];
+            initrdBin = with pkgs; [ uutils-coreutils-noprefix btrfs-progs findutils util-linux ];
 
             # The BTRFS snapshot
             services.rollback = {

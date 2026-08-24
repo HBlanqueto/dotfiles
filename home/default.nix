@@ -21,6 +21,10 @@
             CLUTTER_BACKEND = "wayland";
             NO_AT_BRIDGE = "1";
         };
+
+        file = {
+            "chime/chime.wav".source = ../thm/chime.wav;
+        };
     };
 
     xdg = {

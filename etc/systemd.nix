@@ -1,9 +1,4 @@
-{ config, pkgs, system, ... }:
-
-let
-    isAarch64 = system == "aarch64-linux";
-in
-
+{ config, pkgs, username, ... }:
 {
     networking = {
         networkmanager.enable = true;
@@ -67,13 +62,37 @@ in
         memoryPercent = 50;
     };
 
-    systemd.oomd = {
-        enable = true;
-        enableRootSlice = true;
-        enableUserSlices = true;
-        enableSystemSlice = true;
-        settings.OOM = {
-        "DefaultMemoryPressureDurationSec" = "20s";
+    systemd = {
+        services = {
+            boot-sound = {
+                enable = true;
+                description = "chime";
+                wants = ["sound.target"];
+                after = [ "sound.target" "home-manager-${username}.service" ];
+                wantedBy = ["multi-user.target"];
+
+                serviceConfig = {
+                    Type = "oneshot";
+                    ExecStartPre = [
+                    "-${pkgs.alsa-utils}/bin/amixer -c 1 sset Master 100% unmute"
+                    "-${pkgs.alsa-utils}/bin/amixer -c 1 sset Speaker 100% unmute"
+                ];
+
+                    ExecStart = "${pkgs.alsa-utils}/bin/aplay -c 2 -D plughw:1,0 /home/${username}/chime/chime.wav";
+                    RemainAfterExit = false;
+                    SupplementaryGroups = "audio";
+                };
+            };
+        };
+
+        oomd = {
+            enable = true;
+            enableRootSlice = true;
+            enableUserSlices = true;
+            enableSystemSlice = true;
+            settings.OOM = {
+            "DefaultMemoryPressureDurationSec" = "20s";
+            };
         };
     };
 

@@ -43,7 +43,8 @@ in
         systemPackages = with pkgs; [
             git 
             wget 
-            curl 
+            curl
+            btrfs-progs
 
             polkit_gnome 
             gsettings-desktop-schemas 

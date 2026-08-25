@@ -8,7 +8,6 @@ in
     imports = [
         ./systemd.nix
         ./uutils.nix
-        ./environment.nix
         ./fonts.nix
         
         ./desktop/gnome.nix
@@ -30,13 +29,23 @@ in
         keyMap = "es";
     };
 
-    time.timeZone = "America/Merida";
+    time = {
+        timeZone = "America/Merida";
+    };
 
-    i18n.defaultLocale = "es_MX.UTF-8";
+    i18n = {
+        defaultLocale = "es_MX.UTF-8";
+    };
 
-    networking.hostName = hostName;
+    networking = {
+        hostName = hostName;
+    };
 
-    programs.fish.enable = true;
+    programs = {
+        fish = {
+            enable = true;
+        };
+    };
 
     environment = {
         binsh = "${pkgs.dash}/bin/dash";
@@ -44,13 +53,11 @@ in
             git 
             wget 
             curl
-            btrfs-progs
 
             polkit_gnome 
             gsettings-desktop-schemas 
             libnotify
 
-            firefox
             wezterm
         ];
 
@@ -97,7 +104,19 @@ in
         };
     };
 
-    documentation.nixos.enable = false;
+    documentation = {
+        nixos = {
+            enable = false;
+        };
+
+        man = {
+            enable = false; 
+            
+            cache = {
+                enable = false;
+            };
+        };
+    };
 
     hardware = {
         enableRedistributableFirmware = true;

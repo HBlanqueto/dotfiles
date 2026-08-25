@@ -10,7 +10,9 @@ in
                             then pkgs.linuxPackages_latest     
                         else pkgs.cachyosKernels.linuxPackages-cachyos-latest-lto-x86_64-v3;
 
-        tmp.cleanOnBoot = true;
+        tmp = {
+            cleanOnBoot = true;
+        };
 
         loader = {
             systemd-boot.enable = true;
@@ -31,17 +33,19 @@ in
             initrdBin = with pkgs; [ uutils-coreutils-noprefix btrfs-progs findutils util-linux ];
 
             # The BTRFS snapshot
-            services.rollback = {
-                wantedBy = [ "initrd.target" ];
-                before = [ "sysroot.mount" ];
-                unitConfig.DefaultDependencies = "no";
-                serviceConfig.Type = "oneshot";
-                script = import ./snapshot.nix { inherit pkgs; };
+            services = {
+                rollback = {
+                    wantedBy = [ "initrd.target" ];
+                    before = [ "sysroot.mount" ];
+                    unitConfig.DefaultDependencies = "no";
+                    serviceConfig.Type = "oneshot";
+                    script = builtins.readFile ./snapshot.sh;
+                    };
                 };
             };
         };
 
-        kernelParams = [ "quiet" "splash" "rd.udev.log_level=3" "rd.systemd.show_status=auto" ];
+        kernelParams = [ "quiet" "splash" "rd.udev.log_level=3" "rd.systemd.show_status=auto" "microcode.amd_sha_check=off" ];
 
         kernel.sysctl = {
             "kernel.nmi_watchdog" = 0;

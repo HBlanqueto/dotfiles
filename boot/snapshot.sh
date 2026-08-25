@@ -1,8 +1,7 @@
-{ pkgs, ... }:
+#!/bin/sh
 
-''
     sleep 2
-
+    
     mkdir -p /btrfs_tmp
 
     mount /dev/disk/by-uuid/9ddcd09a-903e-4863-94db-bb1ccb5d3236 /btrfs_tmp
@@ -10,7 +9,8 @@
     if [ -e /btrfs_tmp/@rootfs ]; then
       mkdir -p /btrfs_tmp/old_roots
       timestamp=$(date "+%Y-%m-%d_%H:%M:%S")
-      mv /btrfs_tmp/@rootfs /btrfs_tmp/old_roots/''${timestamp}
+      
+      mv -f /btrfs_tmp/@rootfs /btrfs_tmp/old_roots/${timestamp}
     fi
 
     if [ -d /btrfs_tmp/old_roots ]; then
@@ -20,4 +20,3 @@
     btrfs subvolume snapshot /btrfs_tmp/@rootfs-blank /btrfs_tmp/@rootfs
 
     umount /btrfs_tmp
-''

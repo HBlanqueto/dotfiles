@@ -41,9 +41,21 @@
         upower.enable = true;
         trezord.enable = true;
 
-        # UTM
-        # qemuGuest.enable = false;
-        # spice-vdagentd.enable = false;
+        xserver = {
+            enable = true;
+            wacom.enable = false;
+            excludePackages = [ pkgs.xterm ];
+            
+            xkb = {
+                layout = "es";
+                variant = "";
+            };
+        };
+
+        displayManager = {
+            gdm.enable = true;
+        };
+    
 
         pipewire = {
             enable = true;
@@ -56,17 +68,12 @@
         };
     };
 
-    zramSwap = {
-        enable = true;
-        algorithm = "zstd";
-        memoryPercent = 50;
-    };
-
     systemd = {
         services = {
-            boot-sound = {
+
+            chime = {
                 enable = true;
-                description = "chime";
+                description = "Boot up";
                 wants = ["sound.target"];
                 after = [ "sound.target" "home-manager-${username}.service" ];
                 wantedBy = ["multi-user.target"];
@@ -94,6 +101,12 @@
             "DefaultMemoryPressureDurationSec" = "20s";
             };
         };
+    };
+
+    zramSwap = {
+        enable = true;
+        algorithm = "zstd";
+        memoryPercent = 50;
     };
 
     nix = {

@@ -37,9 +37,13 @@
         gvfs.enable = true;
         libinput.enable = true;
         openssh.enable = true;
-        printing.enable = true;
         upower.enable = true;
         trezord.enable = true;
+
+        printing = {
+            enable = true;
+            drivers = [ pkgs.epson-escpr2 ];
+        };
 
         xserver = {
             enable = true;
@@ -85,7 +89,7 @@
                     "-${pkgs.alsa-utils}/bin/amixer -c 1 sset Speaker 100% unmute"
                 ];
 
-                    ExecStart = "${pkgs.alsa-utils}/bin/aplay -c 2 -D plughw:1,0 /home/${username}/chime/chime.wav";
+                    ExecStart = "${pkgs.alsa-utils}/bin/aplay -c 2 -D plughw:1,0 /home/${username}/.config/chime/chime.wav";
                     RemainAfterExit = false;
                     SupplementaryGroups = "audio";
                 };

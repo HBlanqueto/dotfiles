@@ -24,7 +24,7 @@
         };
 
         file = {
-            "chime/chime.wav".source = ../thm/chime.wav;
+            ".config/chime/chime.wav".source = ../thm/chime.wav;
         };
     };
 

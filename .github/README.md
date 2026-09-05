@@ -59,6 +59,20 @@ An overview of the core configuration files and directories that make up this Ni
 > [!WARNING]
 > This system may be considered unstable due to replacing `coreutils` with `uutils`. Disable this feature if necessary.
 
+### Secure Boot (Lanzaboote)
+
+> [!IMPORTANT]
+> This configuration features a Zero-Touch Secure Boot setup.
+
+Before booting the NixOS live USB, prepare your motherboard.
+
+1. Enter your BIOS/UEFI settings.
+2. Navigate to **Secure Boot**.
+3. Select **Reset to Setup Mode** (or *Clear All Secure Boot Keys*).
+4. Save and exit.
+
+On the first boot after installation, Lanzaboote automatically generates the keys, bypasses `efivarfs` immutability to enroll them, and reboots the system. Because `/var/lib/auto-cryptenroll` and `/var/lib/sbctl` are persisted, no manual `sbctl` or `chattr` commands are ever required.
+
 ### Partitions
 
 ```shell

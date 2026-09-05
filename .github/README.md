@@ -135,11 +135,11 @@ mount /dev/disk/by-uuid/YOUR-UUID-HERE /btrfs_tmp
 ### Installation
 
 > [!NOTE]
-> If you changed the hostname in `settings.nix`, make sure to replace `#nixos` with your new hostname in the command above.
+> If you changed the hostname in `settings.nix`, make sure to replace `#nixos` with your new hostname in the command below.
 
-  ```shell
+```shell
 nixos-install --root /mnt --flake '#nixos' --impure --show-trace
-  ```
+```
 
 ## Credits
 

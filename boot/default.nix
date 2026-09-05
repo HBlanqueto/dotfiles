@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 
 {
     boot = {
@@ -10,11 +10,25 @@
 
         loader = {
             systemd-boot = {
-                enable = true;
+                enable = lib.mkForce false;
             };
 
             efi = {
                 canTouchEfiVariables = true;
+            };
+        };
+
+        lanzaboote = {
+            enable = true;
+            pkiBundle = "/var/lib/sbctl";
+            
+            autoGenerateKeys = { 
+                enable = true;
+            };
+
+            autoEnrollKeys = {
+                enable = true;
+                autoReboot = true;
             };
         };
 

@@ -51,6 +51,7 @@ in
     environment = {
         binsh = "${pkgs.dash}/bin/dash";
         systemPackages = with pkgs; [
+            sbctl
             git 
             wget 
             curl

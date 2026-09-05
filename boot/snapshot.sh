@@ -8,7 +8,7 @@
 
     if [ -e /btrfs_tmp/@rootfs ]; then
       mkdir -p /btrfs_tmp/old_roots
-      timestamp=$(date "+%Y-%m-%d_%H:%M:%S")
+      timestamp=$(date "+%Y-%m-%d_%H-%M-%S")
       
       mv -f /btrfs_tmp/@rootfs /btrfs_tmp/old_roots/${timestamp}
     fi

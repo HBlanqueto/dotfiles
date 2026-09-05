@@ -19,18 +19,23 @@
         nix-cachyos-kernel.url = "github:xddxdd/nix-cachyos-kernel/release";
         impermanence.url = "github:nix-community/impermanence";
         ucodenix.url = "github:e-tho/ucodenix";
+        
+        lanzaboote = {
+            url = "github:nix-community/lanzaboote";
+            inputs.nixpkgs.follows = "unstable";
+        };
 
         brave-previews.url = "github:drishal/brave-browser-flake";
         mac-style.url = "github:SergioRibera/s4rchiso-plymouth-theme";
     };
 
-    outputs = inputs: 
+    outputs = { self, nixpkgs, home, impermanence, ucodenix, lanzaboote, mac-style, ... }@inputs: 
         let
             settings = import ./settings.nix;
         in 
         {
             nixosConfigurations = {
-                "${settings.hostName}" = inputs.nixpkgs.lib.nixosSystem {
+                "${settings.hostName}" = nixpkgs.lib.nixosSystem {
                     system = settings.system;
 
                     specialArgs = {
@@ -40,15 +45,16 @@
 
                     modules = [
                         ./etc
-                        inputs.impermanence.nixosModules.impermanence
-                        inputs.home.nixosModules.home-manager
-                        inputs.ucodenix.nixosModules.default
+                        impermanence.nixosModules.impermanence
+                        home.nixosModules.home-manager
+                        ucodenix.nixosModules.default
+                        lanzaboote.nixosModules.lanzaboote
                         {
                             nixpkgs.config.allowUnfree = true;
                             
                             nixpkgs.overlays = [
                                 (final: prev: {
-                                    mac-style-plymouth = inputs.mac-style.packages.${prev.stdenv.hostPlatform.system}.default;
+                                    mac-style-plymouth = mac-style.packages.${prev.stdenv.hostPlatform.system}.default;
                                 })
                             ];
                         }

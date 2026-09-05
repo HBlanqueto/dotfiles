@@ -1,27 +1,32 @@
-{ config, pkgs, lib, inputs, ... }:
+{ pkgs, inputs, gitName, gitEmail, ... }:
+
+let
+    yaziConfig = import ../config/yazi;
+in
 
 {
-    home.packages = with pkgs; [
-        fastfetch
-        eza
-        mpc
-        ffmpeg
-        efibootmgr
-        python3
-        trezor-suite
-        vscode
-        nautilus
+    home = {
+        stateVersion = "26.05";
 
-        karere
-        telegram-desktop
-        bitwarden-desktop
+        packages = with pkgs; [
+            fastfetch
+            eza
+            mpc
+            ffmpeg
+            efibootmgr
+            python3
         
-        morewaita-icon-theme
+            trezor-suite
+            vscode
+            nautilus
 
-        onlyoffice-desktopeditors
-    ];
+            karere
+            telegram-desktop
+            bitwarden-desktop
 
-    home.stateVersion = "26.05";
+            onlyoffice-desktopeditors
+        ];
+    };
 
     programs = {
         brave = {
@@ -33,8 +38,8 @@
             enable = true;
             settings = {
                 user = {
-                    email = "mc4w6wmkrv@privaterelay.appleid.com";
-                    name = "H. Blanqueto";
+                    name = gitName;
+                    email = gitEmail;
                 };
             };
         };
@@ -47,13 +52,16 @@
             };
             initLua = builtins.readFile ../config/yazi/init.lua;
             
-            settings = (import ../config/yazi {}).settings;
-            theme = (import ../config/yazi {}).theme;
+            settings = yaziConfig.settings;
+            theme = yaziConfig.theme;
         };
 
         ncmpcpp = {
             enable = true;
-            package = pkgs.ncmpcpp.override { visualizerSupport = true; };
+            package = pkgs.ncmpcpp.override { 
+                visualizerSupport = true; 
+            };
+            
             settings = import ../config/ncmpcpp.nix;
         };
 
@@ -110,7 +118,7 @@
                 mopidy-local
                 mopidy-mpd
             ];
-            settings = import ../config/mopidy.nix {};
+            settings = import ../config/mopidy.nix { };
         };
     };
 }

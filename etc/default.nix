@@ -1,91 +1,51 @@
-{ config, pkgs, lib, inputs, hostName, username, description, userdescription, hashedpassword, system, ... }:
-
-let
-    theme = import ../thm { };
-in
+{ inputs, ... }:
 
 {
     imports = [
+        ./global.nix
         ./systemd.nix
         ./uutils.nix
         ./fonts.nix
         
         ./desktop/gnome.nix
+        ./desktop/hyprland.nix
 
         ../hardware-configuration.nix
         ../boot
     ];
 
-    home-manager = {
-        backupFileExtension = "backup";
-        sharedModules = [ ];
-        extraSpecialArgs = { inherit inputs theme hostName username; };
-        users.${username} = import ../home;
-    };
-
-    console = {
-        colors = with theme.colors; [ bg c1 c2 c3 c4 c5 c6 c7 ] ++ [ lbg c9 c10 c11 c12 c13 c14 c15 ];
-        font = "Lat2-Terminus16";
-        keyMap = "es";
-    };
-
-    time = {
-        timeZone = "America/Merida";
-    };
-
-    i18n = {
-        defaultLocale = "es_MX.UTF-8";
-    };
-
-    networking = {
-        hostName = hostName;
-    };
-
-    programs = {
-        fish = {
-            enable = true;
-        };
-    };
-
     environment = {
-        binsh = "${pkgs.dash}/bin/dash";
-        systemPackages = with pkgs; [
-            git 
-            wget 
-            curl
-
-            polkit_gnome 
-            gsettings-desktop-schemas 
-            libnotify
-
-            wezterm
-        ];
-
         persistence."/persist" = {
             hideMounts = true;
-            directories = [
-                "/var/log"
-                "/var/lib/bluetooth"
-                "/var/lib/nixos"
-                "/etc/NetworkManager/system-connections"
-                "/var/lib/AccountsService"
-                "/etc/nixos"
-            ];
-            files = [
-                "/etc/machine-id"
+                directories = [
+                    "/var/log"
+                    "/var/lib/bluetooth"
+                    "/var/lib/nixos"
+                    "/etc/NetworkManager/system-connections"
+                    "/var/lib/AccountsService"
+                    "/etc/nixos"
+                ];
+            
+                files = [
+                    "/etc/machine-id"
             ];
         };
     };
 
-    users = { 
-        defaultUserShell = pkgs.fish;
-        mutableUsers = false;
-        users.${username} = {
-            isNormalUser = true;
-            description = userdescription;
-            extraGroups = [ "networkmanager" "wheel" ];
-            createHome = true;
-            hashedPassword = hashedpassword;
+    nix = {
+        settings = {
+            cores = 0;
+            max-jobs = "auto";
+
+            experimental-features = [ "nix-command" "flakes" ];
+            substituters = [ 
+                "https://attic.xuyh0120.win/lantian" # CachyOS Kernel
+                "https://hyprland.cachix.org" # Hyprland
+            ];
+            trusted-public-keys = [ 
+                "lantian:EeAUQ+W+6r7EtwnmYjeVwx5kOGEBpjlBfPlzGlTNvHc="
+                "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc="
+            ];
         };
     };
 
@@ -94,14 +54,6 @@ in
             allowUnfree = true;
         };
         overlays = [ inputs.nix-cachyos-kernel.overlays.pinned ];
-    };
-
-    nix = {
-        settings = {
-            experimental-features = [ "nix-command" "flakes" ];
-            substituters = [ "https://attic.xuyh0120.win/lantian" ];
-            trusted-public-keys = [ "lantian:EeAUQ+W+6r7EtwnmYjeVwx5kOGEBpjlBfPlzGlTNvHc="];
-        };
     };
 
     documentation = {
@@ -127,5 +79,7 @@ in
         };
     };
     
-    system.stateVersion = "26.05";
+    system = {
+        stateVersion = "26.05";
+    };
 }

@@ -1,22 +1,21 @@
-{ config, pkgs, inputs, system, ... }:
-
-let
-    isAarch64 = system == "aarch64-linux";
-in
+{ pkgs, ... }:
 
 {
     boot = {
-        kernelPackages = if isAarch64 
-                            then pkgs.linuxPackages_latest     
-                        else pkgs.cachyosKernels.linuxPackages-cachyos-latest-lto-x86_64-v3;
+        kernelPackages = pkgs.cachyosKernels.linuxPackages-cachyos-latest-lto-x86_64-v3;
 
         tmp = {
             cleanOnBoot = true;
         };
 
         loader = {
-            systemd-boot.enable = true;
-            efi.canTouchEfiVariables = true;
+            systemd-boot = {
+                enable = true;
+            };
+
+            efi = {
+                canTouchEfiVariables = true;
+            };
         };
 
         plymouth = {
@@ -30,16 +29,15 @@ in
         initrd = {
             verbose = false;
             systemd = {
-            initrdBin = with pkgs; [ uutils-coreutils-noprefix btrfs-progs findutils util-linux ];
+                initrdBin = with pkgs; [ uutils-coreutils-noprefix btrfs-progs findutils util-linux ];
 
-            # The BTRFS snapshot
-            services = {
-                rollback = {
-                    wantedBy = [ "initrd.target" ];
-                    before = [ "sysroot.mount" ];
-                    unitConfig.DefaultDependencies = "no";
-                    serviceConfig.Type = "oneshot";
-                    script = builtins.readFile ./snapshot.sh;
+                services = {
+                    rollback = {
+                        wantedBy = [ "initrd.target" ];
+                        before = [ "sysroot.mount" ];
+                        unitConfig.DefaultDependencies = "no";
+                        serviceConfig.Type = "oneshot";
+                        script = builtins.readFile ./snapshot.sh;
                     };
                 };
             };

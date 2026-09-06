@@ -62,6 +62,7 @@ in
             libnotify
 
             wezterm
+            firefox
         ];
     };
 }

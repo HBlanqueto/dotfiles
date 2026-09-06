@@ -75,6 +75,16 @@
     hardware = {
         enableRedistributableFirmware = true;
 
+        graphics = {
+            enable = true;
+        };
+
+        amdgpu = {
+            initrd = {
+                enable = true;
+            };
+        };
+
         bluetooth = {
             enable = true;
             powerOnBoot = true;

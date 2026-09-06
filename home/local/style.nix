@@ -5,29 +5,19 @@
         pointerCursor = {
             name = "Adwaita";
             package = pkgs.adwaita-icon-theme;
-            size = 24;
-            gtk.enable = true;
+            gtk.enable = false;
             x11.enable = true;
         };
 
         sessionVariables = {
             QT_WAYLAND_DISABLE_WINDOWDECORATION = "1";
-            QT_QPA_PLATFORMTHEME = "gnome";
+            QT_QPA_PLATFORMTHEME = "xdgdesktopportal";
         };
     };
 
+    # Keep GTK mutable so dark mode can toggle dynamically via D-Bus/gsettings.
     gtk = {
-        enable = true;
-        
-        theme = {
-            name = "Adwaita";
-            package = pkgs.gnome-themes-extra;
-        };
-
-        iconTheme = {
-            name = "Adwaita";
-            package = pkgs.adwaita-icon-theme;
-        };
+        enable = false;
     };
 
     xdg = {

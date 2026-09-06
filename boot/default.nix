@@ -28,7 +28,7 @@
 
             autoEnrollKeys = {
                 enable = true;
-                autoReboot = true;
+                autoReboot = false;
             };
         };
 

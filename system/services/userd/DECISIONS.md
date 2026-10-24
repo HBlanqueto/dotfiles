@@ -1,7 +1,7 @@
 # Decisiones de keel-userd
 
 Registro de las decisiones que no se explican solas en el código: lo que se
-cerró al implementar F0 y lo que queda pendiente para fases futuras.
+cerró al implementar F0, F1a y lo que queda pendiente para fases futuras.
 
 ## F0 (fundaciones)
 
@@ -77,6 +77,48 @@ cerró al implementar F0 y lo que queda pendiente para fases futuras.
   `system/users/default.nix` y `system/lib/data.nix` siguen siendo la fuente de
   verdad hasta F1.
 
+## F1a (identidad)
+
+- **Backends.** `userdb`, `homed` y `declared` coexisten; `declared` es de solo
+  lectura. El orden por defecto es `userdb`, `homed`, `declared`; si `userdb`
+  no está disponible, un usuario sin backend explícito cae en `homed`.
+- **userdb.** Escribe registros JSON en `/etc/userdb` siguiendo la especificación
+  de systemd-userdb: `<name>.user`, `<uid>.user`, `<name>.user-privileged`,
+  `<name>.group` y `<name>:<group>.membership`. La contraseña se hashea con
+  `mkpasswd -m yescrypt` y se guarda en `.user-privileged` (`/privileged/hashedPassword`).
+- **homed.** Usa `org.freedesktop.home1.Manager.CreateHome` con
+  `storage = "directory"`. El registro incluye `privileged.hashedPassword`,
+  `secret.password` y `enforcePasswordPolicy = false` para evitar el rechazo de
+  contraseñas sencillas en las VMs de prueba. Los UIDs de homed se asignan en el
+  rango reservado `60001-60513` (`HOMED_UID_RANGE` en `bus/manager.rs`) porque
+  systemd-homed espera usuarios "humanos" en ese rango.
+- **PAM.** `pam_exec.so` con `expose_authtok` se sitúa antes que
+  `pam_systemd_home.so` y `pam_unix.so` con control `sufficient`. Para usuarios
+  userdb autentica directamente; para usuarios homed falla y deja que
+  `pam_systemd_home.so` pregunte la contraseña y desbloquee el hogar. El helper
+  lee la contraseña de stdin hasta EOF, no con `read_line`, porque
+  `pam_exec` no envía salto de línea final.
+- **Login en tests.** `su - <usuario>` desde root sigue pasando por la pila PAM,
+  así que el test usa `expect` para enviar la contraseña en cada prompt
+  `Password:` (incluido el segundo de `pam_systemd_home`).
+- **Grupos extra.** Solo `video` se añade automáticamente; `networkmanager` se
+  quitó porque homed valida la existencia de los grupos y `networkmanager` no
+  siempre existe. Los administradores reciben `wheel`.
+- **Persistencia.** `/etc/userdb`, `/var/lib/systemd/home` y
+  `/var/lib/keel-userd` se añaden a `environment.persistence."/persist"`. Sin
+  esto los usuarios userdb desaparecen tras el rollback de la raíz.
+- **ArchiveUser.** El home se copia (no se renombra) a
+  `stateDir/archive/<name>-<timestamp>` para evitar fallos por enlaces cruzados
+  cuando `/home` y `/var/lib/keel-userd` están en diferentes filesystems. El UID
+  liberado queda como *tombstone* en el registro y no se reutiliza.
+- **SetPassword.** Rechaza usuarios declarados con `ReadOnly`; para userdb
+  rehashea y escribe `.user-privileged`; para homed usa
+  `ChangePasswordHome`.
+- **nixosTest `userd-f1`.** Cubre alta/login de userdb y homed, sudo/polkit
+  para admins, fallback a homed cuando `/etc/userdb` es de solo lectura,
+  declared read-only, archive sin reutilización de UID y supervivencia tras
+  reinicio.
+
 ## Fases futuras (no implementado)
 
 - **F1 — crewd.** keel-userd sustituye a crewd: retirar el servicio, los TOML
@@ -84,14 +126,6 @@ cerró al implementar F0 y lo que queda pendiente para fases futuras.
   `system/core/user.nix`, y dar un camino de migración para las cuentas
   existentes de la ThinkPad (leer los TOML y crear los usuarios con userdb o
   homed antes de apagar lo viejo).
-- **F1 — contraseñas con userdb.** El hash va en `<name>.user-privileged`
-  (0600), nunca en `/etc/shadow` (con `mutableUsers = false` se pierde). Con
-  homed, en el registro de homed. `SetPassword` nunca pasa por `pam_unix`.
-- **F1 — admin = wheel.** `wheel` vive en `/etc/group`; el usuario de
-  userdb/homed entra por membresía de userdb. Comprobar pronto que sudo y polkit
-  lo reconocen; si no, documentar la alternativa antes de seguir.
-- **F1 — persistencia.** Añadir a `environment.persistence."/persist"` también
-  `/var/lib/systemd/home` y `/etc/userdb`.
 - **Primer arranque.** Hoy `firstBoot` sale de `system/lib/data.nix` al evaluar.
   Pasará a decidirse en runtime (`HasNoUsers`), y el asistente de `welcome/`
   llamará a `CreateUser` en vez de escribir TOML y reconstruir.

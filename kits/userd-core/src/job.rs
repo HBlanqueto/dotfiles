@@ -177,6 +177,10 @@ pub struct JobRecord {
     /// Usuario cuya cola serializa el job; `None` para trabajos globales.
     pub user: Option<Username>,
     pub state: JobState,
+    /// Datos privados de la operación, en JSON. Nunca contiene contraseñas en
+    /// claro.
+    #[serde(default)]
+    pub payload: Option<String>,
     pub created_at: u64,
     pub updated_at: u64,
 }
@@ -196,9 +200,16 @@ impl JobRecord {
             target: target.into(),
             user,
             state: JobState::Queued,
+            payload: None,
             created_at: now,
             updated_at: now,
         }
+    }
+
+    #[must_use]
+    pub fn with_payload(mut self, payload: impl Into<String>) -> Self {
+        self.payload = Some(payload.into());
+        self
     }
 
     /// Tras un reinicio, todo job no terminal vuelve a la cola. Los `Blocked`

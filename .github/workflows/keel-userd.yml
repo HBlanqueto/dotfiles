@@ -59,4 +59,4 @@ jobs:
         run: nix flake check --impure --no-build
 
       - name: nixosTest de keel-userd
-        run: nix build .#checks.x86_64-linux.userd-f0 --print-build-logs
+        run: nix build .#checks.x86_64-linux.userd-f1 --print-build-logs

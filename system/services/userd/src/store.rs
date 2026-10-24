@@ -115,6 +115,21 @@ impl UserStore {
         Ok(())
     }
 
+    /// Borra el KDL del usuario y su copia en memoria.
+    pub fn remove(&self, name: &Username) -> Result<(), Error> {
+        let path = self.users_dir.join(format!("{name}.kdl"));
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+        self.users
+            .write()
+            .map_err(|_| Error::LockPoisoned("users".into()))?
+            .remove(name);
+        Ok(())
+    }
+
     fn load_all(&self) {
         let Ok(entries) = std::fs::read_dir(&self.users_dir) else {
             return;

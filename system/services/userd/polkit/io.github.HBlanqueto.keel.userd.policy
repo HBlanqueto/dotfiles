@@ -12,6 +12,15 @@
       <allow_active>auth_admin_keep</allow_active>
     </defaults>
   </action>
+  <action id="io.github.HBlanqueto.keel.userd.users.password-own">
+    <description>Cambiar la contraseña propia</description>
+    <message>Se requiere autenticación para cambiar tu contraseña</message>
+    <defaults>
+      <allow_any>auth_self_keep</allow_any>
+      <allow_inactive>auth_self_keep</allow_inactive>
+      <allow_active>auth_self_keep</allow_active>
+    </defaults>
+  </action>
   <action id="io.github.HBlanqueto.keel.userd.home.modify-own">
     <description>Modificar el home propio</description>
     <defaults>

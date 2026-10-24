@@ -1,10 +1,33 @@
 <interface name="io.github.HBlanqueto.Keel.Userd1.Manager">
+  <method name="ListUsers">
+    <arg type="ao" direction="out"/>
+  </method>
+  <method name="FindUserByName">
+    <arg name="name" type="s" direction="in"/>
+    <arg type="o" direction="out"/>
+  </method>
+  <method name="CreateUser">
+    <arg name="name" type="s" direction="in"/>
+    <arg name="options" type="a{sv}" direction="in"/>
+    <arg type="o" direction="out"/>
+  </method>
+  <method name="ArchiveUser">
+    <arg name="user" type="o" direction="in"/>
+    <arg name="keep_home" type="b" direction="in"/>
+    <arg type="o" direction="out"/>
+  </method>
   <method name="ListJobs">
     <arg type="ao" direction="out"/>
   </method>
   <method name="ListBackends">
     <arg type="a(ssb)" direction="out"/>
   </method>
+  <signal name="UserAdded">
+    <arg name="path" type="o"/>
+  </signal>
+  <signal name="UserRemoved">
+    <arg name="path" type="o"/>
+  </signal>
   <signal name="ConfigRejected">
     <arg name="name" type="s"/>
     <arg name="reason" type="s"/>

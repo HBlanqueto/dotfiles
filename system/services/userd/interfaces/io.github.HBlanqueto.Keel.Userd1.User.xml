@@ -1,0 +1,10 @@
+<interface name="io.github.HBlanqueto.Keel.Userd1.User">
+  <method name="SetPassword">
+    <arg name="password" type="s" direction="in"/>
+  </method>
+  <property name="Backend" type="s" access="read"/>
+  <property name="Managed" type="b" access="read"/>
+  <property name="Name" type="s" access="read"/>
+  <property name="State" type="s" access="read"/>
+  <property name="Uid" type="u" access="read"/>
+</interface>

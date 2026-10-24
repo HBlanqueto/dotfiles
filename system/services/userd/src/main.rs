@@ -5,7 +5,8 @@ use keel_userd::config::Config;
 use keel_userd::jobs::Journal;
 use keel_userd::{Error, run};
 #[cfg(feature = "test-hooks")]
-use keel_userd_core::ids::{JobId, Username};
+use keel_userd_core::ids::JobId;
+use keel_userd_core::ids::Username;
 #[cfg(feature = "test-hooks")]
 use keel_userd_core::job::{JobKind, JobRecord, JobState};
 #[cfg(feature = "test-hooks")]
@@ -19,6 +20,13 @@ fn main() -> Result<(), Error> {
     init_tracing();
 
     let arguments: Vec<String> = std::env::args().skip(1).collect();
+    if let Some(command) = arguments.first() {
+        match command.as_str() {
+            "pam-auth" => std::process::exit(check_password()),
+            "pam-account" => std::process::exit(check_account()),
+            _ => {}
+        }
+    }
     #[cfg(feature = "test-hooks")]
     if arguments
         .first()
@@ -133,4 +141,86 @@ fn seed_job(arguments: &[String]) -> Result<(), Error> {
 
     println!("{id}");
     Ok(())
+}
+
+/// Verifica la contraseña de PAM contra `.user-privileged`. Solo usa stdin y
+/// no escribe nada en logs.
+fn check_password() -> i32 {
+    let Ok(user) = std::env::var("PAM_USER") else {
+        return 1;
+    };
+    let Ok(user) = Username::new(user) else {
+        return 1;
+    };
+    let mut bytes = Vec::new();
+    if std::io::Read::read_to_end(&mut std::io::stdin().lock(), &mut bytes).is_err() {
+        return 1;
+    }
+    let password = String::from_utf8_lossy(&bytes);
+    let password = password.trim_end_matches(['\n', '\r']);
+    if password.is_empty() {
+        return 1;
+    }
+
+    let path = PathBuf::from("/etc/userdb").join(format!("{user}.user-privileged"));
+    let Ok(bytes) = std::fs::read(path) else {
+        return 1;
+    };
+    let Ok(record) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+        return 1;
+    };
+    let Some(hash) = record
+        .pointer("/privileged/hashedPassword/0")
+        .and_then(serde_json::Value::as_str)
+    else {
+        return 1;
+    };
+
+    match verify_password(hash, password) {
+        Ok(true) => 0,
+        Ok(false) | Err(_) => 1,
+    }
+}
+
+fn check_account() -> i32 {
+    let Ok(user) = std::env::var("PAM_USER") else {
+        return 1;
+    };
+    let Ok(user) = Username::new(user) else {
+        return 1;
+    };
+    i32::from(
+        !PathBuf::from("/etc/userdb")
+            .join(format!("{user}.user"))
+            .is_file(),
+    )
+}
+
+fn verify_password(hash: &str, password: &str) -> Result<bool, Error> {
+    let parts: Vec<&str> = hash.split('$').collect();
+    if parts.len() < 5 || parts[1] != "y" {
+        return Ok(false);
+    }
+    let salt = format!("${}${}${}", parts[1], parts[2], parts[3]);
+
+    let mut child = std::process::Command::new("mkpasswd")
+        .args(["-m", "yescrypt", "-S", &salt, "--stdin"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|error| Error::Password(error.to_string()))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        stdin
+            .write_all(password.as_bytes())
+            .map_err(|error| Error::Password(error.to_string()))?;
+    }
+    let output = child
+        .wait_with_output()
+        .map_err(|error| Error::Password(error.to_string()))?;
+    if !output.status.success() {
+        return Ok(false);
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim() == hash)
 }

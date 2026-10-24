@@ -10,7 +10,12 @@ pub mod backends;
 pub mod bus;
 pub mod config;
 pub mod error;
+pub mod identity;
 pub mod jobs;
+pub mod password;
+pub mod registry;
+pub mod services;
+pub mod storage;
 pub mod store;
 
 use std::sync::Arc;
@@ -23,7 +28,11 @@ pub use error::Error;
 
 use crate::bus::Manager;
 use crate::jobs::Scheduler;
+use crate::jobs::handlers::{ArchiveUserHandler, CreateUserHandler};
+use crate::registry::Registry;
+use crate::services::Services;
 use crate::store::{StoreEvent, UserStore};
+use keel_userd_core::job::JobKind;
 
 /// Arranca el daemon hasta que llegue SIGTERM o SIGINT.
 pub async fn run(config: Config) -> Result<(), Error> {
@@ -38,18 +47,38 @@ pub async fn run(config: Config) -> Result<(), Error> {
     let scheduler = Scheduler::open(&config).await?;
     scheduler.set_connection(connection.clone())?;
 
+    let registry = Arc::new(Registry::new(scheduler.database())?);
+    let services = Arc::new(Services::new(
+        Arc::clone(&config),
+        Arc::clone(&store),
+        registry,
+    ));
+    services.set_connection(connection.clone())?;
+
+    scheduler
+        .register(
+            JobKind::CreateUser,
+            Arc::new(CreateUserHandler::new(Arc::clone(&services))),
+        )
+        .await?;
+    scheduler
+        .register(
+            JobKind::ArchiveUser,
+            Arc::new(ArchiveUserHandler::new(Arc::clone(&services))),
+        )
+        .await?;
+
     connection
         .object_server()
         .at(
             ROOT_PATH,
-            Manager::new(
-                Arc::clone(&scheduler),
-                Arc::clone(&config),
-                Some(connection.clone()),
-            ),
+            Manager::new(Arc::clone(&scheduler), Arc::clone(&services)),
         )
         .await?;
     bus::manager::register_jobs(&connection, &scheduler).await?;
+    for view in services.views() {
+        services.register_user(&view).await?;
+    }
     // Pedir el nombre después de registrar los objetos evita que una llamada
     // llegue antes de que existan las interfaces.
     connection.request_name(BUS_NAME).await?;

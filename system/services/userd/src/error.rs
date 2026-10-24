@@ -26,6 +26,18 @@ pub enum Error {
     JobNotFound(JobId),
     #[error("job {0} is not in the expected state")]
     UnexpectedState(JobId),
+    #[error("no free UID in the configured range")]
+    UidRangeExhausted,
+    #[error("UID {0} is already in use")]
+    UidInUse(u32),
+    #[error("identity backend error: {0}")]
+    Identity(String),
+    #[error("password hashing failed: {0}")]
+    Password(String),
+    #[error("operation not allowed: {0}")]
+    Forbidden(String),
+    #[error("user is busy: {0}")]
+    Busy(String),
     #[error("job {0} cannot be cancelled in its current state")]
     JobNotCancelable(JobId),
     #[error("lock poisoned: {0}")]

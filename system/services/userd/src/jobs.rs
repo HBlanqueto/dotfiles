@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::future::Future;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -16,25 +15,27 @@ use crate::Error;
 use crate::bus::Job;
 use crate::config::Config;
 
+pub mod handlers;
+
 const JOBS: TableDefinition<u64, &[u8]> = TableDefinition::new("jobs");
 
 /// Journal de jobs sobre redb.
 pub struct Journal {
-    database: Database,
+    database: Arc<Database>,
 }
 
 impl Journal {
-    pub fn open(path: &Path) -> Result<Self, Error> {
-        let database = Database::create(path)?;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
-
+    pub fn new(database: Arc<Database>) -> Result<Self, Error> {
         let transaction = database.begin_write()?;
         {
             transaction.open_table(JOBS)?;
         }
         transaction.commit()?;
-
         Ok(Self { database })
+    }
+
+    pub fn open(path: &Path) -> Result<Self, Error> {
+        Self::new(crate::storage::open(path)?)
     }
 
     pub fn put(&self, record: &JobRecord) -> Result<(), Error> {
@@ -71,6 +72,7 @@ pub trait Handler: Send + Sync {
 /// Serializa los jobs por usuario y limita los builds concurrentes.
 pub struct Scheduler {
     journal: Journal,
+    database: Arc<Database>,
     jobs: RwLock<HashMap<JobId, JobRecord>>,
     actors: tokio::sync::Mutex<HashMap<String, mpsc::Sender<JobId>>>,
     semaphore: Arc<Semaphore>,
@@ -84,7 +86,8 @@ impl Scheduler {
     /// Abre el journal, reanuda los jobs no terminales y despacha los `Queued`.
     pub async fn open(config: &Config) -> Result<Arc<Self>, Error> {
         std::fs::create_dir_all(&config.state_dir)?;
-        let journal = Journal::open(&config.journal_path())?;
+        let database = crate::storage::open(&config.journal_path())?;
+        let journal = Journal::new(Arc::clone(&database))?;
         let mut records = journal.all()?;
 
         let mut max_id = 0;
@@ -104,6 +107,7 @@ impl Scheduler {
 
         let scheduler = Arc::new(Self {
             journal,
+            database,
             jobs: RwLock::new(records.into_iter().map(|job| (job.id, job)).collect()),
             actors: tokio::sync::Mutex::new(HashMap::new()),
             semaphore: Arc::new(Semaphore::new(config.max_builds.max(1))),
@@ -118,6 +122,11 @@ impl Scheduler {
         }
 
         Ok(scheduler)
+    }
+
+    #[must_use]
+    pub fn database(&self) -> Arc<Database> {
+        Arc::clone(&self.database)
     }
 
     /// Conecta el scheduler con el bus para registrar los objetos `Job` nuevos.

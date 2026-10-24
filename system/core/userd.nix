@@ -36,6 +36,33 @@ let
     destination = "/share/polkit-1/actions/io.github.HBlanqueto.keel.userd.policy";
     text = builtins.readFile ../services/userd/polkit/io.github.HBlanqueto.keel.userd.policy;
   };
+
+  declaredUsers = lib.mapAttrsToList (name: user: {
+    name = name;
+    uid = user.uid;
+    real_name = user.description or "";
+    admin = builtins.elem "wheel" (user.extraGroups or [ ]);
+    home = user.home;
+    shell = user.shell;
+  }) (lib.filterAttrs (_: user: user.isNormalUser) config.users.users);
+
+  managedNames =
+    let
+      dir = "/persist${cfg.stateDir}/users";
+    in
+    if builtins ? currentSystem && builtins.pathExists dir then
+      map (lib.removeSuffix ".kdl") (
+        builtins.filter (name: lib.hasSuffix ".kdl" name) (builtins.attrNames (builtins.readDir dir))
+      )
+    else
+      [ ];
+
+  collisions = builtins.filter (user: builtins.elem user.name managedNames) declaredUsers;
+
+  pamHelper = pkgs.writeShellScript "keel-userd-pam-check" ''
+    export PATH=${lib.makeBinPath [ pkgs.mkpasswd ]}
+    exec ${cfg.package}/bin/keel-userd "$@"
+  '';
 in
 {
   options.keel.userd = {
@@ -68,11 +95,37 @@ in
         ]
       );
       default = [
-        "homed"
         "userdb"
+        "homed"
         "declared"
       ];
       description = "Orden de preferencia de los backends de identidad.";
+    };
+
+    identity.homed.storage = lib.mkOption {
+      type = lib.types.enum [
+        "directory"
+        "subvolume"
+      ];
+      default = "subvolume";
+      description = "Almacenamiento de los homes de homed; nunca luks.";
+    };
+
+    identity.userdb.uidRange = lib.mkOption {
+      type = lib.types.submodule {
+        options = {
+          from = lib.mkOption {
+            type = lib.types.port;
+            default = 30000;
+          };
+          to = lib.mkOption {
+            type = lib.types.port;
+            default = 59999;
+          };
+        };
+      };
+      default = { };
+      description = "Rango de UIDs que asigna el registry de userdb.";
     };
 
     packages.priority = lib.mkOption {
@@ -98,6 +151,99 @@ in
       userdb_dir = "/etc/userdb";
       identity_priority = cfg.identity.priority;
       package_priority = cfg.packages.priority;
+      uid_range = cfg.identity.userdb.uidRange;
+      homed_storage = cfg.identity.homed.storage;
+      declared_users = declaredUsers;
+    };
+
+    assertions = [
+      {
+        assertion = cfg.identity.userdb.uidRange.from <= cfg.identity.userdb.uidRange.to;
+        message = "keel.userd.identity.userdb.uidRange.from debe ser menor o igual que to.";
+      }
+      {
+        assertion = builtins.elem "systemd" config.system.nssDatabases.passwd;
+        message = "keel-userd necesita \"systemd\" en system.nssDatabases.passwd.";
+      }
+      {
+        assertion = lib.any (entry: lib.hasInfix "systemd" entry) config.system.nssDatabases.group;
+        message = "keel-userd necesita \"systemd\" en system.nssDatabases.group.";
+      }
+      {
+        assertion = collisions == [ ];
+        message = "Estos usuarios declarados chocan con usuarios gestionados en ${cfg.stateDir}: ${
+          lib.concatStringsSep ", " (map (user: user.name) collisions)
+        }";
+      }
+    ];
+
+    services.homed.enable = lib.mkIf (builtins.elem "homed" cfg.identity.priority) true;
+    services.nscd.enable = true;
+
+    security.pam.services = lib.mkIf (builtins.elem "userdb" cfg.identity.priority) {
+      login.rules.auth.keel-userd = {
+        order = 9000;
+        control = "sufficient";
+        modulePath = "${pkgs.pam}/lib/security/pam_exec.so";
+        args = [
+          "expose_authtok"
+          "quiet"
+          "${pamHelper}"
+          "pam-auth"
+        ];
+      };
+      login.rules.account.keel-userd = {
+        order = 9000;
+        control = "sufficient";
+        modulePath = "${pkgs.pam}/lib/security/pam_exec.so";
+        args = [
+          "quiet"
+          "${pamHelper}"
+          "pam-account"
+        ];
+      };
+      su.rules.auth.keel-userd = {
+        order = 9000;
+        control = "sufficient";
+        modulePath = "${pkgs.pam}/lib/security/pam_exec.so";
+        args = [
+          "expose_authtok"
+          "quiet"
+          "${pamHelper}"
+          "pam-auth"
+        ];
+      };
+      su.rules.account.keel-userd = {
+        order = 9000;
+        control = "sufficient";
+        modulePath = "${pkgs.pam}/lib/security/pam_exec.so";
+        args = [
+          "quiet"
+          "${pamHelper}"
+          "pam-account"
+        ];
+      };
+      sudo.rules.auth.keel-userd = {
+        order = 9000;
+        control = "sufficient";
+        modulePath = "${pkgs.pam}/lib/security/pam_exec.so";
+        args = [
+          "expose_authtok"
+          "quiet"
+          "${pamHelper}"
+          "pam-auth"
+        ];
+      };
+      sudo.rules.account.keel-userd = {
+        order = 9000;
+        control = "sufficient";
+        modulePath = "${pkgs.pam}/lib/security/pam_exec.so";
+        args = [
+          "quiet"
+          "${pamHelper}"
+          "pam-account"
+        ];
+      };
     };
 
     systemd.services.keel-userd = {
@@ -105,6 +251,12 @@ in
       wantedBy = [ "multi-user.target" ];
       after = [ "dbus.service" ];
       requires = [ "dbus.service" ];
+
+      path = with pkgs; [
+        mkpasswd
+        systemd
+        coreutils
+      ];
 
       serviceConfig = {
         Type = "dbus";
@@ -117,16 +269,28 @@ in
 
     systemd.tmpfiles.rules = [
       "d ${cfg.stateDir} 0700 root root -"
+      "d /etc/userdb 0755 root root -"
     ];
 
     services.dbus.packages = [ dbusPolicy ];
     security.polkit.enable = true;
     environment.systemPackages = [ polkitPolicy ];
 
-    # F1 debe añadir también /var/lib/systemd/home y /etc/userdb.
     environment.persistence."/persist".directories = lib.mkIf cfg.persistence.enable [
       {
         directory = cfg.stateDir;
+        user = "root";
+        group = "root";
+        mode = "0700";
+      }
+      {
+        directory = "/etc/userdb";
+        user = "root";
+        group = "root";
+        mode = "0755";
+      }
+      {
+        directory = "/var/lib/systemd/home";
         user = "root";
         group = "root";
         mode = "0700";

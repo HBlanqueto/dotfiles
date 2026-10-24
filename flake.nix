@@ -232,22 +232,28 @@
 
           # demo.slint must compile and render. NpButton is the smallest
           # component with a real size, so it exercises the whole file.
-          slint-demo = pkgs.runCommand "check-slint-demo" {
-            nativeBuildInputs = with pkgs; [ slint-viewer xvfb-run ];
-          } ''
-            export HOME=$TMPDIR
-            cd ${./kits/neptunia}
-            xvfb-run -a slint-viewer demo.slint --component NpButton \
-              --screenshot $TMPDIR/demo.png --backend software
-            test -s $TMPDIR/demo.png
-            ${pkgs.coreutils}/bin/touch $out
-          '';
+          slint-demo =
+            pkgs.runCommand "check-slint-demo"
+              {
+                nativeBuildInputs = with pkgs; [
+                  slint-viewer
+                  xvfb-run
+                ];
+              }
+              ''
+                export HOME=$TMPDIR
+                cd ${./kits/neptunia}
+                xvfb-run -a slint-viewer demo.slint --component NpButton \
+                  --screenshot $TMPDIR/demo.png --backend software
+                test -s $TMPDIR/demo.png
+                ${pkgs.coreutils}/bin/touch $out
+              '';
         }
         # Arranca el daemon en una VM, consulta el bus y comprueba que un job
         # sobrevive a un reinicio del servicio. Solo x86_64: el runner de CI y
         # las máquinas del repo no emulan aarch64.
         // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
-          userd-f0 = import ./system/services/userd/tests/f0.nix {
+          userd-f1 = import ./system/services/userd/tests/f1.nix {
             inherit pkgs inputs;
             daemon = systemPackages.${system}.keel-userd-test;
           };

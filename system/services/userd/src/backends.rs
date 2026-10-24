@@ -44,7 +44,7 @@ pub async fn probe_all(connection: Option<&Connection>, config: &Config) -> Vec<
     for kind in kinds {
         statuses.push(BackendStatus {
             kind,
-            availability: probe(kind, connection, config).await,
+            availability: probe_kind(kind, connection, config).await,
         });
     }
     statuses
@@ -56,7 +56,7 @@ fn push_unique(kinds: &mut Vec<BackendKind>, kind: BackendKind) {
     }
 }
 
-async fn probe(
+pub async fn probe_kind(
     kind: BackendKind,
     connection: Option<&Connection>,
     config: &Config,

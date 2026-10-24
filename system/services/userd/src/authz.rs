@@ -27,3 +27,17 @@ pub async fn check(
         .await?;
     Ok(result.is_authorized)
 }
+
+/// UID del emisor del mensaje.
+pub async fn caller_uid(connection: &Connection, header: &Header<'_>) -> Result<u32, zbus::Error> {
+    let sender = header
+        .sender()
+        .ok_or_else(|| zbus::Error::Failure("message has no sender".into()))?;
+    let name = zbus::names::BusName::try_from(sender.as_str())
+        .map_err(|error| zbus::Error::Failure(error.to_string()))?;
+    let proxy = zbus::fdo::DBusProxy::new(connection).await?;
+    proxy
+        .get_connection_unix_user(name)
+        .await
+        .map_err(|error| zbus::Error::Failure(error.to_string()))
+}

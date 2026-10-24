@@ -19,11 +19,19 @@ pub const POLKIT_PREFIX: &str = "io.github.HBlanqueto.keel.userd";
 pub const MANAGER_INTERFACE: &str = "io.github.HBlanqueto.Keel.Userd1.Manager";
 /// Interfaz de un job.
 pub const JOB_INTERFACE: &str = "io.github.HBlanqueto.Keel.Userd1.Job";
+/// Interfaz de un usuario.
+pub const USER_INTERFACE: &str = "io.github.HBlanqueto.Keel.Userd1.User";
 
 /// Ruta del objeto de un job.
 #[must_use]
 pub fn job_path(id: JobId) -> String {
     format!("{ROOT_PATH}/Job/{}", id.get())
+}
+
+/// Ruta del objeto de un usuario.
+#[must_use]
+pub fn user_path(uid: crate::ids::Uid) -> String {
+    format!("{ROOT_PATH}/User/{}", uid.get())
 }
 
 /// Errores propios del protocolo.
@@ -67,6 +75,7 @@ pub enum PolkitAction {
     PackagesInstallOwn,
     PackagesInstallAny,
     CapabilitiesToggle,
+    UsersPasswordOwn,
 }
 
 impl PolkitAction {
@@ -79,6 +88,7 @@ impl PolkitAction {
             Self::PackagesInstallOwn => "packages.install-own",
             Self::PackagesInstallAny => "packages.install-any",
             Self::CapabilitiesToggle => "capabilities.toggle",
+            Self::UsersPasswordOwn => "users.password-own",
         }
     }
 
@@ -106,6 +116,14 @@ mod tests {
         assert_eq!(
             PolkitAction::UsersManage.name(),
             format!("{POLKIT_PREFIX}.users.manage")
+        );
+        assert_eq!(
+            PolkitAction::UsersPasswordOwn.name(),
+            format!("{POLKIT_PREFIX}.users.password-own")
+        );
+        assert_eq!(
+            user_path(crate::ids::Uid::new(60_001)),
+            format!("{ROOT_PATH}/User/60001")
         );
     }
 }

@@ -100,8 +100,8 @@ cerró al implementar F0, F1a y lo que queda pendiente para fases futuras.
   contraseña. Además se genera una clave de recuperación `modhex64` como hace
   `homectl --recovery-key=yes`: su hash va en `privileged.recoveryKey`, el tipo
   en `recoveryKeyType` y la clave en claro en `secret.password` junto a la
-  contraseña normal. El almacenamiento por defecto es `subvolume`; el test usa
-  `directory` porque su raíz es ext4. Los UIDs se asignan en `60001-60513`
+  contraseña normal. El almacenamiento por defecto es `subvolume` y el test
+  también usa `subvolume` sobre btrfs. Los UIDs se asignan en `60001-60513`
   (`HOMED_UID_RANGE` en `bus/manager.rs`).
 - **Clave de recuperación.** `CreateUser` la entrega una sola vez con
   `Job.TakeRecoveryKey()`; no hay propiedad. El método exige que el UID del
@@ -109,9 +109,42 @@ cerró al implementar F0, F1a y lo que queda pendiente para fases futuras.
   pasa por polkit `users.manage`. La clave vive en memoria del scheduler, no se
   escribe en redb, KDL ni logs, y se borra al tomarla o al purgar el job.
   Después de tomarla, de reiniciar el daemon o de purgar el job responde
-  `NotFound`. `User.ResetPassword(recovery_key, new_password)` la usa como
-  secreto antiguo de `ChangePasswordHome`; autoriza `users.manage` o al propio
-  usuario.
+  `NotFound`.
+- **Custodia de la clave.** homed exige el texto plano de la clave de
+  recuperación en cada `ChangePasswordHome` para recompilar todas las
+  credenciales. Por eso, al crear un usuario homed, la clave se cifra con
+  `systemd-creds encrypt --name=keel-userd-recovery-<name> --with-key=host`
+  (clave del host, sin TPM obligatorio) y se guarda en
+  `<stateDir>/recovery/<name>.cred`, con directorio `root:root 0700` y archivo
+  `root:root 0600`. Nunca se escribe en texto plano en disco, redb, KDL ni
+  logs. `TakeRecoveryKey` sigue existiendo para que el usuario apunte la clave,
+  pero ya no es necesario para el uso normal.
+- **SetPassword y AdminResetPassword.** `SetPassword(new, old)` descifra el
+  `.cred`, pasa la contraseña antigua y la clave a `ChangePasswordHome` y deja
+  que `Zeroizing` borre el texto plano. Autoriza al propio usuario con
+  `users.password-own` o a un administrador con `users.manage`.
+  `AdminResetPassword(new)` exige siempre `users.manage`, no pide la contraseña
+  del usuario y usa la clave custodiada como único secreto antiguo.
+  `ResetPassword(recovery_key, new)` se mantiene para el caso en que el usuario
+  tenga la clave apuntada.
+- **Sin `.cred`.** Si falta el archivo (cuenta creada antes de la custodia),
+  `SetPassword` y `AdminResetPassword` devuelven un error claro que pide usar
+  `ResetPassword` con la clave. No se intenta adivinar ni regenerar la clave.
+- **Por qué no reduce la seguridad.** Con `storage = "subvolume"` o
+  `"directory"`, homed no cifra el contenido del home: root ya puede leerlo y
+  administrar la cuenta. Custodiar la clave solo evita perder la capacidad de
+  cambiar la contraseña; no añade una vía nueva a datos que ya eran accesibles
+  para root. La custodia se apoya en `credential.secret` de systemd, que vive
+  en `/persist` y se crea antes del bind mount de impermanence. Si algún día se
+  usa `storage = "luks"`, la custodia debe desactivarse: guardar la clave del
+  home cifrado junto al host permitiría a root (o a quien tenga esa clave)
+  saltarse LUKS. En ese caso el cambio de contraseña vuelve a depender de
+  `ResetPassword` con la clave en manos del usuario.
+- **Workaround de systemd 261.** `ChangePasswordHome` falla con `EOVERFLOW`
+  («Value too large for defined data type») si `.identity*` y el contenedor del
+  home no comparten dueño. Antes de cambiar la contraseña se alinean
+  `.identity` y `.identity-blob` con el contenedor (`nobody:nogroup`). Es el
+  workaround de systemd#38941 y no afecta al contenido del home.
 - **PAM.** No se añade código PAM. Con `services.homed.enable`, NixOS pone
   `pam_systemd_home` en `login`, `polkit-1`, `sudo`, `su` y `systemd-user`;
   `gdm-password` lo hereda de `login` con `substack`. El test comprueba los
@@ -120,39 +153,37 @@ cerró al implementar F0, F1a y lo que queda pendiente para fases futuras.
   quitó porque homed valida que el grupo exista. Los administradores reciben
   `wheel` y `sudo`/`polkit` les piden contraseña (no se usa
   `wheelNeedsPassword = false`).
-- **SetPassword.** Para userdb rehashea y reescribe `.user-privileged`. Para
-  homed usa `ChangePasswordHome` y exige la contraseña antigua; la firma D-Bus
-  es `SetPassword(ss)` (`password`, `old_password`). Sin la antigua, systemd-
-  homed no puede reautenticar el registro ni actualizar el `.identity`
-  embebido, y la contraseña nueva no serviría hasta un login con la vieja.
-  Como el registro tiene una clave de recuperación, homed exige también su
-  texto plano para recompilar todas las credenciales. `SetPassword` con la
-  contraseña antigua sola falla con `BadRecoveryKey`/«Missing plaintext
-  recovery key»; por eso el camino de cambio de contraseña es `ResetPassword`
-  con la clave guardada. No se cachea la clave para evitarlo: `TakeRecoveryKey`
-  la borra en cuanto se entrega.
-- **Persistencia.** `/var/lib/systemd/home` y `/var/lib/keel-userd` están en
+- **SetPassword en userdb.** Rehashea y reescribe `.user-privileged`. En homed
+  usa `ChangePasswordHome`; la firma D-Bus es `SetPassword(ss)`
+  (`password`, `old_password`). La contraseña antigua es necesaria para
+  reautenticar el registro.
+- **Persistencia.** `/var/lib/systemd/home`, `/var/lib/keel-userd` y
+  `/var/lib/systemd/credential.secret` están en
   `environment.persistence."/persist"`. Los homes de homed viven en `/home`
-  (subvolumen `@home` en el sistema real, `directory` en el test) y
-  sobreviven al reinicio de la raíz. El test escribe un fichero en el home y lo
-  verifica tras reiniciar.
+  (subvolumen `@home`). El test reinicia la VM y comprueba que el home, la
+  contraseña y el `.cred` siguen funcionando: `SetPassword` descifra la clave
+  custodiada con la `credential.secret` persistida.
 - **ArchiveUser.** El archivo vive en `/home/.keel-archive/<name>-<nanos>`,
   creado por el daemon con `root:root 0700`, dentro del mismo subvolumen que
   los homes. En userdb el home se renombra allí; en homed se mueve
   `/home/<name>.homedir` (directorio o subvolumen) con `rename` antes de
   `UnregisterHome`. Si el `rename` de un subvolumen falla, se usa
-  `btrfs subvolume snapshot` + `delete`. `keep_home=true` no mueve nada y deja
+  `btrfs subvolume snapshot` + `delete`. Al terminar se borra el `.cred` del
+  usuario. `keep_home=true` no mueve nada y deja
   esos datos en `/home/<name>.homedir` tras desregistrar la cuenta.
   systemd-homed puede redescubrir ese `.homedir` y volver a registrar la
   cuenta; es el precio de conservar los datos. El UID liberado queda como
   *tombstone* en el registro, sin reutilizarse.
 - **nixosTest `userd-f1`.** Monta `/home` y `/persist` como subvolúmenes
   `@home` y `@persist` de un btrfs y usa `storage = "subvolume"`. Cubre
-  usuarios homed, sin login userdb: alta, `TakeRecoveryKey` una vez y
-  `NotFound` la segunda, rechazo a un usuario no admin, reset con esa clave
-  tanto por administrador como por el propio usuario, login por tty1 y `su`,
-  sudo y pkexec con contraseña, `pamtester` sobre `gdm-password`, archive de
-  homed con `keep_home` falso y verdadero en `/home/.keel-archive`, declared de
+  usuarios homed, sin login userdb: alta, `.cred` cifrado y sin texto plano,
+  `TakeRecoveryKey` una vez y `NotFound` la segunda, rechazo a un usuario no
+  admin, reset con esa clave tanto por administrador como por el propio
+  usuario, login por tty1 y `su`, sudo y pkexec con contraseña, `pamtester`
+  sobre `gdm-password`, archive de homed con `keep_home` falso y verdadero en
+  `/home/.keel-archive`, borrado del `.cred` al archivar, error claro si falta
+  el `.cred`, `SetPassword` con la antigua tras reiniciar, `AdminResetPassword`
+  sin la antigua, rechazo de `AdminResetPassword` a un no admin, declared de
   solo lectura y todo lo anterior tras reiniciar la VM. No usa
   `wheelNeedsPassword = false`.
 

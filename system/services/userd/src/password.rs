@@ -9,8 +9,8 @@ use zeroize::Zeroizing;
 use crate::Error;
 
 /// Hashea una contraseña en blocking; llamar desde `spawn_blocking`.
-pub async fn hash(password: String) -> Result<String, Error> {
-    hash_secret(Zeroizing::new(password)).await
+pub async fn hash(password: Zeroizing<String>) -> Result<String, Error> {
+    hash_secret(password).await
 }
 
 /// Igual que [`hash`], pero mantiene la contraseña zeroizada mientras se hashea.

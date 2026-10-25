@@ -13,6 +13,19 @@ use crate::config::HomedStorage;
 
 const MODHEX: &[u8; 16] = b"cbdefghijklnrtuv";
 
+/// Valida el formato modhex64 que genera [`recovery_key`].
+#[must_use]
+pub fn is_recovery_key(value: &str) -> bool {
+    value.len() == 71
+        && value.chars().enumerate().all(|(index, character)| {
+            if index % 9 == 8 {
+                character == '-'
+            } else {
+                MODHEX.contains(&(character as u8))
+            }
+        })
+}
+
 #[zbus::proxy(
     interface = "org.freedesktop.home1.Manager",
     default_service = "org.freedesktop.home1",
@@ -96,12 +109,12 @@ pub async fn create(
     }
     record["secret"] = serde_json::json!({ "password": secrets });
 
-    let record = serde_json::to_string(&record)?;
+    let record = Zeroizing::new(serde_json::to_string(&record)?);
     let proxy = Home1ManagerProxy::new(connection)
         .await
         .map_err(|error| Error::Identity(error.to_string()))?;
     proxy
-        .create_home(&record)
+        .create_home(record.as_str())
         .await
         .map_err(|error| Error::Identity(format!("CreateHome: {error}")))?;
     Ok(Some(recovery_key))
@@ -113,19 +126,35 @@ pub async fn set_password(
     password: &str,
     old_secrets: &[&str],
 ) -> Result<(), Error> {
-    let new_secret = serde_json::to_string(&serde_json::json!({
+    // Workaround de systemd 261: si `.identity*` y el contenedor del home no
+    // comparten dueño, ChangePasswordHome falla con EOVERFLOW. El contenedor
+    // es nobody:nogroup, así que alineamos el registro (que no es secreto)
+    // con él. Ver systemd#38941.
+    align_identity_ownership(name)?;
+    let new_secret = Zeroizing::new(serde_json::to_string(&serde_json::json!({
         "password": [password],
-    }))?;
-    let old_secret = serde_json::to_string(&serde_json::json!({
+    }))?);
+    let old_secret = Zeroizing::new(serde_json::to_string(&serde_json::json!({
         "password": old_secrets,
-    }))?;
+    }))?);
     let proxy = Home1ManagerProxy::new(connection)
         .await
         .map_err(|error| Error::Identity(error.to_string()))?;
     proxy
-        .change_password_home(name.as_str(), &new_secret, &old_secret)
+        .change_password_home(name.as_str(), new_secret.as_str(), old_secret.as_str())
         .await
         .map_err(|error| Error::Identity(format!("ChangePasswordHome: {error}")))
+}
+
+fn align_identity_ownership(name: &Username) -> Result<(), Error> {
+    const NOBODY: u32 = 65_534;
+    let home = image_path(name);
+    for path in [home.join(".identity"), home.join(".identity-blob")] {
+        if path.exists() {
+            std::os::unix::fs::chown(&path, Some(NOBODY), Some(NOBODY))?;
+        }
+    }
+    Ok(())
 }
 
 pub async fn unregister(connection: &Connection, name: &Username) -> Result<(), Error> {
@@ -145,13 +174,7 @@ mod tests {
     #[test]
     fn recovery_key_is_modhex_formatted() {
         let key = recovery_key().expect("recovery key");
-        assert_eq!(key.len(), 71);
-        for (index, character) in key.chars().enumerate() {
-            if index % 9 == 8 {
-                assert_eq!(character, '-');
-            } else {
-                assert!(MODHEX.contains(&(character as u8)), "{character}");
-            }
-        }
+        assert!(is_recovery_key(key.as_str()), "{}", key.as_str());
+        assert!(!is_recovery_key("not-a-key"));
     }
 }

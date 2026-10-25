@@ -9,6 +9,7 @@ use keel_userd_core::names::{ROOT_PATH, job_path, user_path};
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::{OwnedObjectPath, OwnedValue};
 use zbus::{Connection, interface};
+use zeroize::Zeroizing;
 
 use crate::authz;
 use crate::backends;
@@ -162,7 +163,7 @@ impl Manager {
 
         let password_hash = if let Some(password) = &options.password {
             Some(
-                password::hash(password.clone())
+                password::hash(Zeroizing::new(password.clone()))
                     .await
                     .map_err(|error| super::DbusError::Failed(error.to_string()))?,
             )

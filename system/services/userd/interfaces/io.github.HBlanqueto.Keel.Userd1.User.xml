@@ -7,6 +7,9 @@
     <arg name="password" type="s" direction="in"/>
     <arg name="old_password" type="s" direction="in"/>
   </method>
+  <method name="AdminResetPassword">
+    <arg name="new_password" type="s" direction="in"/>
+  </method>
   <property name="Backend" type="s" access="read"/>
   <property name="Managed" type="b" access="read"/>
   <property name="Name" type="s" access="read"/>

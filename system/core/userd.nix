@@ -212,6 +212,7 @@ in
 
     systemd.tmpfiles.rules = [
       "d ${cfg.stateDir} 0700 root root -"
+      "d ${cfg.stateDir}/recovery 0700 root root -"
       "d /etc/userdb 0755 root root -"
     ];
 

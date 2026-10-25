@@ -13,6 +13,7 @@ pub mod error;
 pub mod identity;
 pub mod jobs;
 pub mod password;
+pub mod recovery;
 pub mod registry;
 pub mod services;
 pub mod storage;

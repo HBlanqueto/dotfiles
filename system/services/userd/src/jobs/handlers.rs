@@ -116,6 +116,7 @@ impl CreateUserHandler {
                     )
                     .await?;
                     if let Some(recovery_key) = recovery_key {
+                        self.services.recovery.store(&spec.name, &recovery_key)?;
                         self.scheduler.set_result(job.id, recovery_key)?;
                     }
                 }
@@ -230,6 +231,9 @@ impl ArchiveUserHandler {
             }
         }
 
+        if let Err(error) = self.services.recovery.remove(&view.name) {
+            tracing::warn!(user = %view.name, %error, "no se pudo borrar la clave custodiada");
+        }
         self.services.store.remove(&view.name)?;
         self.services.registry.release(view.name.as_str())?;
         self.services.unregister_user(view.uid).await?;

@@ -15,6 +15,7 @@ use zbus::zvariant::OwnedObjectPath;
 use crate::Error;
 use crate::bus::{Manager, User};
 use crate::config::{Config, DeclaredUser};
+use crate::recovery::RecoveryStore;
 use crate::registry::Registry;
 use crate::store::UserStore;
 
@@ -43,6 +44,7 @@ pub struct Services {
     pub config: Arc<Config>,
     pub store: Arc<UserStore>,
     pub registry: Arc<Registry>,
+    pub recovery: RecoveryStore,
     connection: RwLock<Option<Connection>>,
     passwords: tokio::sync::Mutex<HashMap<JobId, String>>,
 }
@@ -50,10 +52,12 @@ pub struct Services {
 impl Services {
     #[must_use]
     pub fn new(config: Arc<Config>, store: Arc<UserStore>, registry: Arc<Registry>) -> Self {
+        let recovery = RecoveryStore::new(&config.state_dir);
         Self {
             config,
             store,
             registry,
+            recovery,
             connection: RwLock::new(None),
             passwords: tokio::sync::Mutex::new(HashMap::new()),
         }

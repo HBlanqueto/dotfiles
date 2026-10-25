@@ -1,4 +1,4 @@
-{ config, ... }:
+{ config, pkgs, ... }:
 {
   # Impermanence roots common to every machine. Persistent dirs that depend on
   # the hardware/roles (cups, sbctl, auto-cryptenroll, fwupd…) are
@@ -35,20 +35,35 @@
         # systemd NO sigue enlaces simbólicos para esta clave, así que
         # debe ser un archivo real (bind mount). Impermanence
         # (rev 7b1d382) bind-montea los `files` con `method = "auto"`
-        # solo si el destino ya existe; el script de abajo lo crea antes.
+        # solo si el origen ya existe; el servicio de abajo lo crea antes.
         "/var/lib/systemd/credential.secret"
       ];
     };
   };
 
-  system.activationScripts.keelCredentialSecret = {
-    deps = [ "specialfs" ];
-    text = ''
-      # Clave de systemd-creds: archivo real, nunca symlink. systemd
-      # (261.3) exige un archivo regular de 4112 bytes (16 de machine-id
-      # hasheado + 4096 de clave), modo exacto 0400, y lo valida al leer
-      # (incluido que el machine-id coincida); si no, lo rechaza o borra.
-      # Por eso la genera `systemd-creds setup`, no nosotros.
+  # systemd-creds necesita su clave antes de que el bind mount de
+  # `/var/lib/systemd/credential.secret` esté activo. El script de activación
+  # corre en initrd, donde `/persist` aún está en `/sysroot/persist` y todavía
+  # no hay machine-id, así que se hace en un servicio de stage 2 ordenado antes
+  # del bind mount de impermanence.
+  systemd.services.keel-credential-secret = {
+    description = "Crea la clave de systemd-creds en /persist";
+    wantedBy = [ "local-fs.target" ];
+    before = [
+      "local-fs.target"
+      "persist-persist-var-lib-systemd-credential.secret.service"
+    ];
+    after = [ "persist.mount" ];
+    requires = [ "persist.mount" ];
+    unitConfig.DefaultDependencies = false;
+    path = [ pkgs.coreutils ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      # La activación de initrd puede haber dejado un symlink (systemd-creds
+      # no los sigue); impermanence lo ignoraría por apuntar al origen.
       if [ -L /var/lib/systemd/credential.secret ]; then
           rm -f /var/lib/systemd/credential.secret
       fi
@@ -59,8 +74,4 @@
       fi
     '';
   };
-
-  # `persist-files` (impermanence) corre después: al existir ya el destino,
-  # `method = "auto"` hace bind mount en vez de symlink.
-  system.activationScripts.persist-files.deps = [ "keelCredentialSecret" ];
 }

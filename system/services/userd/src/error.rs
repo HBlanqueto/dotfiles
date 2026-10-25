@@ -1,4 +1,4 @@
-use keel_userd_core::ids::JobId;
+use keel_userd_core::ids::{JobId, Username};
 use thiserror::Error;
 
 /// Errores internos del daemon.
@@ -34,6 +34,10 @@ pub enum Error {
     Identity(String),
     #[error("password hashing failed: {0}")]
     Password(String),
+    #[error("no hay clave de recuperación custodiada para {0}; usa ResetPassword con la clave")]
+    RecoveryMissing(Username),
+    #[error("recovery key custody error: {0}")]
+    Recovery(String),
     #[error("operation not allowed: {0}")]
     Forbidden(String),
     #[error("user is busy: {0}")]

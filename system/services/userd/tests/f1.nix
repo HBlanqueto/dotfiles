@@ -18,6 +18,7 @@ pkgs.testers.nixosTest {
     {
       imports = [
         inputs.impermanence.nixosModules.impermanence
+        ../../../core/persistence.nix
         ../../../core/userd.nix
       ];
 
@@ -45,10 +46,6 @@ pkgs.testers.nixosTest {
       };
       boot.initrd.systemd.services.keel-test-btrfs = {
         description = "Prepara @home y @persist para el test";
-        before = [
-          "home.mount"
-          "persist.mount"
-        ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
@@ -72,10 +69,6 @@ pkgs.testers.nixosTest {
       };
       systemd.services.keel-test-btrfs = {
         description = "Prepara @home y @persist para el test (stage 2)";
-        before = [
-          "home.mount"
-          "persist.mount"
-        ];
         path = with pkgs; [
           btrfs-progs
           coreutils
@@ -284,6 +277,16 @@ pkgs.testers.nixosTest {
             f"busctl --system call {bus} {path} {user_iface} ResetPassword ss {recovery_key} {new_password}"
         )
 
+    def set_password(path, new_password, old_password):
+        machine.succeed(
+            f"busctl --system call {bus} {path} {user_iface} SetPassword ss {new_password} {old_password}"
+        )
+
+    def admin_reset_password(path, new_password):
+        machine.succeed(
+            f"busctl --system call {bus} {path} {user_iface} AdminResetPassword s {new_password}"
+        )
+
     def archive(path, keep_home):
         value = "true" if keep_home else "false"
         return path_of(call("ArchiveUser", f"ob {path} {value}"))
@@ -331,6 +334,11 @@ pkgs.testers.nixosTest {
     assert recovery_key.count("-") == 7, recovery_key
     machine.fail(f"busctl --system call {bus} {alice_job} {job_iface} TakeRecoveryKey")
     machine.succeed(f"! grep -R -F '{recovery_key}' /var/lib/keel-userd /etc/keel")
+    machine.succeed("test -f /var/lib/keel-userd/recovery/alice.cred")
+    machine.succeed("stat -c '%U:%G:%a' /var/lib/keel-userd/recovery | grep -qx 'root:root:700'")
+    machine.succeed(
+        "stat -c '%U:%G:%a' /var/lib/keel-userd/recovery/alice.cred | grep -qx 'root:root:600'"
+    )
     machine.wait_until_succeeds("getent passwd alice")
     machine.succeed("test -d /home/alice.homedir")
     machine.succeed("btrfs subvolume show /home/alice.homedir")
@@ -394,6 +402,12 @@ pkgs.testers.nixosTest {
     wait_job(bob_job)
     bob = find("bob")
     bob_key = take_recovery_key(bob_job)
+    machine.succeed("test -f /var/lib/keel-userd/recovery/bob.cred")
+    machine.succeed("rm /var/lib/keel-userd/recovery/bob.cred")
+    machine.succeed(
+        f"sh -c 'busctl --system call {bus} {bob} {user_iface} SetPassword ss bobother bobpw"
+        " 2>&1 | grep -qi ResetPassword'"
+    )
     run_expect("bob", "bobpw", "echo archived > /home/bob/marker")
     run_expect(
         "bob",
@@ -411,6 +425,7 @@ pkgs.testers.nixosTest {
     machine.succeed("test ! -e /home/bob.homedir")
     machine.succeed("stat -c '%U:%G:%a' /home/.keel-archive | grep -qx 'root:root:700'")
     machine.succeed("grep -R -q archived /home/.keel-archive/bob-*")
+    machine.succeed("test ! -e /var/lib/keel-userd/recovery/bob.cred")
     machine.wait_until_fails("getent passwd bob")
 
     # ArchiveUser con homed: keep_home=true deja los datos.
@@ -420,11 +435,13 @@ pkgs.testers.nixosTest {
     )
     wait_job(carol_job)
     carol = find("carol")
+    machine.succeed("test -f /var/lib/keel-userd/recovery/carol.cred")
     run_expect("carol", "carolpw", "echo keep > /home/carol/marker")
     wait_not_busy("carol")
     carol_archive = archive(carol, True)
     wait_job(carol_archive)
     machine.succeed("test -f /home/carol.homedir/marker")
+    machine.succeed("test ! -e /var/lib/keel-userd/recovery/carol.cred")
 
     # Reinicio: usuarios, homes y contraseñas siguen funcionando.
     machine.shutdown()
@@ -435,18 +452,35 @@ pkgs.testers.nixosTest {
     machine.wait_until_succeeds("getent passwd alice")
     machine.wait_until_succeeds("getent passwd admin")
     machine.succeed("test -d /var/lib/systemd/home")
+    machine.succeed("test -f /persist/var/lib/systemd/credential.secret")
+    machine.succeed("test -f /var/lib/keel-userd/recovery/alice.cred")
     machine.succeed("grep -R -q archived /home/.keel-archive/bob-*")
     machine.succeed("test -f /home/carol.homedir/marker")
 
-    console_login(1, "alice", "newalicepw")
-    run_expect("alice", "newalicepw", "test -f /home/alice/.persist-test")
-    pamtester_ok("gdm-password", "alice", "newalicepw")
-    pamtester_fails("gdm-password", "alice", "alicepw")
+    # SetPassword descifra la clave custodiada tras el reinicio.
+    set_password(alice, "alicepw2", "newalicepw")
+    pamtester_ok("gdm-password", "alice", "alicepw2")
+    pamtester_fails("gdm-password", "alice", "newalicepw")
+    console_login(1, "alice", "alicepw2")
+    run_expect("alice", "alicepw2", "test -f /home/alice/.persist-test")
+
+    # AdminResetPassword no pide la contraseña anterior.
+    admin_reset_password(alice, "adminresetpw")
+    pamtester_ok("gdm-password", "alice", "adminresetpw")
+    pamtester_fails("gdm-password", "alice", "alicepw2")
+    run_expect("alice", "adminresetpw", "id -un | grep -q alice")
+
+    # Un no admin no puede usar AdminResetPassword.
+    machine.fail(
+        f"su -s /bin/sh alice -c 'timeout 10 busctl --system call {bus} {alice}"
+        f" {user_iface} AdminResetPassword s hacked'"
+    )
+    pamtester_ok("gdm-password", "alice", "adminresetpw")
 
     console_command_ok(1, "admin", "adminpw", "sudo true && echo SUDO_OK", "SUDO_OK")
     console_command_ok(1, "admin", "adminpw", "/run/wrappers/bin/pkexec true && echo PKEXEC_OK", "PKEXEC_OK")
-    console_command_fails(1, "alice", "newalicepw", "sudo true")
-    console_command_fails(1, "alice", "newalicepw", "/run/wrappers/bin/pkexec true")
+    console_command_fails(1, "alice", "adminresetpw", "sudo true")
+    console_command_fails(1, "alice", "adminresetpw", "/run/wrappers/bin/pkexec true")
 
     # Los declarados siguen siendo de solo lectura.
     declared = find("declared")

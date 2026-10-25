@@ -244,12 +244,16 @@ impl ArchiveUserHandler {
             &archive,
             std::os::unix::fs::PermissionsExt::from_mode(0o700),
         )?;
+        std::os::unix::fs::chown(&archive, Some(0), Some(0))?;
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos();
         let target = archive.join(format!("{name}-{nanos}"));
         if let Err(error) = std::fs::rename(home, &target) {
+            if is_btrfs_subvolume(home) {
+                return snapshot_subvolume(home, &target);
+            }
             if error.kind() == std::io::ErrorKind::CrossesDevices
                 || error.raw_os_error() == Some(18)
             {
@@ -274,6 +278,39 @@ impl super::Handler for ArchiveUserHandler {
                 .map_err(|error| JobFailure::new(error.to_string()))
         })
     }
+}
+
+fn is_btrfs_subvolume(path: &std::path::Path) -> bool {
+    Command::new("btrfs")
+        .args(["subvolume", "show"])
+        .arg(path)
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+fn snapshot_subvolume(source: &std::path::Path, target: &std::path::Path) -> Result<(), Error> {
+    let snapshot = Command::new("btrfs")
+        .args(["subvolume", "snapshot"])
+        .arg(source)
+        .arg(target)
+        .status()?;
+    if !snapshot.success() {
+        return Err(Error::Identity(format!(
+            "btrfs subvolume snapshot failed for {}",
+            source.display()
+        )));
+    }
+    let delete = Command::new("btrfs")
+        .args(["subvolume", "delete"])
+        .arg(source)
+        .status()?;
+    if !delete.success() {
+        return Err(Error::Identity(format!(
+            "btrfs subvolume delete failed for {}",
+            source.display()
+        )));
+    }
+    Ok(())
 }
 
 async fn is_busy(name: &Username) -> Result<bool, Error> {

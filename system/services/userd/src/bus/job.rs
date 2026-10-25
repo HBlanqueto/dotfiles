@@ -75,20 +75,46 @@ impl Job {
     }
 
     #[zbus(property)]
-    fn recovery_key(&self) -> zbus::fdo::Result<String> {
-        Ok(self
-            .scheduler
-            .result(self.id)
-            .map_err(|error| zbus::fdo::Error::Failed(error.to_string()))?
-            .map_or_else(String::new, |key| key.to_string()))
-    }
-
-    #[zbus(property)]
     fn error(&self) -> zbus::fdo::Result<String> {
         Ok(self
             .record()?
             .and_then(|record| record.state.error_message().map(ToOwned::to_owned))
             .unwrap_or_default())
+    }
+
+    async fn take_recovery_key(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+    ) -> Result<String, DbusError> {
+        let connection = emitter.connection();
+        let creator = self
+            .scheduler
+            .creator(self.id)
+            .map_err(|error| DbusError::Failed(error.to_string()))?
+            .ok_or_else(|| DbusError::NotFound("recovery key is not available".into()))?;
+        let caller = authz::caller_uid(connection, &header)
+            .await
+            .map_err(|error| DbusError::Failed(error.to_string()))?;
+        if caller != creator {
+            return Err(DbusError::PermissionDenied(
+                "only the job creator can take the recovery key".into(),
+            ));
+        }
+        match authz::check(connection, &header, PolkitAction::UsersManage).await {
+            Ok(true) => {}
+            Ok(false) => {
+                return Err(DbusError::PermissionDenied(
+                    "not authorized to take the recovery key".into(),
+                ));
+            }
+            Err(error) => return Err(DbusError::Failed(error.to_string())),
+        }
+        self.scheduler
+            .take_result(self.id)
+            .map_err(|error| DbusError::Failed(error.to_string()))?
+            .map(|key| key.to_string())
+            .ok_or_else(|| DbusError::NotFound("recovery key was already taken".into()))
     }
 
     async fn cancel(

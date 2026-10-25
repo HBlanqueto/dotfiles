@@ -86,6 +86,7 @@ pub struct Scheduler {
     journal: Journal,
     database: Arc<Database>,
     jobs: RwLock<HashMap<JobId, JobRecord>>,
+    creators: RwLock<HashMap<JobId, u32>>,
     results: RwLock<HashMap<JobId, Zeroizing<String>>>,
     actors: tokio::sync::Mutex<HashMap<String, mpsc::Sender<JobId>>>,
     semaphore: Arc<Semaphore>,
@@ -122,6 +123,7 @@ impl Scheduler {
             journal,
             database,
             jobs: RwLock::new(records.into_iter().map(|job| (job.id, job)).collect()),
+            creators: RwLock::new(HashMap::new()),
             results: RwLock::new(HashMap::new()),
             actors: tokio::sync::Mutex::new(HashMap::new()),
             semaphore: Arc::new(Semaphore::new(config.max_builds.max(1))),
@@ -202,6 +204,16 @@ impl Scheduler {
         Ok(read_lock(&self.jobs, "jobs")?.get(&id).cloned())
     }
 
+    /// Guarda el UID que creó el job; solo vive en memoria.
+    pub fn set_creator(&self, id: JobId, uid: u32) -> Result<(), Error> {
+        write_lock(&self.creators, "creators")?.insert(id, uid);
+        Ok(())
+    }
+
+    pub fn creator(&self, id: JobId) -> Result<Option<u32>, Error> {
+        Ok(read_lock(&self.creators, "creators")?.get(&id).copied())
+    }
+
     /// Guarda un resultado efímero del job. No se persiste en el journal.
     pub fn set_result(&self, id: JobId, result: Zeroizing<String>) -> Result<(), Error> {
         if self.record(id)?.is_none() {
@@ -211,30 +223,9 @@ impl Scheduler {
         Ok(())
     }
 
-    pub fn result(&self, id: JobId) -> Result<Option<Zeroizing<String>>, Error> {
-        Ok(read_lock(&self.results, "results")?.get(&id).cloned())
-    }
-
-    /// Última clave de recuperación de un `CreateUser` que siga en memoria.
-    pub fn result_for_user(
-        &self,
-        name: &keel_userd_core::ids::Username,
-    ) -> Result<Option<Zeroizing<String>>, Error> {
-        let jobs = read_lock(&self.jobs, "jobs")?;
-        let id = jobs
-            .values()
-            .filter(|job| {
-                job.kind == JobKind::CreateUser
-                    && job.user.as_ref() == Some(name)
-                    && matches!(job.state, JobState::Succeeded)
-            })
-            .max_by_key(|job| job.id)
-            .map(|job| job.id);
-        drop(jobs);
-        match id {
-            Some(id) => self.result(id),
-            None => Ok(None),
-        }
+    /// Extrae el resultado y lo borra de memoria.
+    pub fn take_result(&self, id: JobId) -> Result<Option<Zeroizing<String>>, Error> {
+        Ok(write_lock(&self.results, "results")?.remove(&id))
     }
 
     /// Borra los jobs en estado terminal más antiguos que `retention`.
@@ -255,6 +246,7 @@ impl Scheduler {
             for id in ids {
                 scheduler.journal.delete(id)?;
                 write_lock(&scheduler.jobs, "jobs")?.remove(&id);
+                write_lock(&scheduler.creators, "creators")?.remove(&id);
                 write_lock(&scheduler.results, "results")?.remove(&id);
                 tracing::debug!(id = id.get(), "purged old terminal job");
             }
@@ -699,11 +691,17 @@ mod tests {
             .expect("result");
         assert_eq!(
             scheduler
-                .result(JobId::new(4))
+                .take_result(JobId::new(4))
                 .expect("result")
                 .as_ref()
                 .map(|key| key.as_str()),
             Some("secret-key")
+        );
+        assert!(
+            scheduler
+                .take_result(JobId::new(4))
+                .expect("result")
+                .is_none()
         );
         let journal =
             serde_json::to_string(&scheduler.journal.all().expect("journal")).expect("json");
@@ -714,8 +712,13 @@ mod tests {
             .purge_old_jobs(Duration::ZERO)
             .await
             .expect("purge");
-        assert!(scheduler.result(JobId::new(4)).expect("result").is_none());
         assert!(scheduler.record(JobId::new(4)).expect("record").is_none());
+        assert!(
+            scheduler
+                .take_result(JobId::new(4))
+                .expect("result")
+                .is_none()
+        );
 
         std::fs::remove_dir_all(&config.state_dir).ok();
     }

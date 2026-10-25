@@ -26,11 +26,95 @@ pkgs.testers.nixosTest {
       keel.userd = {
         enable = true;
         package = daemon;
-        # Sin impermanence, stateDir y /home comparten filesystem y ArchiveUser
-        # puede mover el .homedir con rename.
-        persistence.enable = false;
-        # El test corre sobre ext4; homed necesita btrfs para `subvolume`.
-        identity.homed.storage = "directory";
+        persistence.enable = true;
+        identity.homed.storage = "subvolume";
+      };
+
+      virtualisation.emptyDiskImages = [ 4096 ];
+      boot.initrd.supportedFilesystems = [ "btrfs" ];
+      boot.initrd.availableKernelModules = [
+        "btrfs"
+        "virtio_blk"
+        "virtio_pci"
+      ];
+      boot.initrd.systemd.extraBin = {
+        blkid = lib.mkForce "${pkgs.util-linux}/bin/blkid";
+        btrfs = "${pkgs.btrfs-progs}/bin/btrfs";
+        "mkfs.btrfs" = "${pkgs.btrfs-progs}/bin/mkfs.btrfs";
+        sleep = "${pkgs.coreutils}/bin/sleep";
+      };
+      boot.initrd.systemd.services.keel-test-btrfs = {
+        description = "Prepara @home y @persist para el test";
+        before = [
+          "home.mount"
+          "persist.mount"
+        ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+        };
+        script = ''
+          udevadm settle || true
+          i=0
+          while [ ! -b /dev/vdb ] && [ "$i" -lt 50 ]; do
+            sleep 0.1
+            i=$((i + 1))
+          done
+          if ! blkid /dev/vdb >/dev/null 2>&1; then
+            mkfs.btrfs -f /dev/vdb
+          fi
+          mkdir -p /run/keel-btrfs
+          mount /dev/vdb /run/keel-btrfs
+          btrfs subvolume create /run/keel-btrfs/@home || true
+          btrfs subvolume create /run/keel-btrfs/@persist || true
+          umount /run/keel-btrfs
+        '';
+      };
+      systemd.services.keel-test-btrfs = {
+        description = "Prepara @home y @persist para el test (stage 2)";
+        before = [
+          "home.mount"
+          "persist.mount"
+        ];
+        path = with pkgs; [
+          btrfs-progs
+          coreutils
+          util-linux
+        ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+        };
+        script = ''
+          if ! blkid /dev/vdb >/dev/null 2>&1; then
+            mkfs.btrfs -f /dev/vdb
+          fi
+          mkdir -p /run/keel-btrfs
+          mount /dev/vdb /run/keel-btrfs
+          btrfs subvolume create /run/keel-btrfs/@home || true
+          btrfs subvolume create /run/keel-btrfs/@persist || true
+          umount /run/keel-btrfs
+        '';
+      };
+      virtualisation.fileSystems = {
+        "/home" = {
+          device = "/dev/vdb";
+          fsType = "btrfs";
+          neededForBoot = true;
+          options = [
+            "subvol=@home"
+            "x-systemd.requires=keel-test-btrfs.service"
+          ];
+        };
+        "/persist" = {
+          device = "/dev/vdb";
+          fsType = "btrfs";
+          neededForBoot = true;
+          options = [
+            "subvol=@persist"
+            "x-systemd.requires=keel-test-btrfs.service"
+          ];
+        };
       };
 
       services.homed.promptOnFirstBoot = false;
@@ -190,19 +274,14 @@ pkgs.testers.nixosTest {
     def pamtester_fails(service, user, password):
         machine.fail(f"printf '%s\\n' '{password}' | pamtester {service} {user} authenticate")
 
-    def set_password(path, password, old_password):
-        machine.succeed(
-            f"busctl --system call {bus} {path} {user_iface} SetPassword ss {password} {old_password}"
+    def take_recovery_key(path):
+        return path_of(
+            machine.succeed(f"busctl --system call {bus} {path} {job_iface} TakeRecoveryKey")
         )
 
     def reset_password(path, recovery_key, new_password):
         machine.succeed(
             f"busctl --system call {bus} {path} {user_iface} ResetPassword ss {recovery_key} {new_password}"
-        )
-
-    def job_string(path, name):
-        return path_of(
-            machine.succeed(f"busctl --system get-property {bus} {path} {job_iface} {name}")
         )
 
     def archive(path, keep_home):
@@ -219,6 +298,8 @@ pkgs.testers.nixosTest {
     machine.start()
     machine.wait_for_unit("keel-userd.service")
     machine.wait_until_succeeds(f"busctl --system status {bus}")
+    machine.succeed("findmnt -n -o FSTYPE /home | grep -qx btrfs")
+    machine.succeed("findmnt -n -o FSTYPE /persist | grep -qx btrfs")
 
     # NixOS debe añadir pam_systemd_home a todos los servicios que autentican.
     for service in ["login", "gdm-password", "polkit-1", "sudo", "su", "systemd-user"]:
@@ -239,12 +320,20 @@ pkgs.testers.nixosTest {
     wait_job(alice_job)
     alice = find("alice")
     assert "homed" in prop(alice, user_iface, "Backend")
-    recovery_key = job_string(alice_job, "RecoveryKey")
+    rc, _ = run_expect(
+        "alice",
+        "alicepw",
+        f"busctl --system call {bus} {alice_job} {job_iface} TakeRecoveryKey",
+    )
+    assert rc != 0, "un usuario normal no debería tomar la clave"
+    recovery_key = take_recovery_key(alice_job)
     assert len(recovery_key) == 71, recovery_key
     assert recovery_key.count("-") == 7, recovery_key
+    machine.fail(f"busctl --system call {bus} {alice_job} {job_iface} TakeRecoveryKey")
     machine.succeed(f"! grep -R -F '{recovery_key}' /var/lib/keel-userd /etc/keel")
     machine.wait_until_succeeds("getent passwd alice")
     machine.succeed("test -d /home/alice.homedir")
+    machine.succeed("btrfs subvolume show /home/alice.homedir")
     machine.succeed("test -d /var/lib/systemd/home")
 
     # Login por tty1 y por su.
@@ -286,8 +375,8 @@ pkgs.testers.nixosTest {
     assert rc != 0, "la contraseña vieja sigue funcionando"
     run_expect("alice", "recoverypw", "id -un | grep -q alice")
 
-    # SetPassword cambia la contraseña y la vieja deja de valer.
-    set_password(alice, "newalicepw", "recoverypw")
+    # homed exige la clave de recuperación al cambiar la contraseña.
+    reset_password(alice, recovery_key, "newalicepw")
     pamtester_ok("gdm-password", "alice", "newalicepw")
     pamtester_fails("gdm-password", "alice", "recoverypw")
     rc, _ = run_expect("alice", "recoverypw", "true")
@@ -304,7 +393,7 @@ pkgs.testers.nixosTest {
     )
     wait_job(bob_job)
     bob = find("bob")
-    bob_key = job_string(bob_job, "RecoveryKey")
+    bob_key = take_recovery_key(bob_job)
     run_expect("bob", "bobpw", "echo archived > /home/bob/marker")
     run_expect(
         "bob",
@@ -320,7 +409,8 @@ pkgs.testers.nixosTest {
     bob_archive = archive(bob, False)
     wait_job(bob_archive)
     machine.succeed("test ! -e /home/bob.homedir")
-    machine.succeed("grep -R -q archived /var/lib/keel-userd/archive/bob-*")
+    machine.succeed("stat -c '%U:%G:%a' /home/.keel-archive | grep -qx 'root:root:700'")
+    machine.succeed("grep -R -q archived /home/.keel-archive/bob-*")
     machine.wait_until_fails("getent passwd bob")
 
     # ArchiveUser con homed: keep_home=true deja los datos.
@@ -345,7 +435,7 @@ pkgs.testers.nixosTest {
     machine.wait_until_succeeds("getent passwd alice")
     machine.wait_until_succeeds("getent passwd admin")
     machine.succeed("test -d /var/lib/systemd/home")
-    machine.succeed("grep -R -q archived /var/lib/keel-userd/archive/bob-*")
+    machine.succeed("grep -R -q archived /home/.keel-archive/bob-*")
     machine.succeed("test -f /home/carol.homedir/marker")
 
     console_login(1, "alice", "newalicepw")

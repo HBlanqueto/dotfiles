@@ -174,9 +174,10 @@ nunca reescribas código solo para silenciarlos.
     sustituto de crewd para gestionar cuentas en runtime. F1a usa por defecto
     `homed` y `declared`; `userdb` solo se usa si se pide explícitamente y no
     admite login por contraseña en NixOS. Incluye clave de recuperación de
-    homed (`Job.RecoveryKey`, solo en memoria), `ResetPassword`, cambio de
-    contraseña, archive con `keep_home` y persistencia del estado en
-    `/persist`. Por defecto no está activo: crewd
+    homed (`Job.TakeRecoveryKey`, solo en memoria y de un solo uso),
+    `ResetPassword`, cambio de contraseña, archive con `keep_home` en
+    `/home/.keel-archive` y persistencia del estado en `/persist`. Por defecto
+    no está activo: crewd
     sigue siendo el servicio instalado. Decisiones por fase:
     `system/services/userd/DECISIONS.md`.
   - `system/services/home-init` — servicio de usuario: si falta

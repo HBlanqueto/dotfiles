@@ -195,6 +195,7 @@ in
       requires = [ "dbus.service" ];
 
       path = with pkgs; [
+        btrfs-progs
         mkpasswd
         systemd
         coreutils

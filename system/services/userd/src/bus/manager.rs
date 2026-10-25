@@ -101,6 +101,16 @@ impl Manager {
             .services
             .connection()
             .map_err(|error| super::DbusError::Failed(error.to_string()))?;
+        let creator = match connection.as_ref() {
+            Some(connection) => authz::caller_uid(connection, &header)
+                .await
+                .map_err(|error| super::DbusError::Failed(error.to_string()))?,
+            None => {
+                return Err(super::DbusError::Failed(
+                    "D-Bus connection unavailable".into(),
+                ));
+            }
+        };
         let backend =
             crate::identity::choose(&self.services.config, connection.as_ref(), options.backend)
                 .await
@@ -182,6 +192,9 @@ impl Manager {
         {
             self.services.remember_password(id, password.clone()).await;
         }
+        self.scheduler
+            .set_creator(id, creator)
+            .map_err(|error| super::DbusError::Failed(error.to_string()))?;
         if let Err(error) = self.scheduler.enqueue(record).await {
             let _ = self.services.registry.release(name.as_str());
             return Err(super::DbusError::Failed(error.to_string()));

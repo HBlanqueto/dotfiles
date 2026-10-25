@@ -135,7 +135,7 @@ impl Config {
 
     #[must_use]
     pub fn archive_dir(&self) -> PathBuf {
-        self.state_dir.join("archive")
+        PathBuf::from("/home/.keel-archive")
     }
 
     #[must_use]

@@ -150,14 +150,14 @@ impl User {
                     .map_err(|error| DbusError::Failed(error.to_string()))?;
             }
             IdentityBackendKind::Homed => {
-                let recovery_key = self.services.recovery_key(&self.view.name);
-                let mut old_secrets = vec![old_password.as_str()];
-                if let Some(key) = &recovery_key {
-                    old_secrets.push(key.as_str());
-                }
-                identity::homed::set_password(connection, &self.view.name, &password, &old_secrets)
-                    .await
-                    .map_err(|error| DbusError::Failed(error.to_string()))?;
+                identity::homed::set_password(
+                    connection,
+                    &self.view.name,
+                    &password,
+                    &[old_password.as_str()],
+                )
+                .await
+                .map_err(|error| DbusError::Failed(error.to_string()))?;
             }
             IdentityBackendKind::Declared => {
                 return Err(DbusError::ReadOnly(

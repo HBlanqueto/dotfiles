@@ -31,7 +31,7 @@
           command = [
             "${pkgs.nodejs}/bin/npx"
             "-y"
-            "mcp-rust-docs@latest"
+            "mcp-rust-docs@0.1.0"
           ];
         };
         gh_grep = {

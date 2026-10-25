@@ -55,11 +55,15 @@ pub async fn run(config: Config) -> Result<(), Error> {
         registry,
     ));
     services.set_connection(connection.clone())?;
+    services.set_scheduler(Arc::clone(&scheduler));
 
     scheduler
         .register(
             JobKind::CreateUser,
-            Arc::new(CreateUserHandler::new(Arc::clone(&services))),
+            Arc::new(CreateUserHandler::new(
+                Arc::clone(&services),
+                Arc::clone(&scheduler),
+            )),
         )
         .await?;
     scheduler

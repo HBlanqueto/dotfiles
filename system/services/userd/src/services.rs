@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, OnceLock, RwLock};
 
 use keel_userd_core::backend::IdentityBackendKind;
 use keel_userd_core::ids::{JobId, Uid, Username};
@@ -11,6 +11,7 @@ use keel_userd_core::spec::UserSpec;
 use zbus::Connection;
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::OwnedObjectPath;
+use zeroize::Zeroizing;
 
 use crate::Error;
 use crate::bus::{Manager, User};
@@ -44,6 +45,7 @@ pub struct Services {
     pub store: Arc<UserStore>,
     pub registry: Arc<Registry>,
     connection: RwLock<Option<Connection>>,
+    scheduler: OnceLock<Arc<crate::jobs::Scheduler>>,
     passwords: tokio::sync::Mutex<HashMap<JobId, String>>,
 }
 
@@ -55,8 +57,17 @@ impl Services {
             store,
             registry,
             connection: RwLock::new(None),
+            scheduler: OnceLock::new(),
             passwords: tokio::sync::Mutex::new(HashMap::new()),
         }
+    }
+
+    pub fn set_scheduler(&self, scheduler: Arc<crate::jobs::Scheduler>) {
+        let _ = self.scheduler.set(scheduler);
+    }
+
+    pub fn recovery_key(&self, name: &Username) -> Option<Zeroizing<String>> {
+        self.scheduler.get()?.result_for_user(name).ok().flatten()
     }
 
     pub fn set_connection(&self, connection: Connection) -> Result<(), Error> {

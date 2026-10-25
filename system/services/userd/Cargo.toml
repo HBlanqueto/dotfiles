@@ -28,3 +28,4 @@ tracing-journald = "0.3"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 zbus = { version = "5.19", default-features = false, features = ["tokio"] }
 zbus_polkit = { version = "5.1", default-features = false, features = ["tokio"] }
+zeroize = "1"

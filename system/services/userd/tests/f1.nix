@@ -26,7 +26,9 @@ pkgs.testers.nixosTest {
       keel.userd = {
         enable = true;
         package = daemon;
-        persistence.enable = true;
+        # Sin impermanence, stateDir y /home comparten filesystem y ArchiveUser
+        # puede mover el .homedir con rename.
+        persistence.enable = false;
         # El test corre sobre ext4; homed necesita btrfs para `subvolume`.
         identity.homed.storage = "directory";
       };
@@ -193,6 +195,26 @@ pkgs.testers.nixosTest {
             f"busctl --system call {bus} {path} {user_iface} SetPassword ss {password} {old_password}"
         )
 
+    def reset_password(path, recovery_key, new_password):
+        machine.succeed(
+            f"busctl --system call {bus} {path} {user_iface} ResetPassword ss {recovery_key} {new_password}"
+        )
+
+    def job_string(path, name):
+        return path_of(
+            machine.succeed(f"busctl --system get-property {bus} {path} {job_iface} {name}")
+        )
+
+    def archive(path, keep_home):
+        value = "true" if keep_home else "false"
+        return path_of(call("ArchiveUser", f"ob {path} {value}"))
+
+    def wait_not_busy(user):
+        machine.wait_until_succeeds(
+            f"! loginctl show-user {user} -p State --value 2>/dev/null"
+            " | grep -Eq 'active|online|lingering|closing'"
+        )
+
 
     machine.start()
     machine.wait_for_unit("keel-userd.service")
@@ -209,7 +231,7 @@ pkgs.testers.nixosTest {
         " echo \"$out\" | grep -qi 'userdb no admite login por contraseña'"
     )
 
-    # Usuario normal de homed: alta, home y login real.
+    # Usuario normal de homed: alta, home, login y clave de recuperación.
     alice_job = create(
         "alice",
         '2 "real-name" s "Alice" "password" s "alicepw"',
@@ -217,6 +239,10 @@ pkgs.testers.nixosTest {
     wait_job(alice_job)
     alice = find("alice")
     assert "homed" in prop(alice, user_iface, "Backend")
+    recovery_key = job_string(alice_job, "RecoveryKey")
+    assert len(recovery_key) == 71, recovery_key
+    assert recovery_key.count("-") == 7, recovery_key
+    machine.succeed(f"! grep -R -F '{recovery_key}' /var/lib/keel-userd /etc/keel")
     machine.wait_until_succeeds("getent passwd alice")
     machine.succeed("test -d /home/alice.homedir")
     machine.succeed("test -d /var/lib/systemd/home")
@@ -240,7 +266,7 @@ pkgs.testers.nixosTest {
     assert "homed" in prop(admin, user_iface, "Backend")
     machine.succeed("getent group wheel | grep -q admin")
     machine.succeed("id -nG admin | grep -qw wheel")
-    machine.succeed("sudo -l -U admin | grep -q ALL")
+    machine.wait_until_succeeds("sudo -l -U admin | grep -q ALL")
     console_command_ok(1, "admin", "adminpw", "sudo true && echo SUDO_OK", "SUDO_OK")
     console_command_ok(1, "admin", "adminpw", "/run/wrappers/bin/pkexec true && echo PKEXEC_OK", "PKEXEC_OK")
 
@@ -248,16 +274,67 @@ pkgs.testers.nixosTest {
     console_command_fails(1, "alice", "alicepw", "sudo true")
     console_command_fails(1, "alice", "alicepw", "/run/wrappers/bin/pkexec true")
 
-    # Persistencia del home antes del reinicio.
-    run_expect("alice", "alicepw", "echo persist > /home/alice/.persist-test")
-
-    # SetPassword cambia la contraseña y la vieja deja de valer.
-    set_password(alice, "newalicepw", "alicepw")
-    pamtester_ok("gdm-password", "alice", "newalicepw")
+    # La clave de recuperación restablece la contraseña olvidada (users.manage).
+    machine.fail(
+        f"busctl --system call {bus} {alice} {user_iface} ResetPassword"
+        " ss ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc wrongpw"
+    )
+    reset_password(alice, recovery_key, "recoverypw")
+    pamtester_ok("gdm-password", "alice", "recoverypw")
     pamtester_fails("gdm-password", "alice", "alicepw")
     rc, _ = run_expect("alice", "alicepw", "true")
     assert rc != 0, "la contraseña vieja sigue funcionando"
+    run_expect("alice", "recoverypw", "id -un | grep -q alice")
+
+    # SetPassword cambia la contraseña y la vieja deja de valer.
+    set_password(alice, "newalicepw", "recoverypw")
+    pamtester_ok("gdm-password", "alice", "newalicepw")
+    pamtester_fails("gdm-password", "alice", "recoverypw")
+    rc, _ = run_expect("alice", "recoverypw", "true")
+    assert rc != 0, "la contraseña vieja sigue funcionando"
     run_expect("alice", "newalicepw", "id -un | grep -q alice")
+
+    # Persistencia del home antes del reinicio.
+    run_expect("alice", "newalicepw", "echo persist > /home/alice/.persist-test")
+
+    # ResetPassword como el propio usuario, sin polkit de administración.
+    bob_job = create(
+        "bob",
+        '2 "real-name" s "Bob" "password" s "bobpw"',
+    )
+    wait_job(bob_job)
+    bob = find("bob")
+    bob_key = job_string(bob_job, "RecoveryKey")
+    run_expect("bob", "bobpw", "echo archived > /home/bob/marker")
+    run_expect(
+        "bob",
+        "bobpw",
+        f"busctl --system call {bus} {bob} {user_iface} ResetPassword ss {bob_key} bobnew",
+    )
+    pamtester_ok("gdm-password", "bob", "bobnew")
+    pamtester_fails("gdm-password", "bob", "bobpw")
+    run_expect("bob", "bobnew", "test -f /home/bob/marker")
+
+    # ArchiveUser con homed: keep_home=false mueve el .homedir.
+    wait_not_busy("bob")
+    bob_archive = archive(bob, False)
+    wait_job(bob_archive)
+    machine.succeed("test ! -e /home/bob.homedir")
+    machine.succeed("grep -R -q archived /var/lib/keel-userd/archive/bob-*")
+    machine.wait_until_fails("getent passwd bob")
+
+    # ArchiveUser con homed: keep_home=true deja los datos.
+    carol_job = create(
+        "carol",
+        '2 "real-name" s "Carol" "password" s "carolpw"',
+    )
+    wait_job(carol_job)
+    carol = find("carol")
+    run_expect("carol", "carolpw", "echo keep > /home/carol/marker")
+    wait_not_busy("carol")
+    carol_archive = archive(carol, True)
+    wait_job(carol_archive)
+    machine.succeed("test -f /home/carol.homedir/marker")
 
     # Reinicio: usuarios, homes y contraseñas siguen funcionando.
     machine.shutdown()
@@ -268,6 +345,8 @@ pkgs.testers.nixosTest {
     machine.wait_until_succeeds("getent passwd alice")
     machine.wait_until_succeeds("getent passwd admin")
     machine.succeed("test -d /var/lib/systemd/home")
+    machine.succeed("grep -R -q archived /var/lib/keel-userd/archive/bob-*")
+    machine.succeed("test -f /home/carol.homedir/marker")
 
     console_login(1, "alice", "newalicepw")
     run_expect("alice", "newalicepw", "test -f /home/alice/.persist-test")

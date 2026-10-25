@@ -1,4 +1,8 @@
 <interface name="io.github.HBlanqueto.Keel.Userd1.User">
+  <method name="ResetPassword">
+    <arg name="recovery_key" type="s" direction="in"/>
+    <arg name="new_password" type="s" direction="in"/>
+  </method>
   <method name="SetPassword">
     <arg name="password" type="s" direction="in"/>
     <arg name="old_password" type="s" direction="in"/>

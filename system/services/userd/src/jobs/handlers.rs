@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use crate::Error;
 use crate::identity::{homed, userdb};
+use crate::jobs::Scheduler;
 use crate::services::Services;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -41,12 +42,16 @@ pub struct ArchiveUserPayload {
 
 pub struct CreateUserHandler {
     services: Arc<Services>,
+    scheduler: Arc<Scheduler>,
 }
 
 impl CreateUserHandler {
     #[must_use]
-    pub fn new(services: Arc<Services>) -> Self {
-        Self { services }
+    pub fn new(services: Arc<Services>, scheduler: Arc<Scheduler>) -> Self {
+        Self {
+            services,
+            scheduler,
+        }
     }
 
     async fn create(&self, job: &JobRecord) -> Result<(), Error> {
@@ -102,7 +107,7 @@ impl CreateUserHandler {
                             "contraseña perdida tras el reinicio, repite CreateUser".into(),
                         ));
                     }
-                    homed::create(
+                    let recovery_key = homed::create(
                         &connection,
                         &spec,
                         payload.password_hash.as_deref(),
@@ -110,6 +115,9 @@ impl CreateUserHandler {
                         self.services.config.homed_storage,
                     )
                     .await?;
+                    if let Some(recovery_key) = recovery_key {
+                        self.scheduler.set_result(job.id, recovery_key)?;
+                    }
                 }
                 IdentityBackendKind::Declared => {
                     return Err(Error::Forbidden("declared users are read-only".into()));
@@ -194,28 +202,7 @@ impl ArchiveUserHandler {
                         std::os::unix::fs::PermissionsExt::from_mode(0o700),
                     )?;
                 } else {
-                    let archive = self.services.config.archive_dir();
-                    std::fs::create_dir_all(&archive)?;
-                    std::fs::set_permissions(
-                        &archive,
-                        std::os::unix::fs::PermissionsExt::from_mode(0o700),
-                    )?;
-                    let nanos = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_nanos();
-                    let target = archive.join(format!("{}-{nanos}", view.name));
-                    if let Err(error) = std::fs::rename(&home, &target) {
-                        if error.kind() == std::io::ErrorKind::CrossesDevices
-                            || error.raw_os_error() == Some(18)
-                        {
-                            return Err(Error::Identity(
-                                "home and archive are on different filesystems; move it manually"
-                                    .into(),
-                            ));
-                        }
-                        return Err(error.into());
-                    }
+                    self.move_home(&view.name, &home)?;
                 }
             }
         }
@@ -226,6 +213,12 @@ impl ArchiveUserHandler {
                     .remove(&view.name, view.uid)?;
             }
             IdentityBackendKind::Homed => {
+                if !payload.keep_home {
+                    let home = homed::image_path(&view.name);
+                    if home.exists() {
+                        self.move_home(&view.name, &home)?;
+                    }
+                }
                 let connection = self
                     .services
                     .connection()?
@@ -241,6 +234,31 @@ impl ArchiveUserHandler {
         self.services.registry.release(view.name.as_str())?;
         self.services.unregister_user(view.uid).await?;
         self.services.emit_user_removed(view.uid).await?;
+        Ok(())
+    }
+
+    fn move_home(&self, name: &Username, home: &std::path::Path) -> Result<(), Error> {
+        let archive = self.services.config.archive_dir();
+        std::fs::create_dir_all(&archive)?;
+        std::fs::set_permissions(
+            &archive,
+            std::os::unix::fs::PermissionsExt::from_mode(0o700),
+        )?;
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let target = archive.join(format!("{name}-{nanos}"));
+        if let Err(error) = std::fs::rename(home, &target) {
+            if error.kind() == std::io::ErrorKind::CrossesDevices
+                || error.raw_os_error() == Some(18)
+            {
+                return Err(Error::Identity(
+                    "home and archive are on different filesystems; move it manually".into(),
+                ));
+            }
+            return Err(error.into());
+        }
         Ok(())
     }
 }

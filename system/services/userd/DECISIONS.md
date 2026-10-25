@@ -97,9 +97,19 @@ cerró al implementar F0, F1a y lo que queda pendiente para fases futuras.
   guarda en `.user-privileged`, aunque no se use para PAM.
 - **homed.** `CreateHome` recibe `privileged.hashedPassword` y
   `secret.password`; systemd-homed exige ambos para crear el home y propagar la
-  contraseña. El almacenamiento por defecto es `subvolume`; el test usa
+  contraseña. Además se genera una clave de recuperación `modhex64` como hace
+  `homectl --recovery-key=yes`: su hash va en `privileged.recoveryKey`, el tipo
+  en `recoveryKeyType` y la clave en claro en `secret.password` junto a la
+  contraseña normal. El almacenamiento por defecto es `subvolume`; el test usa
   `directory` porque su raíz es ext4. Los UIDs se asignan en `60001-60513`
   (`HOMED_UID_RANGE` en `bus/manager.rs`).
+- **Clave de recuperación.** `CreateUser` la devuelve una sola vez en la
+  propiedad de solo lectura `Job.RecoveryKey`. Vive en memoria del scheduler,
+  no se escribe en redb, KDL ni logs, y se borra al purgar el job. Si el
+  proceso se reinicia antes de que el cliente la lea, se pierde: para eso está
+  el resto de credenciales. `User.ResetPassword(recovery_key, new_password)` la
+  usa como secreto antiguo de `ChangePasswordHome`; autoriza `users.manage` o
+  al propio usuario.
 - **PAM.** No se añade código PAM. Con `services.homed.enable`, NixOS pone
   `pam_systemd_home` en `login`, `polkit-1`, `sudo`, `su` y `systemd-user`;
   `gdm-password` lo hereda de `login` con `substack`. El test comprueba los
@@ -113,6 +123,11 @@ cerró al implementar F0, F1a y lo que queda pendiente para fases futuras.
   es `SetPassword(ss)` (`password`, `old_password`). Sin la antigua, systemd-
   homed no puede reautenticar el registro ni actualizar el `.identity`
   embebido, y la contraseña nueva no serviría hasta un login con la vieja.
+  Como el registro tiene una clave de recuperación, homed exige también su
+  texto plano para recompilar todas las credenciales. Mientras el job
+  `CreateUser` siga en memoria, `SetPassword` la añade al secreto antiguo; si
+  el job se purgó o el daemon reinició, hay que usar `ResetPassword` con la
+  clave guardada.
 - **Persistencia.** `/var/lib/systemd/home` y `/var/lib/keel-userd` están en
   `environment.persistence."/persist"`. Los homes de homed viven en `/home`
   (subvolumen `@home` en el sistema real, `directory` en el test) y
@@ -122,13 +137,19 @@ cerró al implementar F0, F1a y lo que queda pendiente para fases futuras.
   `stateDir/archive/<name>-<nanos>`; si el origen y el destino están en
   filesystems distintos se devuelve un error claro en vez de copiar.
   `keep_home=true` deja el home en `/home` con `root:root 0700`. En homed se
-  desregistra el home y el UID liberado queda como *tombstone* en el registro,
+  mueve `/home/<name>.homedir` (directorio o subvolumen) con `rename` antes de
+  `UnregisterHome`; `keep_home=true` no mueve nada y deja esos datos en
+  `/home/<name>.homedir` tras desregistrar la cuenta. systemd-homed puede
+  redescubrir ese `.homedir` y volver a registrar la cuenta; es el precio de
+  conservar los datos. El UID liberado queda como *tombstone* en el registro,
   sin reutilizarse.
 - **nixosTest `userd-f1`.** Cubre usuarios homed, sin login userdb: alta,
-  login por tty1 y `su`, sudo y pkexec con contraseña, `pamtester` sobre
-  `gdm-password`, `SetPassword` con la vieja dejando de valer, declared de
-  solo lectura y todo lo anterior tras reiniciar la VM. No usa
-  `wheelNeedsPassword = false`.
+  clave de recuperación devuelta una vez y ausente del disco, reset con esa
+  clave tanto por administrador como por el propio usuario, login por tty1 y
+  `su`, sudo y pkexec con contraseña, `pamtester` sobre `gdm-password`,
+  `SetPassword` con la vieja dejando de valer, archive de homed con
+  `keep_home` falso y verdadero, declared de solo lectura y todo lo anterior
+  tras reiniciar la VM. No usa `wheelNeedsPassword = false`.
 
 ## Fases futuras (no implementado)
 

@@ -8,6 +8,7 @@
   <property name="Error" type="s" access="read"/>
   <property name="Kind" type="s" access="read"/>
   <property name="Progress" type="u" access="read"/>
+  <property name="RecoveryKey" type="s" access="read"/>
   <property name="State" type="s" access="read"/>
   <property name="Target" type="s" access="read"/>
 </interface>

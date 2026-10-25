@@ -50,6 +50,61 @@ impl User {
         self.view.state.to_owned()
     }
 
+    async fn reset_password(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(signal_emitter)] emitter: zbus::object_server::SignalEmitter<'_>,
+        recovery_key: String,
+        new_password: String,
+    ) -> Result<(), DbusError> {
+        if !self.view.managed || self.view.backend == IdentityBackendKind::Declared {
+            return Err(DbusError::ReadOnly(
+                "declared users have read-only identity".into(),
+            ));
+        }
+        if self.view.backend != IdentityBackendKind::Homed {
+            return Err(DbusError::InvalidConfig(
+                "recovery key reset is only available for homed users".into(),
+            ));
+        }
+        if recovery_key.is_empty() || new_password.is_empty() {
+            return Err(DbusError::InvalidConfig(
+                "recovery key and new password cannot be empty".into(),
+            ));
+        }
+
+        let connection = emitter.connection();
+        let caller = authz::caller_uid(connection, &header)
+            .await
+            .map_err(|error| DbusError::Failed(error.to_string()))?;
+        if caller != self.view.uid.get() {
+            match authz::check(
+                connection,
+                &header,
+                keel_userd_core::names::PolkitAction::UsersManage,
+            )
+            .await
+            {
+                Ok(true) => {}
+                Ok(false) => {
+                    return Err(DbusError::PermissionDenied(
+                        "not authorized to reset this password".into(),
+                    ));
+                }
+                Err(error) => return Err(DbusError::Failed(error.to_string())),
+            }
+        }
+
+        identity::homed::set_password(
+            connection,
+            &self.view.name,
+            &new_password,
+            &[recovery_key.as_str()],
+        )
+        .await
+        .map_err(|error| DbusError::Failed(error.to_string()))
+    }
+
     async fn set_password(
         &self,
         #[zbus(header)] header: Header<'_>,
@@ -95,14 +150,14 @@ impl User {
                     .map_err(|error| DbusError::Failed(error.to_string()))?;
             }
             IdentityBackendKind::Homed => {
-                identity::homed::set_password(
-                    connection,
-                    &self.view.name,
-                    &password,
-                    &old_password,
-                )
-                .await
-                .map_err(|error| DbusError::Failed(error.to_string()))?;
+                let recovery_key = self.services.recovery_key(&self.view.name);
+                let mut old_secrets = vec![old_password.as_str()];
+                if let Some(key) = &recovery_key {
+                    old_secrets.push(key.as_str());
+                }
+                identity::homed::set_password(connection, &self.view.name, &password, &old_secrets)
+                    .await
+                    .map_err(|error| DbusError::Failed(error.to_string()))?;
             }
             IdentityBackendKind::Declared => {
                 return Err(DbusError::ReadOnly(

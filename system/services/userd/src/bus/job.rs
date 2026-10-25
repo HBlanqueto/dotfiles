@@ -75,6 +75,15 @@ impl Job {
     }
 
     #[zbus(property)]
+    fn recovery_key(&self) -> zbus::fdo::Result<String> {
+        Ok(self
+            .scheduler
+            .result(self.id)
+            .map_err(|error| zbus::fdo::Error::Failed(error.to_string()))?
+            .map_or_else(String::new, |key| key.to_string()))
+    }
+
+    #[zbus(property)]
     fn error(&self) -> zbus::fdo::Result<String> {
         Ok(self
             .record()?

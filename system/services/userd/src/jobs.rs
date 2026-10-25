@@ -11,6 +11,7 @@ use keel_userd_core::job::{JobFailure, JobKind, JobRecord, JobState};
 use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
 use tokio::sync::{Semaphore, mpsc};
 use zbus::Connection;
+use zeroize::Zeroizing;
 
 use crate::Error;
 use crate::bus::Job;
@@ -85,6 +86,7 @@ pub struct Scheduler {
     journal: Journal,
     database: Arc<Database>,
     jobs: RwLock<HashMap<JobId, JobRecord>>,
+    results: RwLock<HashMap<JobId, Zeroizing<String>>>,
     actors: tokio::sync::Mutex<HashMap<String, mpsc::Sender<JobId>>>,
     semaphore: Arc<Semaphore>,
     handlers: RwLock<HashMap<JobKind, Arc<dyn Handler>>>,
@@ -120,6 +122,7 @@ impl Scheduler {
             journal,
             database,
             jobs: RwLock::new(records.into_iter().map(|job| (job.id, job)).collect()),
+            results: RwLock::new(HashMap::new()),
             actors: tokio::sync::Mutex::new(HashMap::new()),
             semaphore: Arc::new(Semaphore::new(config.max_builds.max(1))),
             handlers: RwLock::new(HashMap::new()),
@@ -199,6 +202,41 @@ impl Scheduler {
         Ok(read_lock(&self.jobs, "jobs")?.get(&id).cloned())
     }
 
+    /// Guarda un resultado efímero del job. No se persiste en el journal.
+    pub fn set_result(&self, id: JobId, result: Zeroizing<String>) -> Result<(), Error> {
+        if self.record(id)?.is_none() {
+            return Err(Error::JobNotFound(id));
+        }
+        write_lock(&self.results, "results")?.insert(id, result);
+        Ok(())
+    }
+
+    pub fn result(&self, id: JobId) -> Result<Option<Zeroizing<String>>, Error> {
+        Ok(read_lock(&self.results, "results")?.get(&id).cloned())
+    }
+
+    /// Última clave de recuperación de un `CreateUser` que siga en memoria.
+    pub fn result_for_user(
+        &self,
+        name: &keel_userd_core::ids::Username,
+    ) -> Result<Option<Zeroizing<String>>, Error> {
+        let jobs = read_lock(&self.jobs, "jobs")?;
+        let id = jobs
+            .values()
+            .filter(|job| {
+                job.kind == JobKind::CreateUser
+                    && job.user.as_ref() == Some(name)
+                    && matches!(job.state, JobState::Succeeded)
+            })
+            .max_by_key(|job| job.id)
+            .map(|job| job.id);
+        drop(jobs);
+        match id {
+            Some(id) => self.result(id),
+            None => Ok(None),
+        }
+    }
+
     /// Borra los jobs en estado terminal más antiguos que `retention`.
     pub async fn purge_old_jobs(self: &Arc<Self>, retention: Duration) -> Result<(), Error> {
         let scheduler = Arc::clone(self);
@@ -217,6 +255,7 @@ impl Scheduler {
             for id in ids {
                 scheduler.journal.delete(id)?;
                 write_lock(&scheduler.jobs, "jobs")?.remove(&id);
+                write_lock(&scheduler.results, "results")?.remove(&id);
                 tracing::debug!(id = id.get(), "purged old terminal job");
             }
             Ok::<(), Error>(())
@@ -622,6 +661,63 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
         panic!("first job did not finish");
+    }
+
+    #[tokio::test]
+    async fn results_are_memory_only_and_purged() {
+        struct Done;
+        impl Handler for Done {
+            fn run<'a>(
+                &'a self,
+                _job: &'a JobRecord,
+            ) -> Pin<Box<dyn Future<Output = Result<(), JobFailure>> + Send + 'a>> {
+                Box::pin(async { Ok(()) })
+            }
+        }
+
+        let config = temp_config("results");
+        let scheduler = Scheduler::open(&config).await.expect("scheduler");
+        scheduler
+            .register(JobKind::ModifyUser, Arc::new(Done))
+            .await
+            .expect("register");
+        scheduler.enqueue(record(4)).await.expect("enqueue");
+
+        for _ in 0..100 {
+            let finished = scheduler
+                .record(JobId::new(4))
+                .expect("lock")
+                .is_some_and(|job| matches!(job.state, JobState::Succeeded));
+            if finished {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        scheduler
+            .set_result(JobId::new(4), Zeroizing::new("secret-key".into()))
+            .expect("result");
+        assert_eq!(
+            scheduler
+                .result(JobId::new(4))
+                .expect("result")
+                .as_ref()
+                .map(|key| key.as_str()),
+            Some("secret-key")
+        );
+        let journal =
+            serde_json::to_string(&scheduler.journal.all().expect("journal")).expect("json");
+        assert!(!journal.contains("secret-key"));
+
+        tokio::time::sleep(Duration::from_millis(1100)).await;
+        scheduler
+            .purge_old_jobs(Duration::ZERO)
+            .await
+            .expect("purge");
+        assert!(scheduler.result(JobId::new(4)).expect("result").is_none());
+        assert!(scheduler.record(JobId::new(4)).expect("record").is_none());
+
+        std::fs::remove_dir_all(&config.state_dir).ok();
     }
 
     #[tokio::test]

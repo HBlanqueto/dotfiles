@@ -4,11 +4,18 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 
+use zeroize::Zeroizing;
+
 use crate::Error;
 
 /// Hashea una contraseña en blocking; llamar desde `spawn_blocking`.
 pub async fn hash(password: String) -> Result<String, Error> {
-    tokio::task::spawn_blocking(move || hash_blocking(&password))
+    hash_secret(Zeroizing::new(password)).await
+}
+
+/// Igual que [`hash`], pero mantiene la contraseña zeroizada mientras se hashea.
+pub async fn hash_secret(password: Zeroizing<String>) -> Result<String, Error> {
+    tokio::task::spawn_blocking(move || hash_blocking(password.as_str()))
         .await
         .map_err(|error| Error::Password(error.to_string()))?
 }

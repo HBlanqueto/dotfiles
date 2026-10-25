@@ -64,6 +64,14 @@ pub struct DeclaredUser {
     pub shell: String,
 }
 
+fn default_shell() -> String {
+    "/bin/sh".to_owned()
+}
+
+fn default_jobs_retention() -> u64 {
+    7 * 24 * 60 * 60
+}
+
 /// Configuración generada por el módulo NixOS en `/etc/keel/userd.json`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
@@ -77,6 +85,10 @@ pub struct Config {
     pub homed_storage: HomedStorage,
     pub declared_users: Vec<DeclaredUser>,
     pub max_builds: usize,
+    #[serde(default = "default_shell")]
+    pub default_shell: String,
+    #[serde(default = "default_jobs_retention", rename = "jobs_retention_seconds")]
+    pub jobs_retention: u64,
 }
 
 impl Default for Config {
@@ -85,11 +97,7 @@ impl Default for Config {
             state_dir: PathBuf::from("/var/lib/keel-userd"),
             userdb_dir: PathBuf::from("/etc/userdb"),
             inputs_json: PathBuf::from("/etc/keel/userd-inputs.json"),
-            identity_priority: vec![
-                IdentityBackendKind::Userdb,
-                IdentityBackendKind::Homed,
-                IdentityBackendKind::Declared,
-            ],
+            identity_priority: vec![IdentityBackendKind::Homed, IdentityBackendKind::Declared],
             package_priority: vec![
                 PackageBackendKind::NixProfile,
                 PackageBackendKind::HomeManager,
@@ -99,6 +107,8 @@ impl Default for Config {
             homed_storage: HomedStorage::Subvolume,
             declared_users: Vec::new(),
             max_builds: 2,
+            default_shell: default_shell(),
+            jobs_retention: default_jobs_retention(),
         }
     }
 }

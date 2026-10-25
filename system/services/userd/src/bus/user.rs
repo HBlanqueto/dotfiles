@@ -55,6 +55,7 @@ impl User {
         #[zbus(header)] header: Header<'_>,
         #[zbus(signal_emitter)] emitter: zbus::object_server::SignalEmitter<'_>,
         password: String,
+        old_password: String,
     ) -> Result<(), DbusError> {
         if !self.view.managed || self.view.backend == IdentityBackendKind::Declared {
             return Err(DbusError::ReadOnly(
@@ -94,9 +95,14 @@ impl User {
                     .map_err(|error| DbusError::Failed(error.to_string()))?;
             }
             IdentityBackendKind::Homed => {
-                identity::homed::set_password(connection, &self.view.name, &password)
-                    .await
-                    .map_err(|error| DbusError::Failed(error.to_string()))?;
+                identity::homed::set_password(
+                    connection,
+                    &self.view.name,
+                    &password,
+                    &old_password,
+                )
+                .await
+                .map_err(|error| DbusError::Failed(error.to_string()))?;
             }
             IdentityBackendKind::Declared => {
                 return Err(DbusError::ReadOnly(

@@ -1,4 +1,4 @@
-# nixosTest de F1a: backends de identidad userdb/homed/declared.
+# nixosTest de F1a: identidad homed/declared y login por PAM.
 {
   pkgs,
   inputs,
@@ -9,7 +9,12 @@ pkgs.testers.nixosTest {
   name = "keel-userd-f1";
 
   nodes.machine =
-    { lib, pkgs, ... }:
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     {
       imports = [
         inputs.impermanence.nixosModules.impermanence
@@ -22,14 +27,24 @@ pkgs.testers.nixosTest {
         enable = true;
         package = daemon;
         persistence.enable = true;
+        # El test corre sobre ext4; homed necesita btrfs para `subvolume`.
         identity.homed.storage = "directory";
       };
 
       services.homed.promptOnFirstBoot = false;
-      security.sudo.wheelNeedsPassword = false;
+
+      # Servicio PAM que simula el login gráfico; no arrancamos GDM para no
+      # engordar la VM. Las reglas por defecto incluyen pam_systemd_home.
+      security.pam.services.gdm-password = {
+        unixAuth = true;
+        startSession = true;
+      };
+      security.polkit.enablePkexecWrapper = true;
+
       environment.systemPackages = [
         pkgs.util-linux
         pkgs.expect
+        pkgs.pamtester
       ];
 
       users.users.declared = {
@@ -85,140 +100,191 @@ pkgs.testers.nixosTest {
             f"busctl --system get-property {bus} {path} {iface} {name}"
         )
 
-    def run_as(name, password, command, marker):
+    def run_expect(user, password, command):
+        """Ejecuta `su - user -c command` con expect y devuelve (rc, output)."""
         expect_block = (
-            f'\"Password:\" {{ send \"{password}\\r\"; exp_continue }} '
-            f'\"Login incorrect\" {{ close; wait; exit 4 }} '
-            f'\"{marker}\" {{ close; wait; exit 0 }} '
-            f'eof {{ wait; exit 2 }} '
-            f'timeout {{ close; wait; exit 5 }}'
+            '-re {[Pp]assword[^:]*:} { send "' + password + '\\r"; exp_continue } '
+            '"Authentication is required" { exp_continue } '
+            '"Sorry, try again" { close; wait; exit 4 } '
+            '"not authorized" { close; wait; exit 5 } '
+            '"is not in the sudoers file" { close; wait; exit 5 } '
+            'eof { wait; exit 2 } '
+            'timeout { close; wait; exit 6 }'
         )
         machine.succeed(
             "set +e; "
-            f"expect -c 'set timeout 30; "
-            f"spawn su - {name} -c \"{command}\"; "
+            "expect -c 'set timeout 30; "
+            f'spawn su - {user} -c "{command}"; '
             f"expect {expect_block}; "
-            "catch wait result; exit [lindex $result 3]' > /tmp/run_as.out 2>&1; "
-            "echo $? > /tmp/run_as.rc"
+            "catch wait result; exit [lindex $result 3]' > /tmp/run.out 2>&1; "
+            "echo $? > /tmp/run.rc"
         )
-        rc = int(machine.succeed("cat /tmp/run_as.rc").strip())
-        output = machine.succeed("cat /tmp/run_as.out")
+        rc = int(machine.succeed("cat /tmp/run.rc").strip())
+        output = machine.succeed("cat /tmp/run.out")
         return rc, output
 
-    def login_as(name, password):
-        rc, output = run_as(name, password, "id -un", name)
-        assert rc == 0, output
-        assert name in output, output
+    def console_start(tty, user, password):
+        machine.send_key(f"alt-f{tty}")
+        machine.wait_until_succeeds(f"[ $(fgconsole) = {tty} ]")
+        machine.wait_for_unit(f"getty@tty{tty}.service")
+        machine.wait_until_succeeds(f"pgrep -f 'agetty.*tty{tty}'")
+        machine.wait_until_tty_matches(str(tty), "login: ")
+        machine.send_chars(user, 0.05)
+        machine.send_key("ret")
+        machine.wait_until_tty_matches(str(tty), "Password: ", timeout=30)
+        machine.send_chars(password, 0.05)
+        machine.send_key("ret")
+        machine.wait_until_succeeds(f"pgrep -u {user} bash", timeout=30)
+        machine.send_chars("clear", 0.05)
+        machine.send_key("ret")
+        machine.wait_until_tty_matches(str(tty), "$", timeout=10)
 
-    def can_sudo(name, password):
-        rc, output = run_as(name, password, "sudo -n true && echo SUDO_OK", "SUDO_OK")
-        return rc == 0 and "SUDO_OK" in output
+    def console_finish(tty, user):
+        machine.send_chars("exit", 0.05)
+        machine.send_key("ret")
+        # sudo/pkexec pueden dejar el shell en un estado raro; nos aseguramos.
+        machine.succeed(f"pkill -KILL -u {user} bash || true")
+        machine.wait_until_fails(f"pgrep -u {user} bash", timeout=30)
+        machine.wait_for_unit(f"getty@tty{tty}.service")
+        machine.wait_until_succeeds(f"pgrep -f 'agetty.*tty{tty}'", timeout=30)
+
+    def console_login(tty, user, password):
+        console_start(tty, user, password)
+        machine.send_chars(f"id -un > /tmp/{user}-tty-login", 0.05)
+        machine.send_key("ret")
+        machine.wait_for_file(f"/tmp/{user}-tty-login")
+        console_finish(tty, user)
+
+    def console_command_ok(tty, user, password, command, marker):
+        console_start(tty, user, password)
+        machine.send_chars(command, 0.05)
+        machine.send_key("ret")
+        machine.wait_until_tty_matches(str(tty), "assword", timeout=30)
+        machine.send_chars(password, 0.05)
+        machine.send_key("ret")
+        machine.wait_until_tty_matches(str(tty), marker, timeout=60)
+        console_finish(tty, user)
+
+    def console_command_fails(tty, user, password, command):
+        console_start(tty, user, password)
+        machine.send_chars(f"{command}; echo FAILED", 0.05)
+        machine.send_key("ret")
+        try:
+            machine.wait_until_tty_matches(str(tty), "assword", timeout=10)
+            machine.send_chars(password, 0.05)
+            machine.send_key("ret")
+        except Exception:
+            pass
+        try:
+            machine.wait_until_tty_matches(str(tty), "FAILED", timeout=15)
+        except Exception:
+            machine.send_key("ctrl-c")
+            machine.wait_until_tty_matches(str(tty), "FAILED", timeout=30)
+        console_finish(tty, user)
+
+    def pamtester_ok(service, user, password):
+        machine.succeed(f"printf '%s\\n' '{password}' | pamtester {service} {user} authenticate")
+
+    def pamtester_fails(service, user, password):
+        machine.fail(f"printf '%s\\n' '{password}' | pamtester {service} {user} authenticate")
+
+    def set_password(path, password, old_password):
+        machine.succeed(
+            f"busctl --system call {bus} {path} {user_iface} SetPassword ss {password} {old_password}"
+        )
 
 
     machine.start()
     machine.wait_for_unit("keel-userd.service")
     machine.wait_until_succeeds(f"busctl --system status {bus}")
 
-    # Usuario normal de userdb: alta, home y login real.
+    # NixOS debe añadir pam_systemd_home a todos los servicios que autentican.
+    for service in ["login", "gdm-password", "polkit-1", "sudo", "su", "systemd-user"]:
+        machine.succeed(f"grep -q pam_systemd_home /etc/pam.d/{service}")
+
+    # userdb sigue existiendo solo para identidad, nunca para login con contraseña.
+    machine.succeed(
+        f"out=$(busctl --system call {bus} {root} {manager} CreateUser"
+        " sa{sv} nologin 2 backend s userdb password s x 2>&1 || true);"
+        " echo \"$out\" | grep -qi 'userdb no admite login por contraseña'"
+    )
+
+    # Usuario normal de homed: alta, home y login real.
     alice_job = create(
         "alice",
         '2 "real-name" s "Alice" "password" s "alicepw"',
     )
     wait_job(alice_job)
     alice = find("alice")
-    assert "userdb" in prop(alice, user_iface, "Backend")
-    machine.succeed("getent passwd alice")
-    machine.succeed("stat -c %U:%G /home/alice | grep -q alice:alice")
-    machine.succeed("test -f /etc/userdb/alice.user")
-    machine.succeed("test -f /etc/userdb/alice.user-privileged")
-    machine.succeed("test -L /etc/userdb/30000.user")
-    machine.succeed("test -f /etc/userdb/alice:video.membership")
-    login_as("alice", "alicepw")
+    assert "homed" in prop(alice, user_iface, "Backend")
+    machine.wait_until_succeeds("getent passwd alice")
+    machine.succeed("test -d /home/alice.homedir")
+    machine.succeed("test -d /var/lib/systemd/home")
 
-    # Admin de userdb: wheel vía userdb y sudo/polkit.
+    # Login por tty1 y por su.
+    console_login(1, "alice", "alicepw")
+    assert "alice" in machine.succeed("cat /tmp/alice-tty-login")
+    run_expect("alice", "alicepw", "id -un | grep -q alice")
+
+    # PAM para el servicio gráfico.
+    pamtester_ok("gdm-password", "alice", "alicepw")
+    pamtester_fails("gdm-password", "alice", "wrongpassword")
+
+    # Admin de homed: wheel, sudo y polkit pidiendo contraseña.
     admin_job = create(
         "admin",
         '3 "real-name" s "Admin" "admin" b true "password" s "adminpw"',
     )
     wait_job(admin_job)
     admin = find("admin")
-    machine.succeed("test -f /etc/userdb/admin:wheel.membership")
+    assert "homed" in prop(admin, user_iface, "Backend")
     machine.succeed("getent group wheel | grep -q admin")
     machine.succeed("id -nG admin | grep -qw wheel")
     machine.succeed("sudo -l -U admin | grep -q ALL")
-    login_as("admin", "adminpw")
-    assert can_sudo("admin", "adminpw")
-    machine.succeed("grep -q 'unix-group:wheel' /etc/polkit-1/rules.d/10-nixos.rules")
+    console_command_ok(1, "admin", "adminpw", "sudo true && echo SUDO_OK", "SUDO_OK")
+    console_command_ok(1, "admin", "adminpw", "/run/wrappers/bin/pkexec true && echo PKEXEC_OK", "PKEXEC_OK")
 
-    # El usuario normal no puede usar sudo.
-    assert not can_sudo("alice", "alicepw")
+    # El usuario normal no puede usar sudo ni pkexec.
+    console_command_fails(1, "alice", "alicepw", "sudo true")
+    console_command_fails(1, "alice", "alicepw", "/run/wrappers/bin/pkexec true")
 
-    # Usuario de homed con storage directory y login real.
-    bob_job = create(
-        "bob",
-        '3 "real-name" s "Bob" "backend" s "homed" "password" s "bobpassword"',
-    )
-    wait_job(bob_job)
-    bob = find("bob")
-    assert "homed" in prop(bob, user_iface, "Backend")
-    machine.succeed("getent passwd bob")
-    login_as("bob", "bobpassword")
+    # Persistencia del home antes del reinicio.
+    run_expect("alice", "alicepw", "echo persist > /home/alice/.persist-test")
 
+    # SetPassword cambia la contraseña y la vieja deja de valer.
+    set_password(alice, "newalicepw", "alicepw")
+    pamtester_ok("gdm-password", "alice", "newalicepw")
+    pamtester_fails("gdm-password", "alice", "alicepw")
+    rc, _ = run_expect("alice", "alicepw", "true")
+    assert rc != 0, "la contraseña vieja sigue funcionando"
+    run_expect("alice", "newalicepw", "id -un | grep -q alice")
 
-    # Los usuarios declarados son de solo lectura.
-    declared = find("declared")
-    assert "false" in prop(declared, user_iface, "Managed")
-    machine.succeed(
-        f"sh -c 'busctl --system call {bus} {declared} {user_iface} SetPassword s x"
-        " 2>&1 | grep -qi read-only'"
-    )
-    machine.succeed(
-        f"sh -c 'busctl --system call {bus} {root} {manager} ArchiveUser ob {declared} false"
-        " 2>&1 | grep -qi read-only'"
-    )
-
-    # userdb no disponible: sin backend explícito cae en homed.
-    machine.succeed("mount -t tmpfs -o ro tmpfs /etc/userdb")
-    backends = call("ListBackends")
-    assert '"userdb" "userdb" false' in backends, backends
-    carol_job = create(
-        "carol",
-        '2 "real-name" s "Carol" "password" s "carolpassword"',
-    )
-    wait_job(carol_job)
-    carol = find("carol")
-    assert "homed" in prop(carol, user_iface, "Backend")
-    login_as("carol", "carolpassword")
-    machine.succeed("umount /etc/userdb")
-
-    # Archivar un usuario userdb y comprobar que su UID no se reutiliza.
-    archive_job = create("archive", "0")
-    wait_job(archive_job)
-    archive = find("archive")
-    archived_uid = prop(archive, user_iface, "Uid").split()[-1]
-    archive_op = path_of(
-        call("ArchiveUser", f"ob {archive} false")
-    )
-    wait_job(archive_op)
-    machine.fail("test -e /etc/userdb/archive.user")
-    machine.succeed("ls -d /var/lib/keel-userd/archive/archive-* >/dev/null")
-    machine.fail(f"busctl --system call {bus} {root} {manager} FindUserByName s archive")
-
-    next_job = create("next", "0")
-    wait_job(next_job)
-    next_user = find("next")
-    next_uid = prop(next_user, user_iface, "Uid").split()[-1]
-    assert next_uid != archived_uid, (next_uid, archived_uid)
-
-    # Reinicio: los usuarios de userdb y homed siguen existiendo y entrando.
+    # Reinicio: usuarios, homes y contraseñas siguen funcionando.
     machine.shutdown()
     machine.start()
     machine.wait_for_unit("keel-userd.service")
-    machine.wait_for_unit("nscd.service")
+    machine.wait_for_unit("systemd-homed.service")
     machine.wait_until_succeeds(f"busctl --system status {bus}")
     machine.wait_until_succeeds("getent passwd alice")
-    machine.wait_until_succeeds("getent passwd bob")
-    login_as("alice", "alicepw")
-    login_as("bob", "bobpassword")
+    machine.wait_until_succeeds("getent passwd admin")
+    machine.succeed("test -d /var/lib/systemd/home")
+
+    console_login(1, "alice", "newalicepw")
+    run_expect("alice", "newalicepw", "test -f /home/alice/.persist-test")
+    pamtester_ok("gdm-password", "alice", "newalicepw")
+    pamtester_fails("gdm-password", "alice", "alicepw")
+
+    console_command_ok(1, "admin", "adminpw", "sudo true && echo SUDO_OK", "SUDO_OK")
+    console_command_ok(1, "admin", "adminpw", "/run/wrappers/bin/pkexec true && echo PKEXEC_OK", "PKEXEC_OK")
+    console_command_fails(1, "alice", "newalicepw", "sudo true")
+    console_command_fails(1, "alice", "newalicepw", "/run/wrappers/bin/pkexec true")
+
+    # Los declarados siguen siendo de solo lectura.
+    declared = find("declared")
+    assert "false" in prop(declared, user_iface, "Managed")
+    machine.succeed(
+        f"sh -c 'busctl --system call {bus} {declared} {user_iface} SetPassword ss x x"
+        " 2>&1 | grep -qi read-only'"
+    )
   '';
 }

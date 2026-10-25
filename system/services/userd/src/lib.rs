@@ -19,6 +19,7 @@ pub mod storage;
 pub mod store;
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use keel_userd_core::names::{BUS_NAME, ROOT_PATH};
 use tokio::signal::unix::{SignalKind, signal};
@@ -67,6 +68,19 @@ pub async fn run(config: Config) -> Result<(), Error> {
             Arc::new(ArchiveUserHandler::new(Arc::clone(&services))),
         )
         .await?;
+
+    // Purga periódica de jobs terminales antiguos.
+    let scheduler_for_purge = Arc::clone(&scheduler);
+    let retention = Duration::from_secs(config.jobs_retention);
+    tokio::spawn(async move {
+        scheduler_for_purge.purge_old_jobs(retention).await.ok();
+        let mut interval = tokio::time::interval(Duration::from_secs(3600));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            scheduler_for_purge.purge_old_jobs(retention).await.ok();
+        }
+    });
 
     connection
         .object_server()

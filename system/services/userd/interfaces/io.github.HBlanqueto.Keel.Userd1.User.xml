@@ -1,6 +1,7 @@
 <interface name="io.github.HBlanqueto.Keel.Userd1.User">
   <method name="SetPassword">
     <arg name="password" type="s" direction="in"/>
+    <arg name="old_password" type="s" direction="in"/>
   </method>
   <property name="Backend" type="s" access="read"/>
   <property name="Managed" type="b" access="read"/>

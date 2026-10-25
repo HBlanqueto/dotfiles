@@ -171,8 +171,9 @@ nunca reescribas código solo para silenciarlos.
     un código 4 de `nixos-rebuild` no revierte, solo avisa de las unidades en
     fallo. `NIXDOTS_ROOT` va vacío (`/persist`).
   - `kits/userd-core` + `system/services/userd` — keel-userd (F0/F1a), el
-    sustituto de crewd para gestionar cuentas en runtime. F1a implementa
-    backends `userdb`, `systemd-homed` y `declared`, cambio de contraseña y
+    sustituto de crewd para gestionar cuentas en runtime. F1a usa por defecto
+    `homed` y `declared`; `userdb` solo se usa si se pide explícitamente y no
+    admite login por contraseña en NixOS. Incluye cambio de contraseña y
     persistencia del estado en `/persist`. Por defecto no está activo: crewd
     sigue siendo el servicio instalado. Decisiones por fase:
     `system/services/userd/DECISIONS.md`.

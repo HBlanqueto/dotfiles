@@ -30,6 +30,7 @@ pub enum DbusError {
 mod tests {
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
     use keel_userd_core::backend::IdentityBackendKind;
     use keel_userd_core::ids::{JobId, Uid, Username};
@@ -51,12 +52,16 @@ mod tests {
     }
 
     async fn fixture() -> Fixture {
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos();
-        let dir =
-            std::env::temp_dir().join(format!("userd-conformance-{}-{nanos}", std::process::id()));
+        let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "userd-conformance-{}-{nanos}-{counter}",
+            std::process::id()
+        ));
         let config = Arc::new(Config {
             state_dir: dir.join("state"),
             ..Config::default()

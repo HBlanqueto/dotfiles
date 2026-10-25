@@ -76,15 +76,19 @@ pub async fn set_password(
     connection: &Connection,
     name: &Username,
     password: &str,
+    old_password: &str,
 ) -> Result<(), Error> {
-    let secret = serde_json::to_string(&serde_json::json!({
+    let new_secret = serde_json::to_string(&serde_json::json!({
         "password": [password],
+    }))?;
+    let old_secret = serde_json::to_string(&serde_json::json!({
+        "password": [old_password],
     }))?;
     let proxy = Home1ManagerProxy::new(connection)
         .await
         .map_err(|error| Error::Identity(error.to_string()))?;
     proxy
-        .change_password_home(name.as_str(), &secret, "{}")
+        .change_password_home(name.as_str(), &new_secret, &old_secret)
         .await
         .map_err(|error| Error::Identity(format!("ChangePasswordHome: {error}")))
 }

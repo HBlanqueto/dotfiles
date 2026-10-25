@@ -79,53 +79,65 @@ cerró al implementar F0, F1a y lo que queda pendiente para fases futuras.
 
 ## F1a (identidad)
 
-- **Backends.** `userdb`, `homed` y `declared` coexisten; `declared` es de solo
-  lectura. El orden por defecto es `userdb`, `homed`, `declared`; si `userdb`
-  no está disponible, un usuario sin backend explícito cae en `homed`.
-- **userdb.** Escribe registros JSON en `/etc/userdb` siguiendo la especificación
-  de systemd-userdb: `<name>.user`, `<uid>.user`, `<name>.user-privileged`,
-  `<name>.group` y `<name>:<group>.membership`. La contraseña se hashea con
-  `mkpasswd -m yescrypt` y se guarda en `.user-privileged` (`/privileged/hashedPassword`).
-- **homed.** Usa `org.freedesktop.home1.Manager.CreateHome` con
-  `storage = "directory"`. El registro incluye `privileged.hashedPassword`,
-  `secret.password` y `enforcePasswordPolicy = false` para evitar el rechazo de
-  contraseñas sencillas en las VMs de prueba. Los UIDs de homed se asignan en el
-  rango reservado `60001-60513` (`HOMED_UID_RANGE` en `bus/manager.rs`) porque
-  systemd-homed espera usuarios "humanos" en ese rango.
-- **PAM.** `pam_exec.so` con `expose_authtok` se sitúa antes que
-  `pam_systemd_home.so` y `pam_unix.so` con control `sufficient`. Para usuarios
-  userdb autentica directamente; para usuarios homed falla y deja que
-  `pam_systemd_home.so` pregunte la contraseña y desbloquee el hogar. El helper
-  lee la contraseña de stdin hasta EOF, no con `read_line`, porque
-  `pam_exec` no envía salto de línea final.
-- **Login en tests.** `su - <usuario>` desde root sigue pasando por la pila PAM,
-  así que el test usa `expect` para enviar la contraseña en cada prompt
-  `Password:` (incluido el segundo de `pam_systemd_home`).
+- **Backends.** `homed`, `userdb` y `declared` coexisten, pero el orden por
+  defecto es `homed`, `declared`. `userdb` solo se usa si se pide
+  explícitamente en `CreateUser`; no participa en el login. `declared` es de
+  solo lectura.
+- **userdb sin login.** En NixOS el módulo `nss-systemd` se consulta a través
+  de `nsncd`, que corre como usuario `nscd`. `systemd-userdbd` solo entrega
+  `privileged.hashedPassword` a clientes con UID 0 o al propio usuario, así que
+  `nsncd` nunca ve el hash. El resultado es que `pam_unix` no puede autenticar
+  usuarios userdb. Por eso `CreateUser` con `backend=userdb` y contraseña
+  devuelve `InvalidConfig` ("userdb no admite login por contraseña en NixOS;
+  usa homed"). No hay módulo PAM propio ni `pam_exec`: se descartó esa vía
+  porque duplicaba autenticación y no resolvía el problema de fondo.
+- **userdb como identidad.** Sigue escribiendo `<name>.user`, `<uid>.user`,
+  `<name>.user-privileged`, `<name>.group` y `<name>:<group>.membership` para
+  usos sin login. La contraseña se hashea con `mkpasswd -m yescrypt` y se
+  guarda en `.user-privileged`, aunque no se use para PAM.
+- **homed.** `CreateHome` recibe `privileged.hashedPassword` y
+  `secret.password`; systemd-homed exige ambos para crear el home y propagar la
+  contraseña. El almacenamiento por defecto es `subvolume`; el test usa
+  `directory` porque su raíz es ext4. Los UIDs se asignan en `60001-60513`
+  (`HOMED_UID_RANGE` en `bus/manager.rs`).
+- **PAM.** No se añade código PAM. Con `services.homed.enable`, NixOS pone
+  `pam_systemd_home` en `login`, `polkit-1`, `sudo`, `su` y `systemd-user`;
+  `gdm-password` lo hereda de `login` con `substack`. El test comprueba los
+  seis ficheros.
 - **Grupos extra.** Solo `video` se añade automáticamente; `networkmanager` se
-  quitó porque homed valida la existencia de los grupos y `networkmanager` no
-  siempre existe. Los administradores reciben `wheel`.
-- **Persistencia.** `/etc/userdb`, `/var/lib/systemd/home` y
-  `/var/lib/keel-userd` se añaden a `environment.persistence."/persist"`. Sin
-  esto los usuarios userdb desaparecen tras el rollback de la raíz.
-- **ArchiveUser.** El home se copia (no se renombra) a
-  `stateDir/archive/<name>-<timestamp>` para evitar fallos por enlaces cruzados
-  cuando `/home` y `/var/lib/keel-userd` están en diferentes filesystems. El UID
-  liberado queda como *tombstone* en el registro y no se reutiliza.
-- **SetPassword.** Rechaza usuarios declarados con `ReadOnly`; para userdb
-  rehashea y escribe `.user-privileged`; para homed usa
-  `ChangePasswordHome`.
-- **nixosTest `userd-f1`.** Cubre alta/login de userdb y homed, sudo/polkit
-  para admins, fallback a homed cuando `/etc/userdb` es de solo lectura,
-  declared read-only, archive sin reutilización de UID y supervivencia tras
-  reinicio.
+  quitó porque homed valida que el grupo exista. Los administradores reciben
+  `wheel` y `sudo`/`polkit` les piden contraseña (no se usa
+  `wheelNeedsPassword = false`).
+- **SetPassword.** Para userdb rehashea y reescribe `.user-privileged`. Para
+  homed usa `ChangePasswordHome` y exige la contraseña antigua; la firma D-Bus
+  es `SetPassword(ss)` (`password`, `old_password`). Sin la antigua, systemd-
+  homed no puede reautenticar el registro ni actualizar el `.identity`
+  embebido, y la contraseña nueva no serviría hasta un login con la vieja.
+- **Persistencia.** `/var/lib/systemd/home` y `/var/lib/keel-userd` están en
+  `environment.persistence."/persist"`. Los homes de homed viven en `/home`
+  (subvolumen `@home` en el sistema real, `directory` en el test) y
+  sobreviven al reinicio de la raíz. El test escribe un fichero en el home y lo
+  verifica tras reiniciar.
+- **ArchiveUser.** En userdb el home se renombra a
+  `stateDir/archive/<name>-<nanos>`; si el origen y el destino están en
+  filesystems distintos se devuelve un error claro en vez de copiar.
+  `keep_home=true` deja el home en `/home` con `root:root 0700`. En homed se
+  desregistra el home y el UID liberado queda como *tombstone* en el registro,
+  sin reutilizarse.
+- **nixosTest `userd-f1`.** Cubre usuarios homed, sin login userdb: alta,
+  login por tty1 y `su`, sudo y pkexec con contraseña, `pamtester` sobre
+  `gdm-password`, `SetPassword` con la vieja dejando de valer, declared de
+  solo lectura y todo lo anterior tras reiniciar la VM. No usa
+  `wheelNeedsPassword = false`.
 
 ## Fases futuras (no implementado)
 
 - **F1 — crewd.** keel-userd sustituye a crewd: retirar el servicio, los TOML
   de `/persist/keel/users`, `hashedPasswordFile` y su aserción en
   `system/core/user.nix`, y dar un camino de migración para las cuentas
-  existentes de la ThinkPad (leer los TOML y crear los usuarios con userdb o
-  homed antes de apagar lo viejo).
+  existentes de la ThinkPad (leer los TOML y crear los usuarios con homed antes
+  de apagar lo viejo). La migración de F1b cambiará el UID de la cuenta
+  existente al rango de homed y hará `chown` del home.
 - **Primer arranque.** Hoy `firstBoot` sale de `system/lib/data.nix` al evaluar.
   Pasará a decidirse en runtime (`HasNoUsers`), y el asistente de `welcome/`
   llamará a `CreateUser` en vez de escribir TOML y reconstruir.

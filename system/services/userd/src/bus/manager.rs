@@ -106,7 +106,34 @@ impl Manager {
                 .await
                 .map_err(|error| super::DbusError::BackendUnavailable(error.to_string()))?;
 
+        if backend == IdentityBackendKind::Userdb && options.password.is_some() {
+            return Err(super::DbusError::InvalidConfig(
+                "userdb no admite login por contraseña en NixOS; usa homed".into(),
+            ));
+        }
+
         let uid = if let Some(uid) = options.import_uid {
+            if uid < 1000 {
+                return Err(super::DbusError::InvalidConfig(
+                    "imported UIDs below 1000 are reserved for system users".into(),
+                ));
+            }
+            if uid >= 60_000 && backend != IdentityBackendKind::Homed {
+                return Err(super::DbusError::InvalidConfig(
+                    "UIDs >= 60000 are reserved for systemd-homed".into(),
+                ));
+            }
+            if self
+                .services
+                .config
+                .declared_users
+                .iter()
+                .any(|user| user.uid == uid)
+            {
+                return Err(super::DbusError::Conflict(
+                    "UID is already used by a declared user".into(),
+                ));
+            }
             self.services
                 .registry
                 .reserve(name.as_str(), uid)
@@ -291,6 +318,12 @@ fn parse_create_options(
     let password = take_string(&mut options, "password")?;
     let import_uid = take_u32(&mut options, "uid")?;
     let import = take_bool(&mut options, "import")?.unwrap_or(false);
+
+    if groups.iter().any(|group| group == "wheel") {
+        return Err(super::DbusError::InvalidConfig(
+            "use admin=true to grant wheel; do not include it in groups".into(),
+        ));
+    }
 
     if !options.is_empty() {
         return Err(super::DbusError::InvalidConfig(format!(

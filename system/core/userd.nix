@@ -59,10 +59,11 @@ let
 
   collisions = builtins.filter (user: builtins.elem user.name managedNames) declaredUsers;
 
-  pamHelper = pkgs.writeShellScript "keel-userd-pam-check" ''
-    export PATH=${lib.makeBinPath [ pkgs.mkpasswd ]}
-    exec ${cfg.package}/bin/keel-userd "$@"
-  '';
+  defaultShell =
+    if lib.isDerivation config.users.defaultUserShell then
+      "/run/current-system/sw${config.users.defaultUserShell.shellPath}"
+    else
+      toString config.users.defaultUserShell;
 in
 {
   options.keel.userd = {
@@ -95,11 +96,10 @@ in
         ]
       );
       default = [
-        "userdb"
         "homed"
         "declared"
       ];
-      description = "Orden de preferencia de los backends de identidad.";
+      description = "Orden de preferencia de los backends de identidad. `userdb` solo se usa si se pide explícitamente; no admite login por contraseña.";
     };
 
     identity.homed.storage = lib.mkOption {
@@ -143,6 +143,12 @@ in
       ];
       description = "Orden de preferencia de los backends de paquetes.";
     };
+
+    jobs.retention = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 7 * 24 * 60 * 60;
+      description = "Segundos que se conservan los jobs en estado terminal antes de purgarlos.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -154,6 +160,8 @@ in
       uid_range = cfg.identity.userdb.uidRange;
       homed_storage = cfg.identity.homed.storage;
       declared_users = declaredUsers;
+      default_shell = defaultShell;
+      jobs_retention_seconds = cfg.jobs.retention;
     };
 
     assertions = [
@@ -179,72 +187,6 @@ in
 
     services.homed.enable = lib.mkIf (builtins.elem "homed" cfg.identity.priority) true;
     services.nscd.enable = true;
-
-    security.pam.services = lib.mkIf (builtins.elem "userdb" cfg.identity.priority) {
-      login.rules.auth.keel-userd = {
-        order = 9000;
-        control = "sufficient";
-        modulePath = "${pkgs.pam}/lib/security/pam_exec.so";
-        args = [
-          "expose_authtok"
-          "quiet"
-          "${pamHelper}"
-          "pam-auth"
-        ];
-      };
-      login.rules.account.keel-userd = {
-        order = 9000;
-        control = "sufficient";
-        modulePath = "${pkgs.pam}/lib/security/pam_exec.so";
-        args = [
-          "quiet"
-          "${pamHelper}"
-          "pam-account"
-        ];
-      };
-      su.rules.auth.keel-userd = {
-        order = 9000;
-        control = "sufficient";
-        modulePath = "${pkgs.pam}/lib/security/pam_exec.so";
-        args = [
-          "expose_authtok"
-          "quiet"
-          "${pamHelper}"
-          "pam-auth"
-        ];
-      };
-      su.rules.account.keel-userd = {
-        order = 9000;
-        control = "sufficient";
-        modulePath = "${pkgs.pam}/lib/security/pam_exec.so";
-        args = [
-          "quiet"
-          "${pamHelper}"
-          "pam-account"
-        ];
-      };
-      sudo.rules.auth.keel-userd = {
-        order = 9000;
-        control = "sufficient";
-        modulePath = "${pkgs.pam}/lib/security/pam_exec.so";
-        args = [
-          "expose_authtok"
-          "quiet"
-          "${pamHelper}"
-          "pam-auth"
-        ];
-      };
-      sudo.rules.account.keel-userd = {
-        order = 9000;
-        control = "sufficient";
-        modulePath = "${pkgs.pam}/lib/security/pam_exec.so";
-        args = [
-          "quiet"
-          "${pamHelper}"
-          "pam-account"
-        ];
-      };
-    };
 
     systemd.services.keel-userd = {
       description = "keel-userd user management daemon";

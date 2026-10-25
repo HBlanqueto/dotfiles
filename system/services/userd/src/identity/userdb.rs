@@ -114,9 +114,9 @@ impl Userdb {
     }
 
     fn write_privileged(&self, name: &Username, uid: Uid, hash: &str) -> Result<(), Error> {
-        let record = serde_json::json!({
-            "privileged": { "hashedPassword": [hash] },
-        });
+        // El archivo `.user-privileged` contiene exclusivamente la sección
+        // `privileged` del registro JSON, tal como lo espera `nss-systemd`.
+        let record = serde_json::json!({ "privileged": { "hashedPassword": [hash] } });
         self.write_json(&format!("{name}.user-privileged"), &record, 0o600)?;
         self.link(
             &format!("{name}.user-privileged"),

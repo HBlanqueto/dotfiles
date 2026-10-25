@@ -4,6 +4,7 @@ use std::path::Path;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use keel_userd_core::ids::JobId;
 use keel_userd_core::job::{JobFailure, JobKind, JobRecord, JobState};
@@ -58,6 +59,16 @@ impl Journal {
             records.push(serde_json::from_slice(value.value())?);
         }
         Ok(records)
+    }
+
+    pub fn delete(&self, id: JobId) -> Result<(), Error> {
+        let transaction = self.database.begin_write()?;
+        {
+            let mut table = transaction.open_table(JOBS)?;
+            table.remove(id.get())?;
+        }
+        transaction.commit()?;
+        Ok(())
     }
 }
 
@@ -186,6 +197,55 @@ impl Scheduler {
 
     pub fn record(&self, id: JobId) -> Result<Option<JobRecord>, Error> {
         Ok(read_lock(&self.jobs, "jobs")?.get(&id).cloned())
+    }
+
+    /// Borra los jobs en estado terminal más antiguos que `retention`.
+    pub async fn purge_old_jobs(self: &Arc<Self>, retention: Duration) -> Result<(), Error> {
+        let scheduler = Arc::clone(self);
+        tokio::task::spawn_blocking(move || {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            let cutoff = now.saturating_sub(retention.as_secs());
+            let ids: Vec<JobId> = scheduler
+                .records()?
+                .into_iter()
+                .filter(|record| record.is_terminal() && record.updated_at < cutoff)
+                .map(|record| record.id)
+                .collect();
+            for id in ids {
+                scheduler.journal.delete(id)?;
+                write_lock(&scheduler.jobs, "jobs")?.remove(&id);
+                tracing::debug!(id = id.get(), "purged old terminal job");
+            }
+            Ok::<(), Error>(())
+        })
+        .await
+        .map_err(|error| Error::Identity(error.to_string()))?
+    }
+
+    /// Si el payload del job contiene `password_hash`, lo sustituye por `null`
+    /// en memoria y en el journal.
+    pub async fn redact_secrets(self: &Arc<Self>, id: JobId) -> Result<(), Error> {
+        let scheduler = Arc::clone(self);
+        tokio::task::spawn_blocking(move || {
+            let mut record = scheduler
+                .record(id)?
+                .ok_or_else(|| Error::JobNotFound(id))?;
+            if let Some(payload) = record.payload.as_mut()
+                && let Ok(mut value) = serde_json::from_str::<serde_json::Value>(payload)
+                && value.get("password_hash").is_some()
+            {
+                value["password_hash"] = serde_json::Value::Null;
+                *payload = serde_json::to_string(&value)?;
+                scheduler.journal.put(&record)?;
+                write_lock(&scheduler.jobs, "jobs")?.insert(id, record);
+            }
+            Ok::<(), Error>(())
+        })
+        .await
+        .map_err(|error| Error::Identity(error.to_string()))?
     }
 
     /// Cambia el estado solo si el actual cumple `expected`.
@@ -336,6 +396,7 @@ async fn actor(scheduler: Arc<Scheduler>, mut receiver: mpsc::Receiver<JobId>) {
             Ok(()) => JobState::Succeeded,
             Err(failure) => JobState::Failed(failure),
         };
+        let terminal = state.is_terminal();
 
         if let Err(error) = scheduler
             .transition(
@@ -346,6 +407,11 @@ async fn actor(scheduler: Arc<Scheduler>, mut receiver: mpsc::Receiver<JobId>) {
             .await
         {
             tracing::warn!(%error, id = id.get(), "could not finish job");
+        }
+        if terminal {
+            scheduler.redact_secrets(id).await.unwrap_or_else(|error| {
+                tracing::warn!(%error, id = id.get(), "could not redact job payload");
+            });
         }
         drop(permit);
     }

@@ -78,7 +78,10 @@ impl CreateUserHandler {
                 backend: Some(payload.backend),
                 uid: Some(uid),
                 real_name: payload.real_name.clone(),
-                shell: payload.shell.clone(),
+                shell: payload
+                    .shell
+                    .clone()
+                    .or_else(|| Some(self.services.config.default_shell.clone())),
                 groups: payload.groups.clone(),
                 admin: payload.admin,
             };
@@ -94,6 +97,11 @@ impl CreateUserHandler {
                         .connection()?
                         .ok_or_else(|| Error::Identity("D-Bus connection unavailable".into()))?;
                     let password = self.services.take_password(job.id).await;
+                    if payload.password_hash.is_some() && password.is_none() {
+                        return Err(Error::Identity(
+                            "contraseña perdida tras el reinicio, repite CreateUser".into(),
+                        ));
+                    }
                     homed::create(
                         &connection,
                         &spec,
@@ -175,22 +183,40 @@ impl ArchiveUserHandler {
             )));
         }
 
-        if !payload.keep_home && view.backend == IdentityBackendKind::Userdb {
+        if view.backend == IdentityBackendKind::Userdb {
             let home = userdb::Userdb::home(&view.name);
             if home.exists() {
-                let archive = self.services.config.archive_dir();
-                std::fs::create_dir_all(&archive)?;
-                std::fs::set_permissions(
-                    &archive,
-                    std::os::unix::fs::PermissionsExt::from_mode(0o700),
-                )?;
-                let timestamp = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs();
-                let target = archive.join(format!("{}-{timestamp}", view.name));
-                copy_dir_all(&home, &target)?;
-                std::fs::remove_dir_all(&home)?;
+                if payload.keep_home {
+                    // Bloquea el home en /home: root puede acceder, el usuario no.
+                    std::os::unix::fs::chown(&home, Some(0), Some(0))?;
+                    std::fs::set_permissions(
+                        &home,
+                        std::os::unix::fs::PermissionsExt::from_mode(0o700),
+                    )?;
+                } else {
+                    let archive = self.services.config.archive_dir();
+                    std::fs::create_dir_all(&archive)?;
+                    std::fs::set_permissions(
+                        &archive,
+                        std::os::unix::fs::PermissionsExt::from_mode(0o700),
+                    )?;
+                    let nanos = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_nanos();
+                    let target = archive.join(format!("{}-{nanos}", view.name));
+                    if let Err(error) = std::fs::rename(&home, &target) {
+                        if error.kind() == std::io::ErrorKind::CrossesDevices
+                            || error.raw_os_error() == Some(18)
+                        {
+                            return Err(Error::Identity(
+                                "home and archive are on different filesystems; move it manually"
+                                    .into(),
+                            ));
+                        }
+                        return Err(error.into());
+                    }
+                }
             }
         }
 
@@ -253,19 +279,4 @@ async fn is_busy(name: &Username) -> Result<bool, Error> {
     })
     .await
     .map_err(|error| Error::Identity(error.to_string()))?
-}
-
-fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> Result<(), Error> {
-    std::fs::create_dir_all(dst)?;
-    for entry in std::fs::read_dir(src)? {
-        let entry = entry?;
-        let path = entry.path();
-        let target = dst.join(entry.file_name());
-        if path.is_dir() {
-            copy_dir_all(&path, &target)?;
-        } else {
-            std::fs::copy(&path, &target)?;
-        }
-    }
-    Ok(())
 }

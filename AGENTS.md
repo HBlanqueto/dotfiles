@@ -51,6 +51,17 @@ Se cumplen al pie de la letra. Ganan el diff más corto y la respuesta más cort
    trabajar»). Si borras código, borra también sus tests.
 9. **Ahorra tokens.** Lee rangos, no ficheros enteros. No pegues en el chat el
    código que ya está en el diff. Cierra con 1–3 líneas: qué cambió y qué queda.
+10. **Investiga antes de suponer.** Si la causa o la API no está clara,
+   consulta en internet, en este orden:
+   1. el código y la documentación oficial de la dependencia **en la versión
+      fijada**: el código de nixpkgs en el rev de `flake.lock`, el manual de NixOS, la documentación de disko, lanzaboote, nixos-facter y home-manager, y docs.rs para ratatui y Slint;
+   2. los issues, PR, changelogs y discusiones del proyecto upstream;
+   3. foros como Discourse, Stack Overflow o Reddit, solo como pista y
+      contrastados con 1 o 2.
+
+   No adoptes una solución que no puedas apoyar en una fuente. Si la solución
+   es un rodeo, pon el enlace en el commit o en el comentario de una línea de la
+   regla 6. En el chat va la conclusión con el enlace, no la investigación.
 
 ### Así se aplica en dotfiles
 

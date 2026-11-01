@@ -20,6 +20,11 @@
 
     brave-previews.url = "github:drishal/brave-browser-flake";
     brave-previews.inputs.nixpkgs.follows = "nixpkgs";
+
+    malaysia = {
+      url = "github:HBlanqueto/malaysia";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =

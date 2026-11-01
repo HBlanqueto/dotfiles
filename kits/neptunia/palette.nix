@@ -1,8 +1,4 @@
-# Paleta de la consola (neptunia): única fuente para los 16 colores ANSI de
-# console.colors (user.nix) y para la config/línea de comandos de kmscon
-# (system/core/console.nix y installer/nix/kmscon-palette.nix). El negro de fondo
-# puro se define aquí una sola vez. El tema llega como argumento (se importa una
-# sola vez en flake.nix).
+# Console palette: the 16 ANSI colors.
 { theme }:
 let
   inherit (theme) colors;
@@ -32,10 +28,8 @@ let
       toString (byte (builtins.substring 4 2 c))
     }";
 
-  # Fondo negro puro de la TTY (no el bg neptunia).
   black = "000000";
 
-  # Los 16 colores ANSI de la consola del kernel, en orden (0-15).
   consoleColors = [
     black
     colors.c1
@@ -55,7 +49,6 @@ let
     colors.c15
   ];
 
-  # sufijo "" => opción `palette`, el resto => `palette-<sufijo>`.
   entries = [
     {
       suffix = "";

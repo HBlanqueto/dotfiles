@@ -5,9 +5,6 @@
 }:
 
 let
-  # WezTerm solo usa cinco pesos (Normal, Italic, Bold, BoldItalic, y
-  # DemiBold=Half). Descargar los otros siete .otf (~30 MiB) era peso muerto:
-  # no están en cache.nixos.org y el GC semanal los volvía a bajar.
   rev = "dc5a3e6fcc2e16ad476b7be3c3c17c2273b260ea";
   base = "https://raw.githubusercontent.com/shaunsingh/SFMono-Nerd-Font-Ligaturized/${rev}";
 

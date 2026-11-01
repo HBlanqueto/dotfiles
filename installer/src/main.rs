@@ -1,9 +1,4 @@
-//! `installer` — a text-mode installer for the Keel NixOS config.
-//!
-//! With no arguments it runs in dry-run mode: every screen is shown, every
-//! command is displayed, but nothing outside a temporary directory is touched.
-//! `--install` performs the real installation from the NixOS live ISO.
-
+//! Text-mode installer entry point (dry-run by default, `--install` for real).
 use color_eyre::eyre::{bail, Result};
 use nixdots_installer::app::App;
 use nixdots_installer::detect;
@@ -53,15 +48,12 @@ fn help_text() -> String {
     "nixdots-installer [--install] [--repo <ruta|url>]\n\n  (sin argumentos)  simulación\n  --install         instalación real (requiere root, desde la ISO)\n  --repo            repositorio a instalar (defecto github:HBlanqueto/dotfiles)".to_string()
 }
 
-/// Where the installer records that it started and how it exited, so
-/// `install.sh` can tell a kmscon failure from a real run and reuse the code.
 const STATE_DIR: &str = "/tmp/keel-installer";
 
 fn main() -> Result<()> {
     color_eyre::install()?;
     theme::console::install_panic_hook();
 
-    // Keep kernel messages off the console so they never corrupt the TUI.
     let _ = std::process::Command::new("dmesg")
         .arg("-n")
         .arg("1")
@@ -77,8 +69,6 @@ fn main() -> Result<()> {
         return run(args);
     }
 
-    // Real install: tell `install.sh` we started (so it does not relaunch the
-    // ASCII fallback) and record the exit code once we are done.
     mark_started();
     let result = run(args);
     write_exit_code(result.is_ok());
@@ -114,14 +104,11 @@ fn run(args: Args) -> Result<()> {
     result
 }
 
-/// Marks that the installer really started, so `install.sh` knows kmscon handed
-/// control over instead of failing to start.
 fn mark_started() {
     let _ = std::fs::create_dir_all(STATE_DIR);
     let _ = std::fs::write(format!("{}/started", STATE_DIR), b"");
 }
 
-/// Records the exit code (0 ok, 1 otherwise) for `install.sh` to reuse.
 fn write_exit_code(ok: bool) {
     let _ = std::fs::create_dir_all(STATE_DIR);
     let _ = std::fs::write(
@@ -135,8 +122,6 @@ fn prepare_repo(spec: &str, dest: &Path) -> Result<()> {
         std::fs::remove_dir_all(dest).ok();
     }
 
-    // Prefer the repo embedded in the live ISO (`/etc/keel/repo`), so the
-    // install does not depend on the network nor on what is pushed to GitHub.
     let embedded = Path::new("/etc/keel/repo");
     if embedded.exists() {
         let src = std::fs::canonicalize(embedded).unwrap_or_else(|_| embedded.to_path_buf());
@@ -168,9 +153,6 @@ fn copy_dir(src: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Checks out the commit recorded in `/etc/keel/release` (written by the live
-/// ISO) so the install matches what was built, not the tip of the branch.
-/// Best-effort: a shallow clone may lack it, so it is fetched first.
 fn checkout_iso_rev(repo: &Path) {
     let Ok(rev) = nixcore::rebuild::release_commit() else {
         return;

@@ -16,8 +16,6 @@
     security = {
       sudo-rs = {
         enable = true;
-        # El binario solo es ejecutable por wheel: reduce la superficie de
-        # ataque de un setuid para cualquier otra cuenta.
         execWheelOnly = true;
       };
 
@@ -36,7 +34,6 @@
           KbdInteractiveAuthentication = false;
           PermitRootLogin = "no";
         };
-        # Solo ed25519, en /persist para que no se regenere en cada arranque.
         hostKeys = [
           {
             path = "/persist/etc/ssh/ssh_host_ed25519_key";
@@ -45,7 +42,6 @@
         ];
       };
 
-      # Solo para descubrir la impresora Epson; no anunciar servicios.
       avahi = lib.mkIf config.keel.features.epson {
         enable = true;
         nssmdns4 = true;
@@ -59,8 +55,6 @@
         alsa = {
           enable = true;
 
-          # 32-bit ALSA (pkgsi686Linux) only exists on x86; enabling it
-          # breaks evaluation on aarch64, so gate it on the host platform.
           support32Bit = pkgs.stdenv.hostPlatform.isx86_64;
         };
         jack.enable = true;
@@ -69,8 +63,6 @@
     };
 
     systemd = {
-      # Nada de este escritorio espera a la red antes de arrancar; NM ya
-      # conecta en segundo plano. Ahorra hasta varios segundos de arranque.
       services.NetworkManager-wait-online.enable = false;
 
       oomd = {

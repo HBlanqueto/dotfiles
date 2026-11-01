@@ -1,25 +1,7 @@
-//! Color palette.
-//!
-//! Every color is taken verbatim from `kits/neptunia/neptunia.nix`; the test at
-//! the bottom of this module parses that file and fails if the two ever drift
-//! apart. `bg`/`dbg` are intentionally never used as an application background:
-//! the terminal's own background (`Color::Reset`) always shows through.
-//!
-//! Two palettes are produced:
-//!
-//! * [`Palette::truecolor`] uses 24-bit `Color::Rgb`, understood by every
-//!   modern terminal (and by the installer when run over ssh/wezterm/...).
-//! * [`Palette::console`] uses indexed slots after [`console`] has programmed
-//!   them with the same neptunia colors through OSC P. The Linux virtual
-//!   console (`TERM=linux`, the ISO's tty) has no truecolor support, so the
-//!   installer falls back to this.
-
+//! Installer color palette.
 use ratatui::style::Color;
 
-/// Raw hex values mirroring `kits/neptunia/neptunia.nix`.
 pub mod hex {
-    // A data table: not every entry is referenced by the UI, but all are
-    // checked against the theme file by the test below.
     #![allow(dead_code)]
 
     pub const DBG: &str = "0d1219";
@@ -46,13 +28,9 @@ pub mod hex {
     pub const C14: &str = "cee8ff";
     pub const C15: &str = "eef4fa";
 
-    /// `uiDisabled`: a disabled control.
     pub const DISABLED: &str = "2f3a49";
-    /// `uiRule`: the underline of a text field.
     pub const RULE: &str = "2a3442";
-    /// `uiDim`: a non-base background while dimmed.
     pub const DIM: &str = "1c2430";
-    /// `logoLight`: the NixOS logo's light blue, the `~/*` accent on Inicio.
     pub const LOGO_LIGHT: &str = "7fb7ff";
 }
 
@@ -65,7 +43,6 @@ const fn nibble(c: u8) -> u8 {
     }
 }
 
-/// `Color::Rgb` from a 6-digit hex string, usable in const context.
 pub const fn rgb(hex: &str) -> Color {
     let b = hex.as_bytes();
     Color::Rgb(
@@ -75,7 +52,6 @@ pub const fn rgb(hex: &str) -> Color {
     )
 }
 
-/// The 16 palette entries in slot order for OSC P (`slot n = cN`).
 pub const CONSOLE_SLOTS: [&str; 16] = [
     hex::C0,
     hex::C1,
@@ -95,48 +71,27 @@ pub const CONSOLE_SLOTS: [&str; 16] = [
     hex::C15,
 ];
 
-/// Semantic roles used across the UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Palette {
-    /// `fg`
     pub text: Color,
-    /// `c7`
     pub highlight: Color,
-    /// `c8`
     pub muted: Color,
-    /// `lbg`, inactive borders
     pub border: Color,
-    /// `c4`
     pub primary: Color,
-    /// `c12`
     pub focus: Color,
-    /// `c6`
     pub secondary: Color,
-    /// `c2`
     pub success: Color,
-    /// `c3`
     pub warning: Color,
-    /// `c1`
     pub error: Color,
-    /// `c15`, white text on top of colored buttons/rows
     pub white: Color,
-    /// `c0`, dark "well" background (sidebars, list fills)
     pub well: Color,
-    /// `c5`, btrfs snapshot share
     pub snapshot: Color,
-    /// `bg`, text drawn on top of a `primary` fill
     pub on_primary: Color,
-    /// `lbg`, background of the focused row
     pub row_bg: Color,
-    /// `uiDisabled`, a disabled control.
     pub disabled: Color,
-    /// `uiRule`, the underline under a text field.
     pub rule: Color,
-    /// `uiDim`, a non-base background while the screen is dimmed.
     pub dim_bg: Color,
-    /// The NixOS logo's light blue.
     pub logo_light: Color,
-    /// The terminal's own colors.
     pub reset: Color,
 }
 
@@ -166,8 +121,6 @@ impl Palette {
         }
     }
 
-    /// Indexed equivalent, valid only after [`console`] has programmed the
-    /// 16 slots.
     pub const fn console() -> Self {
         Self {
             text: Color::Indexed(15),
@@ -194,41 +147,32 @@ impl Palette {
     }
 }
 
-/// Linux virtual console palette handling via OSC P / OSC R.
 pub mod console {
     use super::CONSOLE_SLOTS;
     use std::io::Write;
 
-    /// `true` when the process is talking to the bare Linux console, which has
-    /// no truecolor support.
     pub fn is_linux_console() -> bool {
         std::env::var("TERM").as_deref() == Ok("linux")
     }
 
     fn write_slots<W: Write>(out: &mut W) -> std::io::Result<()> {
         for (i, hex) in CONSOLE_SLOTS.iter().enumerate() {
-            // ESC ] P <slot> <rrggbb>
             write!(out, "\x1b]P{i:x}{hex}")?;
         }
         out.flush()
     }
 
     fn write_restore<W: Write>(out: &mut W) -> std::io::Result<()> {
-        // ESC ] R
         out.write_all(b"\x1b]R")?;
         out.flush()
     }
 
-    /// Restores the palette on drop, so normal returns, panics and the Ctrl+C
-    /// key path all leave the console as they found it.
     #[must_use = "the guard restores the console palette when dropped"]
     pub struct Guard {
         active: bool,
     }
 
     impl Guard {
-        /// Programs the 16 palette slots when running on the Linux console and
-        /// returns a guard; otherwise a no-op guard.
         pub fn activate() -> Self {
             if !is_linux_console() {
                 return Self { active: false };
@@ -248,10 +192,6 @@ pub mod console {
         }
     }
 
-    /// Installs a panic hook that restores the terminal before the default hook
-    /// prints the backtrace. With `panic = "abort"` a panic skips the normal
-    /// cleanup (`main`'s `restore_terminal`), so without this the shell would be
-    /// left in raw mode / the alternate screen.
     pub fn install_panic_hook() {
         let default = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
@@ -336,7 +276,6 @@ mod tests {
             assert_eq!(theirs, ours, "neptunia.nix {key} cambió");
         }
 
-        // The aliases neptunia.nix defines must still point where we assume.
         assert_eq!(n.get("primary").map(String::as_str), Some("c4"));
         assert_eq!(n.get("primaryBright").map(String::as_str), Some("c12"));
         assert_eq!(n.get("secondary").map(String::as_str), Some("c6"));

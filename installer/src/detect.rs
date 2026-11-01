@@ -1,13 +1,10 @@
-//! Environment detection used by the installer (machine model, disks, the
-//! network backends).
-
+//! Detects the machine model, disks and network backends.
 use serde::Deserialize;
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-/// Runs a command and returns its trimmed stdout, or `None` if it failed.
 pub fn run_trim(program: &str, args: &[&str]) -> Option<String> {
     let output = Command::new(program)
         .args(args)
@@ -25,12 +22,10 @@ pub fn run_trim(program: &str, args: &[&str]) -> Option<String> {
     }
 }
 
-/// `uname -m`, e.g. `x86_64` or `aarch64`.
 pub fn arch() -> Option<String> {
     run_trim("uname", &["-m"])
 }
 
-/// Nix system string (`<arch>-linux`) derived from [`arch`].
 pub fn nix_system() -> Option<String> {
     let arch = arch()?;
     let arch = match arch.as_str() {
@@ -40,12 +35,7 @@ pub fn nix_system() -> Option<String> {
     Some(format!("{arch}-linux"))
 }
 
-/// Whether this machine is expected to use Lanzaboote Secure Boot: a bare-metal
-/// machine (never a VM, not even an x86_64 one, which has no firmware keys to
-/// enroll into; never the aarch64/UTM VM). Drives the sbctl step and the
-/// `secureBoot` field of machine.toml.
 pub fn secure_boot() -> bool {
-    // Any virtualization means no Secure Boot, on every architecture.
     if run_trim("systemd-detect-virt", &[])
         .as_deref()
         .is_some_and(|virt| virt != "none")
@@ -55,8 +45,6 @@ pub fn secure_boot() -> bool {
     !matches!(arch().as_deref(), Some("aarch64") | Some("arm64"))
 }
 
-/// `systemd-detect-virt`. Maps `qemu` to the friendlier «UTM (qemu)» label the
-/// installer shows when it runs inside a UTM/QEMU guest.
 pub fn environment() -> Option<String> {
     let virt = run_trim("systemd-detect-virt", &[])?;
     match virt.as_str() {
@@ -65,9 +53,6 @@ pub fn environment() -> Option<String> {
     }
 }
 
-/// The machine's commercial model, macOS-style: «Máquina virtual», the DMI
-/// product name (or Lenovo's product version), the ARM device-tree model, or
-/// «Laptop»/«PC» as a last resort. Detected in the background at startup.
 pub fn machine_model() -> String {
     let arch = arch().unwrap_or_default();
     let is_arm = arch.starts_with("arm") || arch == "aarch64";
@@ -84,7 +69,6 @@ pub fn machine_model() -> String {
         vendor = dmi_field("sys_vendor").unwrap_or_default();
         let product = dmi_field("product_name");
         let version = dmi_field("product_version");
-        // Lenovo's product_name is a code (20X5…); the version is the real name.
         candidate = if vendor.to_lowercase().contains("lenovo") {
             version.or(product)
         } else {
@@ -125,7 +109,6 @@ fn device_tree_model() -> Option<String> {
     }
 }
 
-/// Firmware placeholders that are not a real model name.
 fn is_placeholder(value: &str) -> bool {
     matches!(
         value.to_lowercase().as_str(),
@@ -147,8 +130,6 @@ fn battery_present() -> bool {
         .unwrap_or(false)
 }
 
-/// Shortens a model the way macOS does: drop a trailing generation, drop the
-/// vendor when it repeats at the start, and collapse whitespace.
 fn simplify_model(model: &str, vendor: &str) -> String {
     let mut model = model.trim().to_string();
     if let Some(idx) = model.rfind(" Gen ") {
@@ -166,7 +147,6 @@ fn simplify_model(model: &str, vendor: &str) -> String {
     model.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// True when something answers on `cache.nixos.org:443`.
 pub fn network_online() -> bool {
     let Ok(addrs) = ("cache.nixos.org", 443).to_socket_addrs() else {
         return false;
@@ -176,12 +156,10 @@ pub fn network_online() -> bool {
         .any(|addr| TcpStream::connect_timeout(&addr, Duration::from_secs(4)).is_ok())
 }
 
-/// The NixOS ISO drops `/etc/NIXOS`; a normal install does not have it.
 pub fn is_live_environment() -> bool {
     Path::new("/etc/NIXOS").exists() || Path::new("/iso").exists()
 }
 
-/// Effective UID, read straight from `/proc` so no extra crate is needed.
 pub fn euid() -> u32 {
     if let Ok(status) = std::fs::read_to_string("/proc/self/status") {
         for line in status.lines() {
@@ -199,14 +177,12 @@ pub fn is_root() -> bool {
     euid() == 0
 }
 
-/// One partition of a disk, as reported by `lsblk`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Partition {
     pub name: String,
     pub size: u64,
     pub fstype: String,
     pub label: String,
-    /// GPT partition type GUID (or MBR type), from `PARTTYPE`.
     pub parttype: String,
     pub mountpoints: Vec<String>,
 }
@@ -216,7 +192,6 @@ impl Partition {
         format!("/dev/{}", self.name)
     }
 
-    /// The EFI System Partition (GPT type GUID).
     pub fn is_efi(&self) -> bool {
         self.parttype
             .eq_ignore_ascii_case("c12a7328-f81f-11d2-ba4b-00a0c93ec93b")
@@ -234,22 +209,16 @@ impl Partition {
     }
 }
 
-/// One physical disk, as reported by `lsblk`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Disk {
     pub name: String,
     pub size: u64,
     pub model: String,
-    /// What is on the disk: "Windows 11", "vacío", "Linux", "datos"…
     pub note: String,
-    /// `false` for the install medium (or anything else not selectable).
     pub available: bool,
-    /// A Windows install was detected (NTFS, or an EFI with `EFI/Microsoft`).
     pub windows: bool,
-    /// Unallocated space (approximate: disk size minus its partitions).
     pub free: u64,
     pub partitions: Vec<Partition>,
-    /// A virtual disk added in simulation mode (never a real target).
     pub test: bool,
 }
 
@@ -266,7 +235,6 @@ impl Disk {
         self.windows
     }
 
-    /// "SAMSUNG 256 GB": the model truncated to fit, plus the nominal capacity.
     pub fn short_name(&self) -> String {
         let size = format!("{} GB", self.nominal_gb());
         let avail = 24usize.saturating_sub(size.chars().count() + 1);
@@ -279,30 +247,24 @@ impl Disk {
         }
     }
 
-    /// The real size with one decimal, in GB (e.g. `238.5 GB`).
     pub fn real_size_gb(&self) -> String {
         format!("{:.1} GB", self.size as f64 / 1_073_741_824.0)
     }
 
-    /// Nominal capacity in GB (marketing size), e.g. 238.5 GiB → 256.
     pub fn nominal_gb(&self) -> u64 {
         nominal_gb(self.size)
     }
 
-    /// The EFI System Partition of the disk, if any.
     pub fn efi(&self) -> Option<&Partition> {
         self.partitions.iter().find(|p| p.is_efi())
     }
 
-    /// The NTFS partitions, largest first.
     pub fn ntfs(&self) -> Vec<&Partition> {
         let mut ntfs: Vec<&Partition> = self.partitions.iter().filter(|p| p.is_ntfs()).collect();
         ntfs.sort_by_key(|p| std::cmp::Reverse(p.size));
         ntfs
     }
 
-    /// Why this disk cannot be used, if it cannot: the install medium, a disk
-    /// in use by the running system, or one too small for Keel.
     pub fn unusable_reason(&self) -> Option<&'static str> {
         if self
             .partitions
@@ -321,7 +283,6 @@ impl Disk {
     }
 }
 
-/// A partition that is mounted by the running system (`/boot` or swap).
 fn partition_in_use(partition: &Partition) -> bool {
     partition.fstype == "swap"
         || partition
@@ -330,8 +291,6 @@ fn partition_in_use(partition: &Partition) -> bool {
             .any(|m| m == "/boot" || m.starts_with("/boot/"))
 }
 
-/// `lsblk -J -b -o NAME,SIZE,MODEL,TYPE,FSTYPE,PARTTYPE,LABEL,MOUNTPOINTS`,
-/// minus the disk the live ISO boots from (and the virtual/no-install devices).
 pub fn disks() -> Vec<Disk> {
     let Some(json) = run_trim(
         "lsblk",
@@ -347,13 +306,10 @@ pub fn disks() -> Vec<Disk> {
     parse_disks(&json)
 }
 
-/// Whether an NTFS filesystem (a likely Windows install) is present.
 pub fn windows_present() -> bool {
     disks().iter().any(|d| d.windows)
 }
 
-/// Virtual disks appended in simulation mode: whole disk, shrink Windows, and
-/// free space. They never exist in a real install.
 pub fn test_disks() -> Vec<Disk> {
     const GB: u64 = 1_000_000_000;
     let make = |name: &str, size_gb: u64, note: &str, windows: bool, free_gb: u64| Disk {
@@ -428,7 +384,6 @@ fn parse_disks(json: &str) -> Vec<Disk> {
                 note,
                 available: !holds_live_medium(&d) && !partitions.iter().any(partition_in_use),
                 windows,
-                // GPT reserves ~1 MiB; ignore it in the estimate.
                 free: size.saturating_sub(used).saturating_sub(1024 * 1024),
                 model: d.model.clone().unwrap_or_default().trim().to_string(),
                 size,
@@ -457,7 +412,6 @@ fn node_partition(node: &Node) -> Partition {
     }
 }
 
-/// zram/loop/sr/ram and friends are never install targets.
 fn is_virtual(name: &str) -> bool {
     ["zram", "loop", "sr", "ram", "fd", "dm-"]
         .iter()
@@ -497,18 +451,13 @@ fn is_live_mount(path: &str) -> bool {
     matches!(path, "/" | "/iso" | "/run/iso" | "/nix")
 }
 
-/// Result of probing an NTFS partition before resizing it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NtfsInfo {
-    /// Minimal volume size `ntfsresize` allows, in bytes (0 when unknown).
     pub min_bytes: u64,
-    /// The volume is BitLocker-encrypted (cannot be resized).
     pub bitlocker: bool,
-    /// The volume is dirty (hibernated or Fast Startup).
     pub dirty: bool,
 }
 
-/// Probes an NTFS partition with `blkid` and `ntfsresize --info --force`.
 pub fn ntfs_info(path: &str) -> NtfsInfo {
     let bitlocker =
         run_trim("blkid", &["-o", "value", "-s", "TYPE", path]).as_deref() == Some("BitLocker");
@@ -527,7 +476,6 @@ pub fn ntfs_info(path: &str) -> NtfsInfo {
                 dirty,
             }
         }
-        // A failing `--info` means a dirty/hibernated volume.
         _ => NtfsInfo {
             min_bytes: 0,
             bitlocker,
@@ -536,7 +484,6 @@ pub fn ntfs_info(path: &str) -> NtfsInfo {
     }
 }
 
-/// The `You might resize at N bytes` value from `ntfsresize --info`.
 fn parse_ntfs_min(text: &str) -> Option<u64> {
     for line in text.lines() {
         let lower = line.to_lowercase();
@@ -555,8 +502,6 @@ fn parse_ntfs_min(text: &str) -> Option<u64> {
     None
 }
 
-/// Free bytes on the disk's EFI System Partition, by mounting it read-only.
-/// `None` when it cannot be determined.
 pub fn efi_free(efi: &Partition) -> Option<u64> {
     if let Some(mp) = efi.mountpoints.iter().find(|m| !m.is_empty()) {
         return df_free(mp);
@@ -595,23 +540,16 @@ fn df_free(path: &str) -> Option<u64> {
         .and_then(|line| line.trim().parse::<u64>().ok())
 }
 
-/// The filesystem UUID of `path` (`blkid -s UUID -o value`), or `None`.
 pub fn partition_uuid(path: &str) -> Option<String> {
     run_trim("blkid", &["-s", "UUID", "-o", "value", path])
 }
 
-/// The LUKS2 partition disko created inside the target disk, with its UUID.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LuksPartition {
-    /// Real device node, e.g. `/dev/vda2` (never a label: udev escapes spaces
-    /// and disko defaults the GPT label to `disk-<disk>-<name>`).
     pub path: String,
-    /// LUKS UUID, for the installed system's `boot.initrd.luks.devices`.
     pub uuid: String,
 }
 
-/// Finds the `crypto_LUKS` partition of `disk` and returns its real device path
-/// and UUID. `disk` is the install target as picked on the Disco screen.
 pub fn luks_partition(disk: &str) -> Option<LuksPartition> {
     let json = run_trim("lsblk", &["-J", "-o", "NAME,TYPE,FSTYPE,UUID", disk])?;
     let mut part = parse_luks(&json)?;
@@ -634,7 +572,6 @@ fn parse_luks(json: &str) -> Option<LuksPartition> {
     })
 }
 
-/// True when a TPM 2.0 chip is present (`/sys/class/tpm/tpm0`, major version 2).
 pub fn tpm2_present() -> bool {
     let dir = Path::new("/sys/class/tpm/tpm0");
     if !dir.exists() {
@@ -642,21 +579,16 @@ pub fn tpm2_present() -> bool {
     }
     match std::fs::read_to_string(dir.join("tpm_version_major")) {
         Ok(version) => version.trim() == "2",
-        // The attribute is not on every kernel; a tpm0 device is close enough.
         Err(_) => true,
     }
 }
 
-/// A mountable removable medium offered by the Cifrado screen's "guardar en
-/// USB" list.
 #[derive(Debug, Clone)]
 pub struct RemovableMedium {
     pub path: String,
     pub label: String,
 }
 
-/// Removable/USB partitions that can hold the recovery key, excluding the
-/// install target and the live ISO.
 pub fn removable_media(target: &str) -> Vec<RemovableMedium> {
     let target_name = target.rsplit('/').next().unwrap_or("").to_string();
     let Some(json) = run_trim(
@@ -731,12 +663,10 @@ pub fn removable_media(target: &str) -> Vec<RemovableMedium> {
     out
 }
 
-/// Nominal capacity in GB (marketing size), e.g. 238.5 GiB → 256.
 pub fn nominal_gb(bytes: u64) -> u64 {
     (bytes as f64 / 1_000_000_000.0).round() as u64
 }
 
-/// Human-readable size, matching `lsblk`'s style closely enough.
 pub fn human_size(bytes: u64) -> String {
     const UNITS: [&str; 6] = ["B", "K", "M", "G", "T", "P"];
     let mut value = bytes as f64;
@@ -777,7 +707,6 @@ mod tests {
             ]
         }"#;
         let disks = parse_disks(json);
-        // The live medium is kept but flagged as not selectable.
         assert_eq!(disks.len(), 2);
         let live = disks.iter().find(|d| d.name == "sda").unwrap();
         assert!(!live.available);

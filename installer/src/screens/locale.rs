@@ -1,9 +1,4 @@
-//! "Lenguaje": a searchable list of locales named in their own language,
-//! centered inside the shared box. The search field is always visible; typing
-//! filters. The chosen code is shown by the app under the box.
-//!
-//! La tabla vive en `localekit`; aquí solo se adapta al TUI.
-
+//! Language selection screen.
 use crate::app::{Action, App, PickItem};
 use crate::widgets::Btn;
 use ratatui::crossterm::event::KeyEvent;
@@ -62,7 +57,6 @@ pub fn commands(app: &App) -> Vec<String> {
     )]
 }
 
-/// Adapta la tabla compartida al tipo del TUI.
 pub fn load_items() -> Vec<PickItem> {
     localekit::locale::all()
         .into_iter()

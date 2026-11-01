@@ -1,13 +1,4 @@
 //! Network probing, Wi-Fi association and the backend abstraction.
-//!
-//! The NixOS minimal ISO enables `networking.networkmanager` (verified in
-//! `nixos/modules/profiles/installation-device.nix`), so `nmcli` is what is
-//! actually present; `iwctl` and `wpa_cli` are fallbacks. All of it is behind
-//! the [`WifiBackend`] trait so the UI can stay backend-agnostic and the
-//! simulation can plug a deterministic backend.
-//!
-//! Wi-Fi passwords are never written to the log or the command panel.
-
 use color_eyre::eyre::{eyre, Result};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
@@ -20,7 +11,6 @@ pub struct Wifi {
 }
 
 impl Wifi {
-    /// Four-step signal bars.
     pub fn bars(&self) -> &'static str {
         match self.signal {
             76..=100 => "▂▄▆█",
@@ -39,24 +29,17 @@ impl Wifi {
     }
 }
 
-/// A Wi-Fi / connectivity backend.
 pub trait WifiBackend: Send + Sync {
     fn name(&self) -> &'static str;
     fn scan(&self) -> Vec<Wifi>;
-    /// Associates with `ssid` using `pass` (empty for open networks). The
-    /// password must not be logged.
     fn connect(&self, ssid: &str, pass: &str) -> Result<()>;
-    /// Whether `cache.nixos.org` is reachable right now.
     fn status(&self) -> bool;
-    /// Whether a saved connection already exists for `ssid`.
     fn is_saved(&self, ssid: &str) -> bool {
         let _ = ssid;
         false
     }
 }
 
-/// The backend to use: a deterministic simulation in dry-run, otherwise the
-/// first tool present on the ISO (`nmcli` → `iwctl` → `wpa_cli`).
 pub fn backend(dry_run: bool) -> Arc<dyn WifiBackend> {
     if dry_run {
         return Arc::new(Sim);
@@ -98,9 +81,6 @@ pub fn online() -> bool {
     crate::detect::network_online()
 }
 
-/// Whether a connection is already up, so the Red screen can be skipped:
-/// NetworkManager reports `connected`, or (fallback) there is a default route
-/// and `cache.nixos.org` resolves.
 pub fn connection_up() -> bool {
     if let Ok(output) = Command::new("nmcli")
         .args(["-t", "-f", "STATE", "general"])
@@ -115,7 +95,6 @@ pub fn connection_up() -> bool {
     has_default_route() && resolves("cache.nixos.org")
 }
 
-/// A default route (destination 00000000, gateway set) in `/proc/net/route`.
 fn has_default_route() -> bool {
     let Ok(text) = std::fs::read_to_string("/proc/net/route") else {
         return false;
@@ -134,13 +113,10 @@ fn resolves(host: &str) -> bool {
     (host, 443).to_socket_addrs().is_ok()
 }
 
-// -- concrete backends --------------------------------------------------------
-
 pub struct Nmcli;
 pub struct Iwd;
 pub struct WpaCli;
 pub struct Null;
-/// Deterministic backend used in the simulation.
 pub struct Sim;
 
 impl WifiBackend for Nmcli {
@@ -238,8 +214,6 @@ impl WifiBackend for Sim {
         sample_networks()
     }
     fn connect(&self, _ssid: &str, pass: &str) -> Result<()> {
-        // Accept any password of 8+ characters; reject shorter ones so the
-        // Error state can be exercised without real hardware.
         if pass.chars().count() >= 8 || pass.is_empty() {
             Ok(())
         } else {
@@ -250,8 +224,6 @@ impl WifiBackend for Sim {
         true
     }
 }
-
-// -- scanning helpers ---------------------------------------------------------
 
 fn which(cmd: &str) -> bool {
     let Some(path) = std::env::var_os("PATH") else {
@@ -424,7 +396,6 @@ fn run_connect(mut cmd: Command) -> Result<()> {
     }
 }
 
-/// Sample networks for the dry-run.
 pub fn sample_networks() -> Vec<Wifi> {
     vec![
         Wifi {
@@ -488,7 +459,7 @@ mod tests {
     fn sim_backend_accepts_long_and_rejects_short() {
         let sim = Sim;
         assert!(sim.connect("red", "12345678").is_ok());
-        assert!(sim.connect("red", "").is_ok()); // open network
+        assert!(sim.connect("red", "").is_ok());
         let err = sim.connect("red", "corta").unwrap_err().to_string();
         assert_eq!(err, "contraseña incorrecta");
     }

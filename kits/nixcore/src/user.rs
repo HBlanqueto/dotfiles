@@ -1,7 +1,4 @@
-//! Validación de nombre de usuario, compartida por el instalador y el asistente
-//! de primer arranque.
-
-/// Usuarios que ya existen en el sistema.
+//! User name validation.
 pub const RESERVED_USERS: &[&str] = &[
     "root",
     "nixos",
@@ -29,8 +26,6 @@ pub const RESERVED_USERS: &[&str] = &[
     "tss",
 ];
 
-/// Por qué `name` no es un nombre de usuario válido, si no lo es. Un `name`
-/// vacío es inválido (el instalador decide antes si usa el generado).
 pub fn username_error(name: &str) -> Option<&'static str> {
     let mut chars = name.chars();
     match chars.next() {
@@ -50,8 +45,6 @@ pub fn username_error(name: &str) -> Option<&'static str> {
     None
 }
 
-/// Por qué `name` no es un nombre de equipo válido (RFC 1123), si no lo es.
-/// Un `name` vacío es inválido (el instalador decide antes si usa el generado).
 pub fn host_name_error(name: &str) -> Option<&'static str> {
     if name.is_empty() {
         return Some("no puede estar vacío");
@@ -68,10 +61,6 @@ pub fn host_name_error(name: &str) -> Option<&'static str> {
     None
 }
 
-/// Derives a macOS-style hostname from a display name: transliterate accents
-/// and ñ to ASCII, drop apostrophes without leaving a gap, turn every other
-/// non-alphanumeric character into a `-` (runs collapse, edges trimmed), keep
-/// the case, cap at 63 chars, and fall back to `keel` when nothing is left.
 pub fn host_name_from_pretty(pretty: &str) -> String {
     let mut out = String::new();
     for ch in pretty.chars() {
@@ -95,8 +84,6 @@ pub fn host_name_from_pretty(pretty: &str) -> String {
     }
 }
 
-/// Derives a username from a display name: strip accents, lowercase, keep
-/// `a-z0-9`, prefix `u` when it would start with a digit, cap at 32 chars.
 pub fn generate_username(name: &str) -> String {
     let mut out = String::new();
     for ch in name.chars() {
@@ -117,8 +104,6 @@ pub fn generate_username(name: &str) -> String {
     out
 }
 
-/// Maps the common accented Latin letters to their unaccented ASCII form
-/// (a dependency-free stand-in for NFD + strip-combining-marks).
 fn deaccent(ch: char) -> char {
     match ch {
         'á' | 'à' | 'â' | 'ä' | 'ã' | 'å' | 'ā' | 'ă' | 'ą' => 'a',

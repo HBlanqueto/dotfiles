@@ -82,7 +82,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         )),
     ];
 
-    // The background repo evaluation, launched when the license was accepted.
     let (mark, text, color) = match &app.source_check {
         CheckState::Ok => (
             "✓ ",

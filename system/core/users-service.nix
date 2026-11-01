@@ -1,6 +1,4 @@
-# Servicio de gestión de cuentas (crewd) y preparación del home en el primer
-# inicio de sesión (steward-home). También publica la referencia exacta del
-# flake instalado para que crewd reconstruya esa versión y no el repo de trabajo.
+# Account management service (`crewd`) and first-login home setup.
 { pkgs, inputs, ... }:
 
 let
@@ -10,8 +8,6 @@ let
   homeInit = inputs.self.packages.${system}.home-init;
   setupGui = inputs.self.packages.${system}.assist-setup;
 
-  # Si ya hay home, el script termina enseguida (y borra la semilla); si no,
-  # muestra la pantalla «Preparando tu escritorio» mientras lo prepara.
   homeInitSession = pkgs.writeShellScript "steward-home-session" ''
     if [ -f "$HOME/.config/home-manager/flake.nix" ]; then
         exec ${homeInit}/bin/nixdots-home-init
@@ -19,8 +15,6 @@ let
     exec ${setupGui}/bin/nixdots-setup-gui --home-init
   '';
 
-  # Polkit lee las acciones de XDG_DATA_DIRS (el directorio de acciones de polkit), no de
-  # /etc/polkit-1/actions: se instala como paquete.
   polkitPolicy = pkgs.writeTextFile {
     name = "io.github.HBlanqueto.Keel.crew.manage.policy";
     destination = "/share/polkit-1/actions/io.github.HBlanqueto.Keel.crew.manage.policy";
@@ -43,8 +37,6 @@ let
     '';
   };
 
-  # Política del bus del sistema: root es el dueño del nombre y cualquier
-  # usuario puede llamar (polkit decide si se autoriza).
   dbusPolicy = pkgs.writeTextFile {
     name = "io.github.HBlanqueto.Keel.Crew1.conf";
     destination = "/share/dbus-1/system.d/io.github.HBlanqueto.Keel.Crew1.conf";
@@ -65,9 +57,6 @@ let
   };
 in
 {
-  # Referencia exacta de la versión instalada. `source` es el source del
-  # flake; `release` es TOML con el commit (o "dirty" si se construyó con
-  # cambios). version/codename se definirán más adelante.
   environment = {
     etc."keel/source".text = inputs.self.outPath;
     etc."keel/release".text = ''
@@ -79,7 +68,6 @@ in
     systemPackages = [ polkitPolicy ];
   };
 
-  # Que el GC no borre la fuente desde la que crewd reconstruye.
   system.extraDependencies = [ inputs.self.outPath ];
 
   security.polkit.enable = true;
@@ -91,7 +79,6 @@ in
     after = [ "dbus.service" ];
     requires = [ "dbus.service" ];
 
-    # nixos-rebuild, mkpasswd y nix se usan desde el servicio.
     path = with pkgs; [
       nixos-rebuild
       nix
@@ -101,7 +88,6 @@ in
     ];
 
     environment = {
-      # Vacío = /persist (las rutas son ${KEEL_ROOT}/persist/keel).
       KEEL_ROOT = "";
       NIX_CONFIG = "experimental-features = nix-command flakes";
     };
@@ -113,8 +99,6 @@ in
     };
   };
 
-  # Servicio de usuario: en cada inicio de sesión comprueba si falta el home.
-  # Si ya existe, ignora y borra la semilla; si no, lo prepara.
   systemd.user.services.steward-home = {
     description = "Prepara el home de Keel";
     wantedBy = [ "default.target" ];
@@ -130,7 +114,6 @@ in
     ];
 
     serviceConfig = {
-      # La GUI vive hasta que termina; no bloquea el target de usuario.
       Type = "simple";
       ExecStart = "${homeInitSession}";
     };

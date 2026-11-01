@@ -7,6 +7,4 @@ final: _: {
 
   xnu-console-font = final.callPackage ../packages/xnu-console-font.nix { };
 
-  # brave-previews is intentionally not exposed here: the input only ships
-  # x86_64-linux outputs. Its overlay is applied directly in system/core/nix.nix.
 }

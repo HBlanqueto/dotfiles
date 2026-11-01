@@ -1,11 +1,8 @@
-//! Teclados: la tabla compartida vive en `localekit`; aquí queda lo que sí
-//! toca el sistema: detectar el layout activo y aplicarlo a la consola.
-
+//! Detects the active keyboard layout and applies one to the console.
 use std::process::{Command, Stdio};
 
 pub use localekit::keyboard::{all, by_id, display, suggest, Layout};
 
-/// The layout currently in use, guessed from `localectl` (falls back to "us").
 pub fn detect_active() -> String {
     if let Ok(output) = Command::new("localectl")
         .arg("status")
@@ -40,10 +37,6 @@ pub fn detect_active() -> String {
     "us".to_string()
 }
 
-/// Applies a layout to the bare Linux console with `loadkeys`.
-///
-/// Its output is captured through [`crate::runner`] (a real command, never a
-/// raw terminal write), so nothing lands on top of the TUI.
 pub fn apply_console(layout: &Layout) -> ConsoleOutcome {
     match console_keymap(layout) {
         Some(keymap) => {
@@ -54,18 +47,15 @@ pub fn apply_console(layout: &Layout) -> ConsoleOutcome {
             }
         }
         None => {
-            // No console equivalent: fall back to `us` and let the caller warn.
             let _ = run_loadkeys("us");
             ConsoleOutcome::Fallback
         }
     }
 }
 
-/// What happened when applying a layout on the console.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConsoleOutcome {
     Applied,
-    /// No console keymap for this layout; `us` was applied instead.
     Fallback,
     Failed,
 }
@@ -76,8 +66,6 @@ fn run_loadkeys(keymap: &str) -> bool {
     crate::runner::run(&cmd, &mut sink) == 0
 }
 
-/// The console keymap (`loadkeys`) that matches an xkb layout/variant. `None`
-/// when the layout has no console equivalent.
 fn console_keymap(layout: &Layout) -> Option<String> {
     Some(
         match (layout.xkb.as_str(), layout.variant.as_str()) {

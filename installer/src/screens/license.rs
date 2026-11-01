@@ -1,7 +1,4 @@
-//! The license screen: a compact NixOS logo, the GPL text (embedded, so it
-//! works offline) in a scrollable box, and the No acepto / Acepto pills.
-//! Acepto opens a small confirmation dialog; No acepto returns to Inicio.
-
+//! License screen with the GPL text and accept/decline buttons.
 use crate::app::{Action, App};
 use crate::widgets::{self, Btn, ButtonRow};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
@@ -11,12 +8,10 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph, Wrap};
 use ratatui::Frame;
 
-/// Embedded so the installer works without network or the repo.
 const LICENSE: &str = include_str!("../../../LICENSE");
 
 pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     let console = crate::theme::console::is_linux_console();
-    // Same full logo as the Inicio screen (never the compact version).
     let logo = crate::logo::nixos_logo(console);
     let logo_h = logo.len() as u16;
     let logo_w = logo
@@ -31,9 +26,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         .unwrap_or(0) as u16;
 
     let box_w = 84.min(area.width.saturating_sub(4)).max(24);
-    // logo + gap + prompt + description(2) + gap + box + gray + gap + buttons
     let overhead = logo_h + 3 + 1 + 2 + 1 + 1 + 1 + 1;
-    // The logo always keeps its height; the text box shrinks instead.
     let box_h = area.height.saturating_sub(overhead).clamp(3, 20);
     let total = overhead + box_h;
     let mut y = area.y + area.height.saturating_sub(total) / 2;
@@ -55,7 +48,6 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     );
     y += 1;
 
-    // The description, wrapped to the box width.
     let box_x = area.x + area.width.saturating_sub(box_w) / 2;
     f.render_widget(
         Paragraph::new(Line::from(vec![
@@ -73,7 +65,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         .wrap(Wrap { trim: true }),
         Rect::new(box_x, y, box_w, 2),
     );
-    y += 3; // description (2) + gap
+    y += 3;
 
     let box_rect = Rect::new(box_x, y, box_w, box_h);
     draw_box(f, app, box_rect);
@@ -109,7 +101,6 @@ fn draw_box(f: &mut Frame, app: &mut App, rect: Rect) {
     let inner = block.inner(rect);
     f.render_widget(block, rect);
 
-    // 1-row and 3-column inner margin; the scrollbar lives in the right one.
     let text_area = Rect::new(
         inner.x + 3,
         inner.y + 1,
@@ -133,7 +124,6 @@ fn draw_box(f: &mut Frame, app: &mut App, rect: Rect) {
     let rendered: Vec<Line> = lines.into_iter().skip(start).take(visible).collect();
     f.render_widget(Paragraph::new(rendered), text_area);
 
-    // `█`/`│` scrollbar, inside the right margin.
     if total > visible && visible > 0 {
         let bar_x = inner.right().saturating_sub(2);
         let thumb_h = (visible * visible / total).max(1);
@@ -158,7 +148,6 @@ fn draw_box(f: &mut Frame, app: &mut App, rect: Rect) {
     }
 }
 
-/// The small confirmation dialog, centered over the license text box.
 fn draw_modal(f: &mut Frame, app: &mut App, over: Rect) {
     let palette = app.palette;
     let buttons = vec![Btn::new("No acepto"), Btn::new("Acepto")];
@@ -181,8 +170,6 @@ fn draw_modal(f: &mut Frame, app: &mut App, over: Rect) {
     });
 }
 
-/// Keys while the confirmation dialog is open: Esc / No acepto close it,
-/// Acepto accepts and moves on. Everything else is swallowed.
 pub fn modal_key(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Esc => app.license_modal = false,
@@ -201,9 +188,6 @@ pub fn modal_key(app: &mut App, key: KeyEvent) {
     }
 }
 
-/// Reflows the embedded license: paragraphs are joined and rewrapped to
-/// `width`, headings stay on their own centered line and the numbered sections
-/// get a hanging indent. The line count is over the reflowed lines.
 fn reflow(palette: &crate::theme::Palette, width: usize) -> Vec<Line<'static>> {
     let src: Vec<&str> = LICENSE.lines().collect();
     let mut out: Vec<Line<'static>> = Vec::new();
@@ -220,7 +204,6 @@ fn reflow(palette: &crate::theme::Palette, width: usize) -> Vec<Line<'static>> {
         while i < src.len() && !src[i].trim().is_empty() {
             i += 1;
         }
-        // One blank line between blocks (never at the start or doubled).
         if !out.is_empty() {
             out.push(Line::from(""));
         }
@@ -245,7 +228,6 @@ fn emit_block(
     if lines.is_empty() {
         return;
     }
-    // The document header (title, version, copyright, address): one line each.
     if header || lines.iter().any(|l| l.contains("Copyright (C)")) {
         for line in &lines {
             let style = if is_uppercase(line) {
@@ -259,7 +241,6 @@ fn emit_block(
         }
         return;
     }
-    // A heading: every line centered in the original, centered and bold.
     if block
         .iter()
         .filter(|l| !l.trim().is_empty())
@@ -275,7 +256,6 @@ fn emit_block(
         }
         return;
     }
-    // A paragraph: join and rewrap, with a hanging indent when numbered.
     let joined = lines.join(" ");
     let indent = if is_numbered(&joined) { 3 } else { 0 };
     let wrapped = wrap_words(&joined, width.saturating_sub(indent).max(1));
@@ -304,7 +284,6 @@ fn is_uppercase(text: &str) -> bool {
             .all(|c| c.is_uppercase())
 }
 
-/// A paragraph that starts a numbered section (`0.`, `12.`, `a)`).
 fn is_numbered(text: &str) -> bool {
     let mut chars = text.chars();
     match chars.next() {
@@ -314,7 +293,6 @@ fn is_numbered(text: &str) -> bool {
     }
 }
 
-/// Greedy word wrap, never breaking a word.
 fn wrap_words(text: &str, width: usize) -> Vec<String> {
     let mut lines: Vec<String> = Vec::new();
     let mut current = String::new();

@@ -1,11 +1,4 @@
-//! `steward home prepare` — prepara `~/.config/home-manager` en el primer
-//! inicio de sesión si aún no existe.
-//!
-//! Fija el input `keel` a la revisión instalada (`/etc/keel/release`), o a
-//! `path:/etc/keel/source` si el sistema se construyó con cambios sin
-//! commitear o no hay red. Rellena el marcador `SYSTEM` con la arquitectura
-//! real. Si el home ya existe, ignora la semilla y pide a `crewd` que la borre.
-
+//! `steward home prepare`: sets up `~/.config/home-manager` on first login.
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -64,8 +57,6 @@ fn run() -> Result<()> {
         prefs.write_home_file(&config.join("prefs.toml"))?;
     }
 
-    // Un flake solo ve lo rastreado: si el directorio es un repo git, añade los
-    // archivos. No creamos el repo.
     if config.join(".git").exists() {
         let _ = Command::new("git")
             .arg("-C")
@@ -78,7 +69,6 @@ fn run() -> Result<()> {
     status("Aplicando tu escritorio");
     let mut ok = home_switch(&config);
     if !ok && !used_fallback {
-        // La revisión de GitHub no se pudo traer (aún sin subir, o sin red).
         status("Sin acceso a la revisión; uso la copia instalada");
         let fallback = format!("path:{flake_ref}");
         write_flake(&config, &fallback, system)?;
@@ -133,7 +123,6 @@ fn is_rev(rev: &str) -> bool {
     rev.len() == 40 && rev.chars().all(|c| c.is_ascii_hexdigit())
 }
 
-/// El usuario de la sesión: `USER`, `LOGNAME` o `id -un`.
 fn username() -> Result<String> {
     for key in ["USER", "LOGNAME"] {
         if let Ok(value) = std::env::var(key) {

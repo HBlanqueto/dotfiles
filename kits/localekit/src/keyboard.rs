@@ -1,37 +1,25 @@
-//! Teclados: la lista xkb completa (layouts y variantes) embebida desde
-//! `base.lst` de `xkeyboard-config`.
-
+//! Embedded xkb keyboard layouts and variants.
 use std::sync::OnceLock;
 
-/// la tabla `base.lst` de xkeyboard-config, embebido por el paquete
-/// (`KEEL_XKB_BASE_LST`).
 const XKB_BASE_LST: &str = include_str!(env!("KEEL_XKB_BASE_LST"));
 
-/// Un layout base o una de sus variantes.
 #[derive(Debug, Clone)]
 pub struct Layout {
-    /// Id único: `us` para un layout, `us:intl` para una variante.
     pub code: String,
-    /// Nombre legible (de `base.lst`).
     pub name: String,
-    /// xkb layout (se escribe como `keyboardLayout`).
     pub xkb: String,
-    /// xkb variant (se escribe como `keyboardVariant`, vacío si no hay).
     pub variant: String,
 }
 
-/// Todos los layouts y variantes, layouts primero; se parsea una vez.
 pub fn all() -> &'static [Layout] {
     static CACHE: OnceLock<Vec<Layout>> = OnceLock::new();
     CACHE.get_or_init(parse_base_lst)
 }
 
-/// Busca una entrada por su id.
 pub fn by_id(id: &str) -> Option<Layout> {
     all().iter().find(|l| l.code == id).cloned()
 }
 
-/// El nombre legible de un par layout/variante, `es` → `Español`.
 pub fn display(layout: &str, variant: &str) -> String {
     all()
         .iter()
@@ -40,7 +28,6 @@ pub fn display(layout: &str, variant: &str) -> String {
         .unwrap_or_else(|| layout.to_string())
 }
 
-/// El layout base sugerido por un código de locale (`es_MX` → `latam`).
 pub fn suggest(locale: &str) -> Option<&'static str> {
     let mut parts = locale.split(['_', '.', '@']);
     let lang = parts.next().unwrap_or("");

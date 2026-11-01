@@ -1,22 +1,10 @@
-//! Datos de cuentas fuera del repo, un archivo por usuario en
-//! `${KEEL_ROOT}/persist/keel/users/<usuario>.toml` (respaldo: `.json`).
-//!
-//! El flake los lee y crea con ellos `users.users.<nombre>` y su home-manager;
-//! no se versionan ni se pierden al reconstruir. `hashedPasswordFile` no se
-//! guarda: se deriva del usuario. El repo vive en `/persist/keel/repo`,
-//! nunca dentro de estos archivos.
-//!
-//! Los datos del sistema (locale, zona, teclado, autologin…) NO van aquí: van
-//! en `machine.toml` (ver [`crate::machine`]). La semilla de apariencia y
-//! accesibilidad vive aparte, en `/persist/keel/users/<usuario>.prefs.toml`.
-
+//! Per-user account data stored outside the repo.
 use crate::store;
 use color_eyre::eyre::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use toml_edit::{value, Item, Table};
 
-/// Preferencias de accesibilidad (todas `false` por defecto).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct A11y {
@@ -32,7 +20,6 @@ pub struct A11y {
     pub screen_keyboard: bool,
 }
 
-/// Identidad de GitHub/Git del usuario.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Git {
@@ -48,24 +35,17 @@ fn default_version() -> u32 {
     1
 }
 
-/// Lo que se escribe en `/persist/keel/users/<usuario>.toml` (camelCase, como lo lee el
-/// flake): solo la cuenta. El git y la apariencia viven en el home.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserData {
     #[serde(default = "default_version")]
     pub version: u32,
     pub username: String,
-    /// Nombre visible («Humberto Blanqueto»).
     pub full_name: String,
-    /// Miembro de `wheel`.
     #[serde(default = "default_true")]
     pub admin: bool,
 }
 
-/// Semilla de un solo uso para el home, en `/persist/keel/users/<usuario>.prefs.toml`:
-/// apariencia, accesibilidad y git. `steward home prepare` la copia al flake del
-/// usuario (git a `home.nix`, lo demás a `prefs.toml`) y borra el original.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Prefs {
@@ -85,18 +65,14 @@ pub struct Prefs {
     pub git: Option<Git>,
 }
 
-/// `${KEEL_ROOT}/persist/keel/users`. Construido como cadena: sin
-/// `KEEL_ROOT` la ruta debe quedar absoluta (`/persist/...`), no relativa.
 pub fn users_dir() -> PathBuf {
     crate::paths::persist().join("users")
 }
 
-/// `/persist/keel/users/<username>.toml`.
 pub fn path_for(username: &str) -> PathBuf {
     users_dir().join(format!("{username}.toml"))
 }
 
-/// `/persist/keel/users/<username>.prefs.toml`.
 pub fn prefs_path_for(username: &str) -> PathBuf {
     users_dir().join(format!("{username}.prefs.toml"))
 }
@@ -111,7 +87,6 @@ fn set_str(doc: &mut toml_edit::DocumentMut, key: &str, s: Option<&str>) {
 }
 
 impl UserData {
-    /// Lee la cuenta de `/persist/keel/users/<usuario>.toml` (o del respaldo JSON).
     pub fn read(username: &str) -> Result<Option<Self>> {
         let path = path_for(username);
         if !path.exists() && !store::json_sibling(&path).exists() {
@@ -135,7 +110,6 @@ impl UserData {
         }))
     }
 
-    /// Todas las cuentas de `/persist/keel/users/*.toml` (sin las semillas `.prefs.toml`).
     pub fn list() -> Result<Vec<Self>> {
         let mut users = Vec::new();
         let Ok(entries) = std::fs::read_dir(users_dir()) else {
@@ -156,8 +130,6 @@ impl UserData {
         Ok(users)
     }
 
-    /// Escritura atómica en `/persist/keel/users/<usuario>.toml` conservando comentarios,
-    /// orden y claves desconocidas; copia la versión anterior a `.bak`.
     pub fn write(&self) -> Result<()> {
         let path = path_for(&self.username);
         let mut doc = store::load_document(&path)?;
@@ -165,8 +137,6 @@ impl UserData {
         doc["username"] = value(&self.username);
         doc["fullName"] = value(&self.full_name);
         doc["admin"] = value(self.admin);
-        // Lo demás vive fuera de la cuenta: git y apariencia van al home
-        // (semilla `.prefs.toml`), no a este archivo. Se retiran al reescribir.
         for key in [
             "template",
             "personalConfig",
@@ -208,12 +178,9 @@ impl Default for Prefs {
 }
 
 impl Prefs {
-    /// Escribe la semilla en `/persist/keel/users/<usuario>.prefs.toml`.
     pub fn write(&self, username: &str) -> Result<()> {
         let path = prefs_path_for(username);
         self.write_seed(&path)?;
-        // La semilla la lee steward home prepare como el propio usuario: 0600 y
-        // dueño correcto (el asistente/userd corren como root).
         store::set_mode(&path, 0o600)?;
         if let Some((uid, gid)) = owner(username) {
             std::os::unix::fs::chown(&path, Some(uid), Some(gid))?;
@@ -221,8 +188,6 @@ impl Prefs {
         Ok(())
     }
 
-    /// Escribe la apariencia/a11y (sin git) en `path`, modo 0600. Es lo que
-    /// `steward home prepare` copia a `~/.config/home-manager/prefs.toml`.
     pub fn write_home_file(&self, path: &Path) -> Result<()> {
         self.write_seed(path)?;
         store::set_mode(path, 0o600)?;
@@ -256,7 +221,6 @@ impl Prefs {
         store::write_document_atomic(path, &doc)
     }
 
-    /// Lee la semilla si existe.
     pub fn read(username: &str) -> Result<Option<Self>> {
         let path = prefs_path_for(username);
         if !path.exists() {
@@ -304,7 +268,6 @@ impl Prefs {
     }
 }
 
-/// uid/gid de `username` según `/etc/passwd` (para chown de la semilla).
 fn owner(username: &str) -> Option<(u32, u32)> {
     let passwd = std::fs::read_to_string("/etc/passwd").ok()?;
     passwd.lines().find_map(|line| {
@@ -317,13 +280,10 @@ fn owner(username: &str) -> Option<(u32, u32)> {
     })
 }
 
-/// `${KEEL_ROOT}/persist/keel/user.json`, el formato antiguo.
 pub fn legacy_path() -> PathBuf {
     crate::paths::persist().join("user.json")
 }
 
-/// Formato antiguo de `user.json` (un único usuario con los campos de sistema
-/// mezclados). Solo se usa para migrarlo a `/persist/keel/users/<usuario>.toml` + machine.toml.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct LegacyUser {
@@ -364,7 +324,6 @@ pub struct LegacyUser {
 }
 
 impl LegacyUser {
-    /// Lee el `user.json` antiguo, o `None` si no existe.
     pub fn read() -> Result<Option<Self>> {
         let path = legacy_path();
         match std::fs::read_to_string(&path) {
@@ -377,8 +336,6 @@ impl LegacyUser {
     }
 }
 
-/// Convierte `machine.json` y `/persist/keel/users/*.json` a TOML sin borrar los originales
-/// (quedan como respaldo). Devuelve cuántos archivos se escribieron.
 pub fn migrate_to_toml() -> Result<usize> {
     let mut written = 0;
     if store::migrate_to_toml(&crate::machine::path())? {

@@ -1,13 +1,8 @@
-// Estado de tema del asistente y tokens de interfaz. Los valores vienen del
-// sistema de diseño kits/neptunia (generated/neptunia.slint); aquí solo
-// se exponen con los nombres que ya usa la UI y se resuelve el acento elegido.
-
+// Wizard theme state and UI tokens.
 import { Theme as Design, Metrics, NeptuniaAccent } from "../../../kits/neptunia/generated/neptunia.slint";
 export { Metrics } from "../../../kits/neptunia/generated/neptunia.slint";
 
 export global Tokens {
-    // Tema: "light" | "dark" | "dark-tint". Quien lo cambie debe sincronizar
-    // Design.mode (ver app.slint); dark es solo un atajo para la UI.
     in-out property <string> theme: "light";
     out property <bool> dark: theme != "light";
 
@@ -36,7 +31,6 @@ export global Tokens {
     out property <color> info: Design.info;
     out property <color> cyan: Design.cyan;
 
-    // Familia sys-* (iconos): iguales en todos los temas, con glifo blanco.
     out property <color> sysBlue: Design.sys-blue;
     out property <color> sysCyan: Design.sys-cyan;
     out property <color> sysPurple: Design.sys-purple;
@@ -71,14 +65,11 @@ export global Tokens {
     out property <duration> durBase: Design.dur-base;
     out property <duration> durSlow: Design.dur-slow;
 
-    // Acento de Neptunia (0) + accents de GNOME (1..n), elegidos en Theme.
     out property <[NeptuniaAccent]> gnomeAccents: Design.accents;
 }
 
 export global Theme {
-    // Acento elegido: 0 = Neptunia (Tokens.accent), 1..n = accent-color de GNOME.
     in-out property <int> accent-index: 0;
-    // Preferencia del sistema: con reducción de movimiento, sólo fundidos.
     in-out property <bool> reduced-motion: false;
 
     out property <[NeptuniaAccent]> accents: Tokens.gnomeAccents;
@@ -91,8 +82,6 @@ export global Theme {
     out property <string> accent-name: accent-index == 0 ? "Neptunia" : accents[gi].label;
 }
 
-// Tokens de movimiento: única fuente de las duraciones de la interfaz. Con
-// `reduce` (interruptor «Reducir animaciones») todas valen 0; AppWindow lo fija.
 export global Motion {
     in-out property <bool> reduce: false;
     out property <duration> fast: reduce ? 0ms : Design.dur-fast;

@@ -1,8 +1,6 @@
 { inputs, ... }:
 
 {
-  # Shared NixOS layer for the single generic configuration; per-machine facts
-  # come from machine.toml/facter.json (see system/lib/data.nix).
   imports = [
     inputs.impermanence.nixosModules.impermanence
 

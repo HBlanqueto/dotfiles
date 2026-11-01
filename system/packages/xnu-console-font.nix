@@ -9,7 +9,6 @@ stdenv.mkDerivation (_finalAttrs: {
   pname = "xnu-console-font";
   version = "12377.121.6";
 
-  # The 256 Latin-1 glyphs of the macOS text console, embedded in XNU.
   src = fetchurl {
     url = "https://raw.githubusercontent.com/apple-oss-distributions/xnu/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/console/iso_font.c";
     hash = "sha256-SOY0BIXq6ywqKDkn83SlEdXgFt5p5u+HN381+rc3BQA=";

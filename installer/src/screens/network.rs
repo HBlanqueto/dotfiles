@@ -103,7 +103,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     }
 }
 
-/// A rounded frame around the list, accent when it holds the focus.
 fn list_frame(f: &mut Frame, app: &App, area: Rect, focused: bool) -> Rect {
     let block = Block::default()
         .borders(Borders::ALL)
@@ -119,9 +118,6 @@ fn list_frame(f: &mut Frame, app: &App, area: Rect, focused: bool) -> Rect {
     inner
 }
 
-/// The Wi-Fi list rows filling `rows` lines (or the empty message). Fixed
-/// columns: the SSID, a 10-column security label and four signal bars (missing
-/// ones dimmed). The selected row is filled border to border, with no marker.
 fn list_lines(app: &App, width: u16, rows: usize, focused: bool) -> Vec<Line<'static>> {
     if app.net.wifi.is_empty() {
         let msg = if app.net.backend.name() == "ninguno" {
@@ -200,9 +196,6 @@ fn wifi_row(app: &App, i: usize, width: u16, focused: bool) -> Line<'static> {
     }
 }
 
-/// Returns `true` when the key was handled by the screen (and must not fall
-/// through to the global shortcuts). Input-focused sub-states return `true`
-/// for every printable key, including `q`, `v` and `r`.
 pub fn key(app: &mut App, key: KeyEvent) -> bool {
     match &mut app.net.phase {
         RedFase::Lista => match key.code {
@@ -268,14 +261,10 @@ pub fn key(app: &mut App, key: KeyEvent) -> bool {
             }
             _ => false,
         },
-        // Conectando has no actions; Conectado lets the globals handle
-        // Enter (Continuar) and Esc (back).
         RedFase::Conectando { .. } | RedFase::Conectado { .. } => false,
     }
 }
 
-/// Enter on a list entry: password prompt for a new secured network, direct
-/// connection for open or already-saved ones.
 fn choose(app: &mut App) {
     let Some(wifi) = app.net.wifi.get(app.net.selected).cloned() else {
         return;
@@ -293,7 +282,6 @@ fn choose(app: &mut App) {
     }
 }
 
-/// Starts the connection from the Contrasena phase.
 pub fn connect(app: &mut App) {
     if let RedFase::Contrasena { ssid, input, .. } = &app.net.phase {
         let ssid = ssid.clone();
@@ -438,7 +426,7 @@ mod tests {
     #[test]
     fn typing_q_in_password_does_not_quit() {
         let mut app = app();
-        press(&mut app, KeyCode::Enter); // -> Contrasena
+        press(&mut app, KeyCode::Enter);
         press(&mut app, KeyCode::Char('q'));
         press(&mut app, KeyCode::Char('v'));
         assert!(!app.should_quit, "q no debe cerrar mientras se escribe");
@@ -470,11 +458,11 @@ mod tests {
     #[test]
     fn short_password_in_simulation_errors() {
         let mut app = app();
-        press(&mut app, KeyCode::Enter); // -> Contrasena
+        press(&mut app, KeyCode::Enter);
         for ch in "corta".chars() {
             press(&mut app, KeyCode::Char(ch));
         }
-        press(&mut app, KeyCode::Enter); // -> Conectando
+        press(&mut app, KeyCode::Enter);
         assert!(matches!(app.net.phase, RedFase::Conectando { .. }));
         wait_for_reply(&mut app);
         assert!(

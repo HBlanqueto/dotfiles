@@ -9,7 +9,6 @@ let
   nerd = pkgs.nerd-fonts.jetbrains-mono;
   fontsConf = pkgs.makeFontsConf { fontDirectories = [ nerd ]; };
 
-  # "R,G,B" values straight from the shared palette, as kmscon CLI args.
   paletteArgs = pkgs.lib.concatMap (e: [
     "--${palette.name e.suffix}"
     e.value
@@ -25,9 +24,6 @@ pkgs.writeShellApplication {
     installer=${installer}/bin/nixdots-installer
     fonts_conf=${fontsConf}
 
-    # On a real VT, outside kmscon, with a render node (what --hwaccel
-    # needs), and unless opted out, open kmscon with Nerd Fonts and the
-    # neptunia palette, then run the installer inside it.
     if [ "''${TERM:-}" = linux ] \
         && [ -z "''${KEEL_IN_KMSCON:-}" ] \
         && [ -z "''${KEEL_NO_KMSCON:-}" ] \

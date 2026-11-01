@@ -12,8 +12,6 @@ fn step_weight(step: Step) -> u64 {
     }
 }
 
-/// Overall percentage: weights of the finished steps, plus the system step's
-/// real nix progress (80 %). 100 % only once everything is done.
 pub fn overall_percent(app: &App) -> u64 {
     let iv = &app.install;
     let mut p = 0u64;
@@ -55,7 +53,6 @@ pub fn key(app: &mut App, key: KeyEvent) -> bool {
             app.install_follow = true;
             true
         }
-        // Scrolling the stages box leaves the follow mode until the bottom.
         KeyCode::Up => {
             app.install_follow = false;
             app.install_log_scroll = app.install_log_scroll.saturating_sub(1);
@@ -85,7 +82,6 @@ pub fn key(app: &mut App, key: KeyEvent) -> bool {
             app.install_follow = true;
             true
         }
-        // Esc is a second way into the cancel confirmation.
         KeyCode::Esc => {
             if app.install.error.is_none() {
                 app.install_cancel = true;

@@ -1,15 +1,4 @@
-# nixdots-rebuild — safe wrapper around nixos-rebuild.
-#
-# Usage: nixdots-rebuild [sw|rb|build|update-sw|update-rb]
-#   sw         build, run the safety checks and activate (default)
-#   rb         same, but stage for the next boot instead of switching
-#   build      only build; never activate
-#   update-sw  nix flake update, then sw
-#   update-rb  nix flake update, then rb
-#
-# The canonical repo path is ~/dotfiles (override with KEEL_REPO). The
-# configuration is always #keel.
-
+# nixdots-rebuild: safe wrapper around nixos-rebuild.
 mode="${1:-sw}"
 update=0
 case "$mode" in
@@ -31,7 +20,6 @@ case "$mode" in
 esac
 
 repo="${KEEL_REPO:-${NIXDOTS_REPO:-$HOME/dotfiles}}"
-# shortcut: acepta ~/nixdots mientras se mueve el repo a ~/dotfiles.
 if [ "$repo" = "$HOME/dotfiles" ] && [ ! -e "$repo/flake.nix" ] && [ -e "$HOME/nixdots/flake.nix" ]; then
     repo="$HOME/nixdots"
 fi
@@ -50,7 +38,6 @@ fi
 
 ref="$repo#keel"
 
-# 1. Always build first; only activate once the checks below pass.
 echo "== nixos-rebuild build ($ref) =="
 nixos-rebuild build --impure --flake "$ref"
 
@@ -58,8 +45,6 @@ if [ "$mode" = "build" ]; then
     exit 0
 fi
 
-# 2. Compare the normal users of the running system (uid >= 1000) with the new
-#    configuration, so no account silently disappears.
 new_users="$(nix eval --impure --json "$repo#nixosConfigurations.keel.config.users.users" --apply '
     users: builtins.mapAttrs (_: u: {
         isNormalUser = u.isNormalUser or false;
@@ -78,6 +63,5 @@ if [ "${#disappearing[@]}" -gt 0 ]; then
     exit 1
 fi
 
-# 3. Activate.
 echo "== nixos-rebuild $mode ($ref) =="
 sudo nixos-rebuild "$mode" --impure --flake "$ref"

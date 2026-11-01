@@ -1,6 +1,4 @@
-# Sistema: locale, zona, teclado, consola y ajustes de cuenta independientes
-# del usuario. Los datos de sistema salen de system/lib/defaults.nix (defaults) y
-# machine.toml (manda); las cuentas concretas las crea system/users/default.nix.
+# System-wide locale, time zone, keyboard, console and account settings.
 {
   config,
   lib,
@@ -11,8 +9,6 @@
 }:
 
 let
-  # La ruta final la comprueba el sistema instalado; el instalador evalúa
-  # desde el ISO, así que system/lib/data.nix apunta KEEL_ROOT al destino.
   inherit (data) root;
 
   inherit (data.settings)
@@ -24,16 +20,12 @@ let
   region = data.settings.region or null;
   timeZoneAuto = data.settings.timeZoneAuto or false;
 
-  # Entrada automática: un único usuario, de machine.toml.
   autoLoginUser = data.machine.autoLoginUser or null;
 
-  # El nombre visible puede traer `\` o `"`; hay que escaparlos.
   escapedPretty = lib.replaceStrings [ "\\" "\"" ] [ "\\\\" "\\\"" ] (
     data.machine.prettyHostName or ""
   );
 
-  # Toda cuenta declarada debe apuntar a un hash existente: con mutableUsers =
-  # false, un archivo ausente deja la cuenta sin contraseña al activar.
   normalUsers = builtins.filter (u: u.isNormalUser) (builtins.attrValues config.users.users);
   missingHashes = builtins.filter (
     u: (u.hashedPasswordFile or null) != null && !(data.exists u.hashedPasswordFile)
@@ -76,9 +68,6 @@ in
   programs = {
     dconf.enable = true;
 
-    # Herramientas de administración del sistema. Solo sirven a admins:
-    # todas acaban en sudo/nixos-rebuild. El home solo conserva
-    # `home-update`.
     fish = {
       enable = true;
       shellAliases = {
@@ -112,24 +101,17 @@ in
   environment = {
     binsh = "${pkgs.dash}/bin/dash";
 
-    # El nombre visible de `hostnamectl` (/etc/machine-info), de machine.toml.
     etc."machine-info" = lib.mkIf (data.machine ? prettyHostName) {
       text = ''
         PRETTY_HOSTNAME="${escapedPretty}"
       '';
     };
 
-    # Herramientas de sistema. Las de escritorio viven en system/core/desktop y las
-    # de portátil en system/core/hardware-detect.nix; las personales, en la
-    # plantilla del usuario.
     systemPackages = with pkgs; [
       comma
 
-      # Con el home fuera del sistema, el CLI va aquí para poder hacer
-      # `home-manager switch` en ~/.config/home-manager.
       inputs.home.packages.${pkgs.stdenv.hostPlatform.system}.home-manager
 
-      # Wrapper seguro de nixos-rebuild (backend de los alias de admin).
       inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.nixdots-rebuild
 
       wget

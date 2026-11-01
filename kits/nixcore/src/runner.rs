@@ -1,9 +1,4 @@
 //! Runs external commands and streams their output line by line.
-//!
-//! The installer never reimplements what these tools do; it only orchestrates
-//! them. Every command is described by a [`Cmd`], which keeps a human-readable
-//! [`Cmd::display`] string for the command panel and the install log.
-
 use color_eyre::eyre::{Context, Result};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Command, Output, Stdio};
@@ -11,16 +6,12 @@ use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
 use std::time::Duration;
 
-/// A command that produces no output for this long is assumed to be stuck and
-/// is killed, so the TUI never freezes waiting on a step that went quiet.
 const IDLE_TIMEOUT: Duration = Duration::from_secs(120);
 
-/// One command to run.
 #[derive(Debug, Clone)]
 pub struct Cmd {
     pub program: String,
     pub args: Vec<String>,
-    /// Full shell-style string shown in the UI.
     pub display: String,
 }
 
@@ -42,12 +33,10 @@ impl Cmd {
         self
     }
 
-    /// Adds a path argument (converted lossily to a string).
     pub fn arg_path(self, path: impl AsRef<std::path::Path>) -> Self {
         self.arg(path.as_ref().to_string_lossy().to_string())
     }
 
-    /// Adds several arguments.
     pub fn args<I, S>(mut self, args: I) -> Self
     where
         I: IntoIterator<Item = S>,
@@ -59,25 +48,18 @@ impl Cmd {
         self
     }
 
-    /// Overrides the displayed string (useful when the real invocation is more
-    /// verbose than what a human wants to read).
     pub fn with_display(mut self, display: impl Into<String>) -> Self {
         self.display = display.into();
         self
     }
 }
 
-/// A streamed piece of a command's output.
 #[derive(Debug, Clone)]
 pub enum Stream {
     Stdout(String),
     Stderr(String),
 }
 
-/// Experimental features every Nix invocation needs. The live ISO may not have
-/// them in `nix.conf`, and `nix eval`/`nix build`/`nix flake` refuse to run
-/// without them, so every child gets them through `NIX_CONFIG`. An existing
-/// value is kept and extended with a newline instead of replaced.
 pub fn nix_config() -> String {
     let ours = "experimental-features = nix-command flakes";
     match std::env::var("NIX_CONFIG") {
@@ -86,10 +68,6 @@ pub fn nix_config() -> String {
     }
 }
 
-/// Runs `cmd` to completion, invoking `sink` for every output line, and returns
-/// the exit code (`-1` when it was killed by a signal, `-2` when it was killed
-/// because it went silent). No command ever inherits the installer's stdin, so
-/// nothing can stop to ask for input and hang the TUI.
 pub fn run(cmd: &Cmd, sink: &mut dyn FnMut(Stream)) -> i32 {
     let mut command = Command::new(&cmd.program);
     command
@@ -101,10 +79,6 @@ pub fn run(cmd: &Cmd, sink: &mut dyn FnMut(Stream)) -> i32 {
     spawn_and_stream(command, &cmd.program, None, sink)
 }
 
-/// Like [`run`], but feeds `input` on the child's stdin. Used for secrets
-/// (LUKS passphrases, recovery keys) that must never appear as an argument, in
-/// the display string or in the log. The data is sent from a helper thread and
-/// the pipe is closed right after, so the child sees EOF.
 pub fn run_with_stdin(cmd: &Cmd, input: &[u8], sink: &mut dyn FnMut(Stream)) -> i32 {
     let mut command = Command::new(&cmd.program);
     command
@@ -154,7 +128,6 @@ fn spawn_and_stream(
     }
     drop(tx);
 
-    // Forward every line as it arrives, aborting if the command goes silent.
     let mut timed_out = false;
     loop {
         match rx.recv_timeout(IDLE_TIMEOUT) {
@@ -210,7 +183,6 @@ fn read_lines<R: Read>(reader: R, is_stderr: bool, tx: &mpsc::Sender<(bool, Stri
     }
 }
 
-/// Runs `cmd` and captures its full output (for short, non-interactive probes).
 pub fn capture(cmd: &Cmd) -> Result<Output> {
     Command::new(&cmd.program)
         .args(&cmd.args)

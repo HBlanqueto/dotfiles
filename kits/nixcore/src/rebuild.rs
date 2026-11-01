@@ -1,11 +1,4 @@
-//! Reconstrucción de la versión instalada con la misma protección que
-//! `steward rebuild`: primero se construye, luego se comprueba que ningún
-//! usuario normal vaya a desaparecer, y solo entonces se activa.
-//!
-//! Lo usan `crewd` y `steward`. Nunca
-//! reconstruye la copia de trabajo del repo: siempre el source instalado en
-//! `/etc/keel/source`.
-
+//! Safe rebuild of the installed system, used by `crewd` and `steward`.
 use color_eyre::eyre::{bail, eyre, Context, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -13,7 +6,6 @@ use toml_edit::DocumentMut;
 
 use crate::runner;
 
-/// Modo de `nixos-rebuild`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
     Switch,
@@ -31,17 +23,12 @@ impl Mode {
     }
 }
 
-/// Resultado de una reconstrucción que llegó a activar.
 #[derive(Debug, Clone, Default)]
 pub struct Outcome {
-    /// Se activó (switch/boot). `false` en modo build.
     pub activated: bool,
-    /// Unidades que quedaron en fallo tras una activación con aviso (código 4
-    /// de `nixos-rebuild`).
     pub failed_units: Vec<String>,
 }
 
-/// `/etc/keel/source` y `/etc/keel/release`, validados.
 pub fn system_ref() -> Result<(PathBuf, String)> {
     let raw = std::fs::read_to_string("/etc/keel/source")
         .wrap_err("falta /etc/keel/source")?
@@ -58,7 +45,6 @@ pub fn system_ref() -> Result<(PathBuf, String)> {
     Ok((path, rev))
 }
 
-/// Commit de `/etc/keel/release` (TOML).
 pub fn release_commit() -> Result<String> {
     let text = std::fs::read_to_string("/etc/keel/release").wrap_err("falta /etc/keel/release")?;
     let doc: DocumentMut = text
@@ -76,8 +62,6 @@ pub fn release_commit() -> Result<String> {
     Ok(commit)
 }
 
-/// Ejecuta la reconstrucción desde `flake_ref`. `allow_missing` son los
-/// usuarios que pueden desaparecer en esta operación (p. ej. el que se borra).
 pub fn run(flake_ref: &Path, mode: Mode, allow_missing: &[String]) -> Result<Outcome> {
     let ref_arg = format!("path:{}#keel", flake_ref.display());
 
@@ -112,7 +96,6 @@ pub fn run(flake_ref: &Path, mode: Mode, allow_missing: &[String]) -> Result<Out
             activated: true,
             failed_units: Vec::new(),
         }),
-        // 4: activado, pero alguna unidad falló. No es motivo para revertir.
         Some(4) => Ok(Outcome {
             activated: true,
             failed_units: failed_units(),
@@ -127,8 +110,6 @@ pub fn run(flake_ref: &Path, mode: Mode, allow_missing: &[String]) -> Result<Out
     }
 }
 
-/// Usuarios normales del sistema que no están en la configuración nueva y no
-/// están en `allow_missing`.
 fn disappearing_users(flake_ref: &Path, allow_missing: &[String]) -> Result<Vec<String>> {
     let ref_arg = format!(
         "path:{}#nixosConfigurations.keel.config.users.users",
@@ -152,7 +133,6 @@ fn disappearing_users(flake_ref: &Path, allow_missing: &[String]) -> Result<Vec<
         .collect())
 }
 
-/// Usuarios normales del sistema en marcha (uid >= 1000 y < 60000).
 fn running_users() -> Vec<String> {
     let Ok(passwd) = std::fs::read_to_string("/etc/passwd") else {
         return Vec::new();
@@ -172,7 +152,6 @@ fn running_users() -> Vec<String> {
         .collect()
 }
 
-/// Unidades systemd en fallo (para el aviso del código 4).
 fn failed_units() -> Vec<String> {
     let Ok(output) = Command::new("systemctl")
         .args(["--failed", "--no-legend", "--plain"])

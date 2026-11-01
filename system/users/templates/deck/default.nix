@@ -1,4 +1,4 @@
-# Plantilla «deck»: el home completo (apps, IA, escritorio) más el tema.
+# Home template "deck": apps, AI tools, desktop and theme.
 { ... }:
 
 {

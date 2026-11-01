@@ -1,9 +1,4 @@
-// Asistente de primer arranque (fase 4a, sólo UI) sobre el sistema Neptunia.
-//
-// Referencias: ~/Descargas/first-boot/mockup-asistente.html + firstboot.css + los
-// tokens/componentes Neptunia. Los colores y medidas salen del sistema de diseño
-// (kits/neptunia), expuesto por theme.slint.
-
+// First-boot wizard UI.
 import "fonts/DancingScript-Regular.ttf";
 import "fonts/DancingScript-Bold.ttf";
 
@@ -17,7 +12,6 @@ import {
     GitIcon, CheckIcon, SpinIcon,
 } from "icons.slint";
 
-// Un idioma del saludo: palabra, texto del botón, ayuda, tamaño y RTL.
 struct Greet {
     word: string,
     cta: string,
@@ -26,37 +20,26 @@ struct Greet {
     rtl: bool,
 }
 
-// Datos del asistente. Las listas son de ejemplo y fijas (la fase 4b traerá las
-// reales). Rust rellena los datos de la máquina, valida el usuario y aplica.
 export global State {
     in-out property <int> step: 0;
     in-out property <bool> applying: false;
     in-out property <string> apply-error: "";
     in-out property <string> log-text: "";
     in-out property <bool> show-details: false;
-    // Fase real del CLI (0..4) y fundido final a negro.
     in-out property <int> prep-phase: 0;
-    // Texto concreto de la fase (steward home prepare lo publica).
     in-out property <string> prep-status: "";
     in-out property <bool> prep-black: false;
-    // A dónde vuelve «Volver a la configuración» (Cuenta si fue la contraseña).
     in-out property <int> error-step: 8;
-    // Saludo escrito letra a letra por Rust.
     in-out property <string> greet-typed: "";
     in-out property <bool> greet-animate: false;
-    // Presentación «Welcome to NixOS» (siempre en inglés) antes del saludo.
     in-out property <float> intro-op: 0.0;
 
-    // ¿Hay red? Si la hay, el paso de Wi‑Fi se salta (pero cuenta en los puntos).
     in-out property <bool> has-network: false;
 
-    // Idioma elegido (código) y su nombre; la lista la rellena Rust desde el
-    // crate `lists` (todos los locales UTF-8, nombre nativo + código).
     in-out property <string> lang-search: "";
     in-out property <string> lang-selected: "es_MX.UTF-8";
     in-out property <string> lang-selected-name: "Español (México)";
     in-out property <int> kb-index: 0;
-    // Zona horaria: ciudad elegida por su zona (la lista la filtra Rust).
     in-out property <string> city-search: "";
     in-out property <string> city-selected: "America/Merida";
     in-out property <string> city-selected-name: "Mérida";
@@ -64,7 +47,6 @@ export global State {
     in-out property <bool> auto-login: false;
     in-out property <bool> git-on: false;
 
-    // Wi‑Fi: panel de contraseña deslizante.
     in-out property <int> net-index: 0;
     in-out property <bool> wifi-pw: false;
     in-out property <int> wifi-connected: -1;
@@ -72,21 +54,15 @@ export global State {
     in-out property <bool> wifi-show: false;
     in-out property <bool> wifi-join: false;
     in-out property <bool> wifi-error: false;
-    // «Otras opciones de red…» y red oculta (SSID a mano).
     in-out property <bool> wifi-options: false;
     in-out property <bool> wifi-hidden: false;
     in-out property <string> wifi-ssid: "";
 
-    // Cuenta: el usuario editable cambia la línea de ayuda por un campo.
     in-out property <bool> username-editing: false;
-    // Se activa al pulsar Continuar con datos inválidos: obliga a mostrar la
-    // validación de todos los campos del paso.
     in-out property <bool> form-attempted: false;
-    // Medidor de seguridad (0..4) y coincidencia, calculados por Rust.
     in-out property <int> pw-strength: 0;
     in-out property <bool> pw-match: true;
 
-    // Accesibilidad (todas false por defecto).
     in-out property <bool> a11y-large-text: false;
     in-out property <bool> a11y-high-contrast: false;
     in-out property <bool> a11y-screen-reader: false;
@@ -103,7 +79,6 @@ export global State {
     in-out property <string> git-name: "";
     in-out property <string> git-email: "";
 
-    // Saludo (paso 0): 13 idiomas.
     in-out property <[Greet]> greets: [
         { word: "hola", cta: "Continuar", hint: "Pulsa Intro para empezar", size: 150px, rtl: false },
         { word: "hello", cta: "Continue", hint: "Press Return to get started", size: 150px, rtl: false },
@@ -120,14 +95,10 @@ export global State {
         { word: "مرحبا", cta: "متابعة", hint: "اضغط على Enter للبدء", size: 120px, rtl: true },
     ];
     in-out property <int> gi: 0;
-    // El saludo empieza oculto: sólo aparece cuando la presentación
-    // «Welcome to NixOS» ha terminado su fundido de salida (lo hace Rust).
     in-out property <bool> g-shown: false;
 
-    // Listas que rellena Rust desde el crate `lists`.
     in-out property <[string]> lang-names: [];
     in-out property <[string]> lang-codes: [];
-    // Sugeridos (siempre visibles): es_MX y en_US.
     in-out property <[string]> suggested-names: ["Español (México)", "English (United States)"];
     in-out property <[string]> suggested-codes: ["es_MX.UTF-8", "en_US.UTF-8"];
 
@@ -144,7 +115,6 @@ export global State {
     in-out property <[string]> city-tz: [];
 }
 
-// Cuadro de icono de paso (64 px) con tinte sólido y brillo arriba.
 component StepIcon inherits Rectangle {
     in property <color> tint: Tokens.accent;
     width: 64px;
@@ -169,7 +139,6 @@ component StepIcon inherits Rectangle {
     }
 }
 
-// Cuadro de icono de fila/ficha (np-ricon): 24 px, radio 8, sys-* sólido.
 component TileIcon inherits Rectangle {
     in property <color> tint: Theme.accent;
     in property <string> icon;
@@ -189,7 +158,6 @@ component TileIcon inherits Rectangle {
     }
 }
 
-// Cabecera de sección (np-group-hd).
 component SectionLabel inherits Rectangle {
     in property <string> text;
     height: 28px;
@@ -205,17 +173,12 @@ component SectionLabel inherits Rectangle {
     }
 }
 
-// Campo de texto Neptunia (np-field/np-input): etiqueta encima, caja de 36 px,
-// radio 8, foco accent + halo de 3 px accent-soft. Icono y ojo opcionales.
 component Field inherits VerticalLayout {
     in-out property <string> text;
     in property <string> label;
     in property <string> placeholder;
     in property <bool> password: false;
     in property <string> help;
-    // `invalid` es la condición; el campo sólo se pinta en rojo tras salir del
-    // campo (blur), tras pulsar Continuar con datos inválidos, o si `immediate`
-    // (p. ej. un error devuelto por el sistema).
     in property <bool> invalid: false;
     in property <bool> immediate: false;
     property <bool> touched: false;
@@ -243,7 +206,6 @@ component Field inherits VerticalLayout {
         border-color: root.error ? Tokens.danger : (ti.has-focus ? Theme.accent : Tokens.line);
         animate border-color { duration: Motion.fast; }
         animate background { duration: Motion.base; }
-        // Halo de foco: borde accent + 3 px de accent-soft, con fundido.
         Rectangle {
             x: -4px;
             y: -4px;
@@ -256,8 +218,6 @@ component Field inherits VerticalLayout {
             opacity: (ti.has-focus && !root.error) ? 1 : 0;
             animate opacity { duration: Motion.fast; }
         }
-        // Foco al hacer clic en cualquier punto de la caja, no sólo sobre el
-        // texto (el TextInput de arriba se ocupa de sus propios clics).
         TouchArea {
             clicked => { ti.focus(); }
         }
@@ -314,7 +274,6 @@ component Field inherits VerticalLayout {
             accepted => { root.accepted(); }
         }
     }
-    // Al salir del campo, la validación ya puede mostrarse.
     property <bool> focused: ti.has-focus;
     changed focused => {
         if (!root.focused) { root.touched = true; }
@@ -327,7 +286,6 @@ component Field inherits VerticalLayout {
     }
 }
 
-// Campo de búsqueda (np-input--search): cápsula sobre bg-control.
 component SearchField inherits Rectangle {
     in-out property <string> text;
     in property <string> placeholder;
@@ -367,8 +325,6 @@ component SearchField inherits Rectangle {
     }
 }
 
-// Fila de lista Neptunia (np-listrow, C+): 40 px mínimos, relleno 14, sin
-// relleno de acento; la elegida lleva una marca ✓ en accent a la derecha.
 component OptionRow inherits Rectangle {
     in property <string> label;
     in property <bool> label-accent: false;
@@ -382,14 +338,12 @@ component OptionRow inherits Rectangle {
     in property <color> icon-tint: Theme.accent;
     in property <bool> lock: false;
     in property <bool> chevron: false;
-    // Marca de elegido: aparece con fundido y escala 0.6→1.0.
     in property <bool> check: false;
     callback picked();
     height: root.sub == "" ? 40px : 52px;
     background: ta.has-hover ? Tokens.bgHover : transparent;
     animate background { duration: Motion.fast; }
     property <length> txtX: root.icon != "" ? 52px : 14px;
-    // Borde derecho del texto de valor, dejando sitio a candado, chevron y ✓.
     property <length> valR: 14px
         + (root.check ? 22px : 0px)
         + (root.lock ? 22px : 0px)
@@ -483,8 +437,6 @@ component OptionRow inherits Rectangle {
     }
 }
 
-// Tarjeta de lista Neptunia (np-group C+): una sola ficha bg-surface, radio 16,
-// borde line, relleno vertical 4; encabezados y filas van DENTRO.
 component ListCard inherits Rectangle {
     width: 100%;
     border-radius: Tokens.radiuslg;
@@ -501,7 +453,6 @@ component ListCard inherits Rectangle {
     }
 }
 
-// Interruptor Neptunia (np-switch): 36 × 20, perilla de 16.
 component Toggle inherits Rectangle {
     in-out property <bool> checked;
     width: 36px;
@@ -529,7 +480,6 @@ component Toggle inherits Rectangle {
     }
 }
 
-// Fila con icono de color (np-ricon), título, descripción y interruptor.
 component IconRow inherits Rectangle {
     in property <string> title;
     in property <string> desc;
@@ -584,13 +534,11 @@ component IconRow inherits Rectangle {
 }
 
 
-// Botón Neptunia (np-btn--lg): 38 px, radio 8 (button), no cápsula.
 component Button inherits Rectangle {
     in property <string> label;
     in property <bool> primary: false;
     in property <bool> enabled: true;
     in property <length> w: 112px;
-    // Altura: `control-lg` (38) por defecto; el pie usa `control-md` (30).
     in property <length> h: Tokens.controllg;
     callback clicked();
     width: w;
@@ -617,7 +565,6 @@ component Button inherits Rectangle {
     }
 }
 
-// Enlace Neptunia (fb-link).
 component LinkText inherits Rectangle {
     in property <string> label;
     in property <color> fg: Theme.accent-strong;
@@ -642,7 +589,6 @@ component LinkText inherits Rectangle {
     }
 }
 
-// Tarjeta de modo claro/oscuro (fb-mode): miniatura radio 12, ventana radio 8.
 component ModeCard inherits Rectangle {
     in property <bool> preview-dark: false;
     in property <bool> selected: false;
@@ -709,7 +655,6 @@ component ModeCard inherits Rectangle {
     }
 }
 
-// Muestra de acento (fb-swatch): 24 px, anillo de 2 px con 2 px de aire.
 component Swatch inherits Rectangle {
     in property <color> c;
     in property <bool> selected: false;
@@ -748,7 +693,6 @@ component Swatch inherits Rectangle {
     }
 }
 
-// Fila del resumen (np-listrow con icono).
 component SummaryRow inherits Rectangle {
     in property <string> k;
     in property <string> v;
@@ -791,7 +735,6 @@ component SummaryRow inherits Rectangle {
     }
 }
 
-// Cabecera de paso: icono → 14 px → título 22/28 → 6 px → descripción.
 component StepHeader inherits VerticalLayout {
     in property <string> title;
     in property <string> subtitle;
@@ -831,14 +774,9 @@ export component AppWindow inherits Window {
     default-font-family: "Inter";
     forward-focus: key-handler;
 
-    // Alias para `slint-viewer --load-data` (capturas por pantalla/tema).
     in-out property <int> step <=> State.step;
-    // Al entrar en Cuenta, la validación vuelve a estar oculta hasta que el
-    // usuario interactúe.
     changed step => { if (State.step == 4) { State.form-attempted = false; } }
     in-out property <string> theme <=> Tokens.theme;
-    // El sistema de diseño resuelve los colores según Design.mode; se sincroniza
-    // aquí (no en el global) porque los componentes sí pueden fijar globales.
     changed theme => {
         Design.mode = theme == "dark" ? NeptuniaMode.dark : theme == "dark-tint" ? NeptuniaMode.dark-tint : NeptuniaMode.light;
     }
@@ -851,28 +789,19 @@ export component AppWindow inherits Window {
     callback apply();
     callback name-edited(string);
     callback username-edited(string);
-    // Idiomas: Rust cambia la traducción activa de Slint.
     callback language-changed(string);
-    // Búsqueda de idioma: Rust filtra la lista de locales.
     callback lang-search-changed(string);
-    // Búsqueda de ciudad: Rust filtra la lista de ciudades.
     callback city-search-changed(string);
-    // Contraseñas: Rust recalcula el medidor de seguridad.
     callback passwords-changed();
-    // Wi‑Fi: Rust conecta con NetworkManager.
     callback wifi-connect();
-    // Avisa a Rust de «Reducir animaciones» (el saludo cambia de ritmo).
     callback reduce-changed(bool);
 
-    // Reducción de movimiento: preferencia del sistema o del paso Accesibilidad.
     property <bool> reduce: Theme.reduced-motion || State.a11y-reduce-motion;
     init => { Motion.reduce = root.reduce; root.reduce-changed(root.reduce); }
     changed reduce => { Motion.reduce = root.reduce; root.reduce-changed(root.reduce); }
 
     out property <bool> in-dlg: State.step >= 1 && State.step <= 8;
 
-    // Fondo: Rust lo sustituye por el PNG desenfocado en caché; el zoom lento
-    // (1.00→1.04 en 30 s, ida y vuelta) sólo corre en el saludo y sin reduce.
     in-out property <image> wallpaper: @image-url("firstboot-blur.jpg");
     out property <float> bg-scale: (Motion.reduce || State.step != 0)
         ? 1.0
@@ -887,7 +816,6 @@ export component AppWindow inherits Window {
     function op(i: int) -> float {
         return State.step == i ? 1.0 : 0.0;
     }
-    // Texto de la fase real del CLI que muestra «Preparando».
     function status-label(p: int) -> string {
         return p == 0 ? @tr("Creando tu cuenta…")
             : p == 1 ? @tr("Aplicando idioma y región…")
@@ -901,7 +829,6 @@ export component AppWindow inherits Window {
     function prev-step(s: int) -> int {
         return (s - 1 == 3 && State.has-network) ? 2 : s - 1;
     }
-    // Tinte del icono de cada paso (familia sys-*).
     function step-tint(i: int) -> color {
         return i == 1 ? Tokens.sysPurple
             : i == 2 ? Tokens.sysBlue
@@ -911,7 +838,6 @@ export component AppWindow inherits Window {
             : i == 7 ? Tokens.sysGreen
             : Tokens.sysBlue;
     }
-    // Fuente del saludo: Dancing Script 600 (latino); Noto Sans CJK y DejaVu.
     function greet-family(i: int) -> string {
         return i >= 6 && i <= 8 ? "Noto Sans CJK SC"
             : (i >= 9 && i <= 10 ? "DejaVu Sans" : (i == 12 ? "DejaVu Sans" : "Dancing Script"));
@@ -919,7 +845,6 @@ export component AppWindow inherits Window {
     function greet-weight(i: int) -> int {
         return (i <= 5 || i == 11) ? 600 : 400;
     }
-    // Resumen de accesibilidad: opciones activas separadas por comas.
     function a11y-join(acc: string, on: bool, name: string) -> string {
         return on ? (acc == "" ? name : acc + ", " + name) : acc;
     }
@@ -934,7 +859,6 @@ export component AppWindow inherits Window {
                 State.a11y-reduce-motion, @tr("Reducir animaciones")),
             State.a11y-screen-keyboard, @tr("Teclado en pantalla"));
     }
-    // «Continuar» del paso Cuenta sólo con nombre, usuario válido y contraseñas.
     function cuenta-valid() -> bool {
         return State.full-name != ""
             && State.username != ""
@@ -942,25 +866,19 @@ export component AppWindow inherits Window {
             && State.password != ""
             && State.password2 == State.password;
     }
-    // Acción de «Continuar»/«Aplicar» y de Intro en un campo. En la cuenta, con
-    // datos inválidos no avanza: obliga a mostrar la validación.
     function continue-clicked() {
         if (State.step == 8) { root.apply(); }
         else if (State.step == 4 && !root.cuenta-valid()) { State.form-attempted = true; }
         else { State.step = root.next-step(State.step); }
     }
-    // Elige idioma: guarda el código y avisa a Rust para que cambie la
-    // traducción activa (sólo hay .po para es, en y pt; el resto cae a inglés).
     function set-language(code: string) {
         State.lang-selected = code;
         root.language-changed(code);
     }
-    // Elige ciudad: guarda su zona y su nombre.
     function pick-city(name: string, zone: string) {
         State.city-selected = zone;
         State.city-selected-name = name;
     }
-    // Wi‑Fi: red abierta conecta directa; protegida abre el panel de contraseña.
     function pick-network(i: int) {
         State.net-index = i;
         State.wifi-error = false;
@@ -973,7 +891,6 @@ export component AppWindow inherits Window {
             State.wifi-connected = i;
         }
     }
-    // Red oculta: SSID a mano y contraseña; abre el mismo panel.
     function open-hidden-network() {
         State.wifi-options = false;
         State.wifi-hidden = true;
@@ -994,7 +911,6 @@ export component AppWindow inherits Window {
         State.wifi-join = true;
         root.wifi-connect();
     }
-    // Sacudida de 3 × 6 px cuando la contraseña no es correcta.
     property <int> shake-step: 0;
     property <length> shake-x: (Motion.reduce || root.shake-step == 0) ? 0px
         : (Math.mod(root.shake-step, 2) == 1 ? 6px : -6px);
@@ -1009,8 +925,6 @@ export component AppWindow inherits Window {
     in-out property <bool> wifi-error-watch <=> State.wifi-error;
     changed wifi-error-watch => { if (root.wifi-error-watch) { root.shake-step = 1; } }
 
-    // Todo el contenido va bajo este FocusScope: así Esc e Intro se oyen aunque
-    // un campo tenga el foco (los eventos suben por los ancestros).
     key-handler := FocusScope {
     width: 100%;
     height: 100%;
@@ -1026,8 +940,6 @@ export component AppWindow inherits Window {
         }
     }
 
-    // Fondo desenfocado en Rust (ver `wallpaper` en main.rs) + velo. Zoom muy
-    // lento 1.00→1.04 en 30 s, ida y vuelta; sólo mientras dura el saludo.
     Image {
         source: root.wallpaper;
         width: parent.width;
@@ -1042,7 +954,6 @@ export component AppWindow inherits Window {
         background: Design.wallpaper-veil;
     }
 
-    // ----------------------------------------------------------------- Hola --
     hello := Rectangle {
         width: parent.width;
         height: parent.height;
@@ -1054,14 +965,10 @@ export component AppWindow inherits Window {
         animate transform-scale-x { duration: Motion.slow; easing: ease-out; }
         animate transform-scale-y { duration: Motion.slow; easing: ease-out; }
 
-        // Presentación «Welcome to NixOS» (siempre en inglés) sobre el fondo:
-        // fundido de entrada, se queda ~2 s y funde; luego empieza el saludo.
         Rectangle {
             width: parent.width;
             height: parent.height;
             background: transparent;
-            // Sin `visible`: si dependiera de intro-op, el fundido de salida se
-            // cortaría al pasar la opacidad por debajo del umbral.
             opacity: State.intro-op;
             animate opacity { duration: Motion.reduce ? 0ms : 700ms; easing: ease-out; }
             VerticalLayout {
@@ -1088,10 +995,6 @@ export component AppWindow inherits Window {
             }
         }
 
-        // El saludo lo escribe Rust letra a letra (State.greet-typed) y luego lo
-        // funde; `greet-animate` es falso en slint-viewer (muestra la palabra).
-
-        // Saludo, un poco por encima del centro (40 px de padding inferior).
         VerticalLayout {
             width: 100%;
             height: 100%;
@@ -1117,8 +1020,6 @@ export component AppWindow inherits Window {
             }
         }
 
-        // Botón principal + ayuda, a 120 px del pie. Ocultos mientras dura la
-        // presentación: sólo aparecen con el saludo (g-shown).
         Rectangle {
             width: 100%;
             height: 68px;
@@ -1189,9 +1090,7 @@ export component AppWindow inherits Window {
         }
     }
 
-    // -------------------------------------------------------------- Diálogo --
     dialog := Rectangle {
-        // Ventana del asistente: 880 × 648 (130 + 620 + 130 y 36 + 548 + 64).
         width: 880px;
         height: 648px;
         x: (parent.width - self.width) / 2;
@@ -1205,8 +1104,6 @@ export component AppWindow inherits Window {
         animate transform-scale-x { duration: Motion.slow; easing: ease-out; delay: Motion.reduce ? 0ms : 180ms; }
         animate transform-scale-y { duration: Motion.slow; easing: ease-out; delay: Motion.reduce ? 0ms : 180ms; }
 
-        // Sombra del diálogo (shadow-window): dos rectángulos apilados con
-        // drop-shadow —una difusa grande y otra corta— más el borde de 1 px.
         Rectangle {
             width: 100%;
             height: 100%;
@@ -1230,8 +1127,6 @@ export component AppWindow inherits Window {
             animate background { duration: Motion.base; }
         }
 
-        // Contenido: columna de 620 px centrada (margen 130), 36 arriba y 548
-        // de alto. Los pasos se deslizan dentro.
         Rectangle {
             x: 130px;
             y: 36px;
@@ -1239,7 +1134,6 @@ export component AppWindow inherits Window {
             height: 548px;
             clip: true;
 
-                // --- Paso 1 · Idioma y región ---
                 p1 := Rectangle {
                     width: 100%;
                     height: 100%;
@@ -1273,7 +1167,6 @@ export component AppWindow inherits Window {
                                 picked => { root.set-language(State.suggested-codes[i]); }
                             }
                         }
-                        // Lista completa de locales (scroll): nombre nativo + código.
                         Rectangle {
                             width: 100%;
                             height: 168px;
@@ -1305,7 +1198,6 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // --- Paso 2 · Accesibilidad ---
                 p2 := Rectangle {
                     width: 100%;
                     height: 100%;
@@ -1379,7 +1271,6 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // --- Paso 3 · Wi-Fi (dos paneles que se deslizan) ---
                 p3 := Rectangle {
                     width: 100%;
                     height: 100%;
@@ -1389,7 +1280,6 @@ export component AppWindow inherits Window {
                     animate x { duration: Motion.reduce ? 0ms : Motion.base; easing: ease-out; }
                     animate opacity { duration: Motion.reduce ? 0ms : Motion.base; easing: ease-out; }
 
-                    // Panel de la lista de redes.
                     Rectangle {
                         width: 100%;
                         height: 100%;
@@ -1433,8 +1323,6 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                    // Panel de la contraseña (entra desde la derecha). Sigue el
-                    // tope de los pasos (540 px) para que el campo quede visible.
                     Rectangle {
                         width: 100%;
                         height: 100%;
@@ -1446,7 +1334,6 @@ export component AppWindow inherits Window {
                         VerticalLayout {
                             alignment: start;
                             spacing: 16px;
-                            // Botón «‹ Redes».
                             Rectangle {
                                 width: 110px;
                                 height: 24px;
@@ -1465,7 +1352,6 @@ export component AppWindow inherits Window {
                                     height: parent.height;
                                 }
                             }
-                            // Icono de Wi‑Fi con insignia de candado.
                             HorizontalLayout {
                                 alignment: center;
                                 Rectangle {
@@ -1527,7 +1413,6 @@ export component AppWindow inherits Window {
                                     wrap: word-wrap;
                                 }
                             }
-                            // Campo + botones, con una pequeña sacudida si falla.
                             Rectangle {
                                 width: 100%;
                                 height: pw-inner.preferred-height;
@@ -1576,7 +1461,6 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // --- Paso 4 · Tu cuenta (variante A: vista previa del inicio) ---
                 p4 := Rectangle {
                     width: 100%;
                     height: 100%;
@@ -1592,7 +1476,6 @@ export component AppWindow inherits Window {
                             title: @tr("Crea tu cuenta");
                             subtitle: @tr("Así te verás al iniciar sesión.");
                         }
-                        // Vista previa del inicio de sesión sobre el wallpaper.
                         Rectangle {
                             width: 100%;
                             height: 132px;
@@ -1624,9 +1507,6 @@ export component AppWindow inherits Window {
                             VerticalLayout {
                                 alignment: center;
                                 spacing: 8px;
-                                // El avatar se centra con un HorizontalLayout: si
-                                // fuera hijo directo del VerticalLayout se
-                                // estiraría a todo el ancho.
                                 HorizontalLayout {
                                     alignment: center;
                                     Rectangle {
@@ -1650,7 +1530,6 @@ export component AppWindow inherits Window {
                                             width: parent.width;
                                             height: parent.height;
                                         }
-                                        // Sin nombre aún: silueta de persona.
                                         MiniIcon {
                                             visible: State.initials == "";
                                             x: (parent.width - self.width) / 2;
@@ -1745,7 +1624,6 @@ export component AppWindow inherits Window {
                                 accepted => { root.continue-clicked(); }
                             }
                         }
-                        // Medidor de seguridad: 4 segmentos y su leyenda.
                         HorizontalLayout {
                             spacing: 4px;
                             height: 16px;
@@ -1787,7 +1665,6 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // --- Paso 5 · Zona horaria ---
                 p5 := Rectangle {
                     width: 100%;
                     height: 100%;
@@ -1847,7 +1724,6 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // --- Paso 6 · Apariencia ---
                 p6 := Rectangle {
                     width: 100%;
                     height: 100%;
@@ -1904,7 +1780,6 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // --- Paso 7 · Git ---
                 p7 := Rectangle {
                     width: 100%;
                     height: 100%;
@@ -1951,7 +1826,6 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // --- Paso 8 · Todo listo ---
                 p8 := Rectangle {
                     width: 100%;
                     height: 100%;
@@ -2015,8 +1889,6 @@ export component AppWindow inherits Window {
                 }
         }
 
-        // Pie de 64 px separado por una línea de 1 px en `line`. No se anima
-        // entre pasos: sólo cambia el enlace/nota con un fundido.
         footer := Rectangle {
             y: 584px;
             width: 100%;
@@ -2036,7 +1908,6 @@ export component AppWindow inherits Window {
                 spacing: 12px;
                 accessible-role: none;
                 accessible-label: @tr("Paso") + " " + State.step + " " + @tr("de") + " 8";
-                // Botón de accesibilidad: desde cualquier paso, al paso 2.
                 Rectangle {
                     width: 30px;
                     height: 30px;
@@ -2057,7 +1928,6 @@ export component AppWindow inherits Window {
                         clicked => { State.step = 2; }
                     }
                 }
-                // Enlace o nota del paso, con fundido.
                 Rectangle {
                     width: 320px;
                     height: 30px;
@@ -2092,7 +1962,6 @@ export component AppWindow inherits Window {
                         clicked => { if (State.step == 3) { State.wifi-options = !State.wifi-options; } }
                     }
                 }
-                // Empuja los botones a la derecha.
                 Rectangle { horizontal-stretch: 1; background: transparent; }
                 Button {
                     label: @tr("Atrás");
@@ -2113,7 +1982,6 @@ export component AppWindow inherits Window {
             }
         }
 
-        // Línea interior (window-inner): sólo visible en oscuro.
         Rectangle {
             x: 1px;
             y: 1px;
@@ -2125,7 +1993,6 @@ export component AppWindow inherits Window {
             border-color: Tokens.windowInner;
         }
 
-        // Opciones de red: popover sobre el pie. El fondo cierra al pulsar.
         if State.wifi-options : TouchArea {
             width: 100%;
             height: 100%;
@@ -2164,7 +2031,6 @@ export component AppWindow inherits Window {
         }
     }
 
-    // ----------------------------------------------------------- Preparando --
     prepare := Rectangle {
         width: parent.width;
         height: parent.height;
@@ -2176,15 +2042,10 @@ export component AppWindow inherits Window {
         animate transform-scale-x { duration: Motion.slow; easing: ease-out; }
         animate transform-scale-y { duration: Motion.slow; easing: ease-out; }
 
-        // 0 mientras prepara; 1 al aparecer el error (funde spinner ↔ «!»).
         property <float> err: State.apply-error == "" ? 0.0 : 1.0;
-        // Texto de fase con fundido: sale, cambia y vuelve a entrar. `shown-phase`
-        // va con binding a `status-label` para que @tr se reevalúe con la
-        // traducción activa (un valor guardado en `init` no se traduce).
         property <int> shown-phase: 0;
         property <string> status-text: root.status-label(prepare.shown-phase);
         property <float> status-op: 1.0;
-        // Alias local para poder usar `changed` (no admite nombres cualificados).
         property <int> phase: State.prep-phase;
         status-timer := Timer {
             interval: Motion.reduce ? 1ms : 250ms;
@@ -2214,7 +2075,6 @@ export component AppWindow inherits Window {
                     width: 48px;
                     height: 48px;
                     background: transparent;
-                    // Spinner: 0,9 s por vuelta, sólo si la pantalla está visible.
                     SpinIcon {
                         x: (parent.width - self.width) / 2;
                         y: (parent.height - self.height) / 2;
@@ -2227,7 +2087,6 @@ export component AppWindow inherits Window {
                             : 0deg;
                         animate opacity { duration: Motion.base; }
                     }
-                    // Con «Reducir animaciones», tres puntos estáticos.
                     if Motion.reduce : HorizontalLayout {
                         alignment: center;
                         spacing: 6px;
@@ -2240,7 +2099,6 @@ export component AppWindow inherits Window {
                             animate opacity { duration: Motion.base; }
                         }
                     }
-                    // Error: «!» con fundido y escala 0.8→1.0.
                     Rectangle {
                         x: (parent.width - self.width) / 2;
                         y: (parent.height - self.height) / 2;
@@ -2361,7 +2219,6 @@ export component AppWindow inherits Window {
             }
         }
 
-        // Aviso de no apagar, a 56 px del pie.
         Text {
             x: 0;
             y: parent.height - 56px - 18px;
@@ -2374,7 +2231,6 @@ export component AppWindow inherits Window {
         }
     }
 
-    // Fundido final a negro (reinicio).
     Rectangle {
         width: parent.width;
         height: parent.height;

@@ -1,24 +1,12 @@
-//! Lectura y reescritura de los datos externos en TOML.
-//!
-//! Los archivos viven bajo `${KEEL_ROOT}/persist/keel`. Para conservar
-//! comentarios, orden y claves desconocidas se edita siempre un
-//! [`toml_edit::DocumentMut`] en vez de serializar un struct. Mientras dure la
-//! migración, si no existe el `.toml` se lee el `.json` hermano.
-//!
-//! shortcut: el respaldo JSON se retira cuando todas las máquinas hayan
-//! migrado con `steward migrate`.
-
+//! Reads and rewrites the external TOML data.
 use color_eyre::eyre::{eyre, Context, Result};
 use std::path::Path;
 use toml_edit::{Array, DocumentMut, Item, Table, Value};
 
-/// Ruta de la variante JSON de un `.toml` (respaldo transitorio).
 pub fn json_sibling(path: &Path) -> std::path::PathBuf {
     path.with_extension("json")
 }
 
-/// Carga el documento de `path`; si no existe, cae al `.json` hermano y, si
-/// tampoco, devuelve un documento vacío.
 pub fn load_document(path: &Path) -> Result<DocumentMut> {
     if path.exists() {
         return parse_toml(path);
@@ -34,8 +22,6 @@ pub fn load_document(path: &Path) -> Result<DocumentMut> {
     Ok(DocumentMut::new())
 }
 
-/// Convierte el `.json` hermano de `path` a TOML sin borrar el original.
-/// `false` si ya existe el `.toml` o no hay `.json`.
 pub fn migrate_to_toml(path: &Path) -> Result<bool> {
     if path.exists() {
         return Ok(false);
@@ -55,7 +41,6 @@ fn parse_toml(path: &Path) -> Result<DocumentMut> {
         .wrap_err_with(|| format!("{} no tiene el formato TOML esperado", path.display()))
 }
 
-/// Convierte un valor JSON (el formato antiguo) al documento TOML.
 pub fn document_from_json(value: &serde_json::Value) -> DocumentMut {
     let mut doc = DocumentMut::new();
     if let Some(object) = value.as_object() {
@@ -68,7 +53,6 @@ pub fn document_from_json(value: &serde_json::Value) -> DocumentMut {
     doc
 }
 
-/// Convierte un valor JSON a un ítem TOML (`None` para `null`).
 pub fn item_from_json(value: &serde_json::Value) -> Option<Item> {
     match value {
         serde_json::Value::Null => None,
@@ -104,8 +88,6 @@ pub fn item_from_json(value: &serde_json::Value) -> Option<Item> {
     }
 }
 
-/// Escribe `doc` de forma atómica (temporal + rename), modo 0644, copiando la
-/// versión anterior a `<archivo>.bak`. Nunca escribe sobre el original en sitio.
 pub fn write_document_atomic(path: &Path, doc: &DocumentMut) -> Result<()> {
     let parent = path
         .parent()
@@ -123,7 +105,6 @@ pub fn write_document_atomic(path: &Path, doc: &DocumentMut) -> Result<()> {
     Ok(())
 }
 
-/// Cambia el modo de un archivo (permisos unix).
 pub fn set_mode(path: &Path, mode: u32) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))?;
@@ -146,7 +127,6 @@ mod tests {
         assert!(out.contains("unknown = 1"), "se perdió una clave: {out}");
         assert!(out.contains("username = \"otro\""));
         assert!(out.contains("admin = true"));
-        // El orden original se conserva: username antes que admin.
         assert!(out.find("username").unwrap() < out.find("admin").unwrap());
     }
 

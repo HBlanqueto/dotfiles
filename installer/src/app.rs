@@ -1,9 +1,4 @@
-//! Application state and the terminal chrome shared by every screen.
-//!
-//! Chrome is always: one header line, a 39-cell text progress bar (3 cells per
-//! step, `n/13`), one centered rounded panel with its title embedded in the top
-//! border, a button row, and an optional `v` commands column.
-
+//! Installer application state and the terminal layout shared by every screen.
 use crate::detect::{self, Disk};
 use crate::disk::{self, DiskDecision};
 use crate::install::{self, Msg as InstallMsg, Plan, Step};
@@ -28,7 +23,6 @@ use zeroize::Zeroizing;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
-    /// Startup splash: logo + prompt + a single Continuar button.
     Splash,
     License,
     Network,
@@ -44,9 +38,6 @@ pub enum Screen {
 }
 
 impl Screen {
-    /// The settings screens that carry the shared progress bar, from Red to
-    /// Resumen. Red is included only when it is shown; the count drops by one
-    /// when it is skipped. Cifrado is always counted, even when it is skipped.
     pub fn flow(show_network: bool) -> Vec<Screen> {
         let mut steps = vec![
             Screen::Locale,
@@ -120,22 +111,15 @@ impl Screen {
     }
 }
 
-/// The kind of element that currently holds the focus, used for the shortcut
-/// line and for Enter/Esc.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FocusKind {
-    /// A text field; `last` when it is the last one on the screen.
-    Field {
-        last: bool,
-    },
+    Field { last: bool },
     List,
     Checkbox,
     Buttons,
     Dialog,
 }
 
-/// The kind of element that currently holds the focus, used for the shortcut
-/// line and for Enter/Esc.
 impl App {
     pub fn focus_kind(&self) -> FocusKind {
         if self.license_modal
@@ -180,15 +164,10 @@ pub enum Action {
     Next,
     Quit,
     Reboot,
-    /// Done screen "Salir": copy the log, umount /mnt and exit.
     Finish,
-    /// Installing Ctrl+C dialog: go back to the running install.
     KeepInstalling,
-    /// Installing Ctrl+C dialog: cancel and exit.
     CancelInstall,
-    /// Installing failure: run the install again from the start.
     RetryInstall,
-    /// License screen "Acepto": open the confirmation dialog.
     LicenseAccept,
     Connect,
     Rescan,
@@ -197,8 +176,6 @@ pub enum Action {
 }
 
 impl Action {
-    /// The button that advances or is the safe default, so it takes the focus
-    /// first. `None` falls back to the first enabled button.
     fn is_primary(self) -> bool {
         matches!(
             self,
@@ -218,8 +195,6 @@ pub enum Quit {
     Normal,
 }
 
-// -- list picker (timezone / locale) -----------------------------------------
-
 pub struct PickItem {
     pub code: String,
     pub name: String,
@@ -229,7 +204,6 @@ pub struct PickItem {
 pub struct Picker {
     pub items: Vec<PickItem>,
     pub filtered: Vec<usize>,
-    /// Index into `filtered`. `None` until the user picks a row.
     pub selected: Option<usize>,
     pub query: Input,
 }
@@ -259,14 +233,11 @@ impl Picker {
             })
             .map(|(i, _)| i)
             .collect();
-        // Keep the selection only if it still points at a valid row.
         if let Some(sel) = self.selected {
             if sel >= self.filtered.len() {
                 self.selected = None;
             }
         }
-        // Typing picks the first match automatically (nothing is selected until
-        // then), so Enter works right after a search.
         if self.selected.is_none() && !self.query.value().is_empty() && !self.filtered.is_empty() {
             self.selected = Some(0);
         }
@@ -294,7 +265,6 @@ impl Picker {
         });
     }
 
-    /// Moves the cursor by `delta` rows (clamped, no wrap) — for paging.
     pub fn move_by(&mut self, delta: isize) {
         if self.filtered.is_empty() {
             return;
@@ -310,9 +280,6 @@ impl Picker {
     }
 }
 
-// -- per-screen state ---------------------------------------------------------
-
-/// The Red screen is its own state machine.
 pub enum RedFase {
     Lista,
     Contrasena {
@@ -355,47 +322,29 @@ pub struct NetState {
     pub online: bool,
     pub wifi: Vec<net::Wifi>,
     pub selected: usize,
-    /// When the current connection attempt started (for the 30 s timeout).
     pub connecting_since: Option<Instant>,
 }
 
-/// The Equipo screen: the detected model plus an optional hand-written network
-/// name (the hostname is otherwise generated from the model).
 pub struct HostState {
-    /// "Usar un nombre de red diferente" (unchecked by default).
     pub custom: bool,
-    /// The hand-written network name, used only while `custom` is set.
     pub name: Input,
-    /// 0 = casilla, 1 = nombre manual (when `custom`).
     pub focus: usize,
 }
 
 pub struct DiskState {
     pub disks: Vec<Disk>,
     pub index: usize,
-    /// The automatic decision for the selected disk.
     pub decision: DiskDecision,
-    /// The user chose "borrar todo" despite a Windows install.
     pub erase_all: bool,
-    /// Freed space (bytes) selected on the shrink bar.
     pub shrink_bytes: u64,
-    /// `d`: show the partition details line.
     pub details: bool,
-    /// Confirmation dialog for "borrar todo".
     pub erase_modal: bool,
-    /// 0 = No, 1 = Borrar todo.
     pub erase_focus: usize,
-    /// The shrink bar holds the focus (Tab).
     pub bar_focus: bool,
-    /// Wrap the System HD partition in LUKS2 (the whole Cifrado screen).
-    /// Always `true` and not togglable from the UI: the "sin cifrar" branches
-    /// in install.rs and the screen keep working, but there is no way to reach
-    /// them until a toggle is added.
     pub encrypt: bool,
 }
 
 impl DiskState {
-    /// Recomputes the decision for the selected disk and resets the shrink bar.
     pub fn refresh_decision(&mut self) {
         let decision = match self.disks.get(self.index) {
             Some(disk) => match disk.unusable_reason() {
@@ -416,7 +365,6 @@ impl DiskState {
         self.bar_focus = false;
     }
 
-    /// The effective action for the selected disk (erase_all overrides Windows).
     pub fn effective(&self) -> DiskDecision {
         if self.erase_all {
             DiskDecision::WholeDisk
@@ -426,30 +374,22 @@ impl DiskState {
     }
 }
 
-/// Focus targets inside the Cifrado screen (skipped when not applicable).
 pub const ENC_PASS: usize = 0;
 pub const ENC_CONFIRM: usize = 1;
 pub const ENC_TPM: usize = 2;
 pub const ENC_NOTED: usize = 3;
 
 pub struct EncState {
-    /// The LUKS passphrase typed by the user.
     pub pass: Input,
     pub confirm: Input,
-    /// One of the `ENC_*` targets.
     pub focus: usize,
-    /// "Desbloquear automáticamente con TPM" (only when `tpm_present`).
     pub tpm: bool,
     pub tpm_present: bool,
-    /// "La anoté en un lugar seguro".
     pub noted: bool,
-    /// The recovery key, kept only in memory and wiped on drop.
     pub recovery: Zeroizing<String>,
-    /// Removable-media picker state for "guardar en USB".
     pub usb_open: bool,
     pub usb: Vec<crate::detect::RemovableMedium>,
     pub usb_index: usize,
-    /// Device the key was last written to.
     pub usb_saved: Option<String>,
 }
 
@@ -470,12 +410,10 @@ impl EncState {
         }
     }
 
-    /// The password the user actually typed (when not reusing the account).
     pub fn passphrase_matches(&self) -> bool {
         !self.pass.value().is_empty() && self.pass.value() == self.confirm.value()
     }
 
-    /// Logical targets in display order, minus the ones that do not apply.
     pub fn targets(&self) -> Vec<usize> {
         let mut targets = vec![ENC_PASS, ENC_CONFIRM];
         if self.tpm_present {
@@ -485,14 +423,11 @@ impl EncState {
         targets
     }
 
-    /// The Cifrado screen can advance only once the key was acknowledged and
-    /// the chosen passphrase is usable.
     pub fn ready(&self) -> bool {
         self.noted && self.passphrase_matches()
     }
 }
 
-/// Result of the background repo evaluation run after accepting the license.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CheckState {
     Idle,
@@ -505,22 +440,17 @@ pub struct InstallView {
     pub started: Instant,
     pub current: Option<Step>,
     pub done: Vec<Step>,
-    /// The step in which the install failed, if it did.
     pub failed: Option<Step>,
     pub log: VecDeque<String>,
     pub built: u64,
     pub total: u64,
     pub finished: bool,
-    /// When the install finished successfully (to hold the 100 % bar ~1 s).
     pub finished_at: Option<Instant>,
     pub error: Option<String>,
     pub log_path: Option<PathBuf>,
-    /// The last level-0 nix message (the real cause, for the status line).
     pub last_error: Option<String>,
-    /// When the current step started, and how long each finished one took.
     step_started: Instant,
     pub durations: Vec<(Step, Duration)>,
-    /// (time, derivations done) samples, for the ETA (last 30 s).
     samples: VecDeque<(Instant, u64)>,
 }
 
@@ -545,9 +475,6 @@ impl InstallView {
         }
     }
 
-    /// Clears the failure state for a retry. Resuming past the disk step keeps
-    /// the steps that already finished so they stay `[x]` (and the disk is not
-    /// reformatted).
     fn resume_from(&mut self, resume: Step) {
         if resume <= Step::Disk {
             *self = InstallView::new();
@@ -571,8 +498,6 @@ impl InstallView {
         }
     }
 
-    /// Pushes a level-0 line (marked so it renders in red) and remembers it as
-    /// the last real error for the clean status line.
     pub fn push_error(&mut self, line: String) {
         self.last_error = Some(line.clone());
         self.push_log(format!("\u{1}{line}"));
@@ -583,7 +508,6 @@ impl InstallView {
         self.log.iter().skip(skip).collect()
     }
 
-    /// Records a progress sample, keeping only the last 30 s for the ETA.
     pub fn record(&mut self, built: u64) {
         let now = Instant::now();
         self.samples.push_back((now, built));
@@ -596,8 +520,6 @@ impl InstallView {
         }
     }
 
-    /// Estimated seconds remaining, from the mean speed over the last 30 s.
-    /// `None` until there is at least ~3 s of usable data.
     pub fn eta_secs(&self) -> Option<u64> {
         let &(first_t, first_b) = self.samples.front()?;
         let &(last_t, last_b) = self.samples.back()?;
@@ -622,91 +544,62 @@ pub struct App {
     pub repo_dir: PathBuf,
     pub source_ok: bool,
     pub network: bool,
-    /// Show the Red screen; skipped when a connection is already up.
     pub show_network: bool,
-    /// Background repo evaluation, launched when the license is accepted.
     pub source_check: CheckState,
     source_check_rx: Option<Receiver<Result<(), String>>>,
 
     pub settings: Settings,
     pub settings_ok: bool,
 
-    /// Lanzaboote Secure Boot (x86_64 bare metal, never the aarch64 VM).
     pub secure_boot: bool,
 
-    // machine detection
     pub virt: Option<String>,
-    /// The commercial model, detected in the background at startup.
     pub model: String,
     model_rx: Option<Receiver<String>>,
 
-    // network
     pub net: NetState,
 
-    // license
-    /// Scroll offset (wrapped lines) of the license text.
     pub license_scroll: usize,
     pub license_max_scroll: usize,
-    /// The confirmation dialog is open (and owns input while it is).
     pub license_modal: bool,
-    /// 0 = No acepto, 1 = Acepto (selected by default).
     pub license_modal_focus: usize,
-    /// 1-based source line at the top of the box, and the total.
     pub license_line: usize,
     pub license_total: usize,
-    /// The license text area, set during `draw` (for the scrollbar).
     pub license_text_area: Rect,
 
-    // pickers
     pub timezones: Option<Picker>,
     pub loc: Option<Picker>,
 
-    // keyboard
     pub keyboards: Option<Picker>,
-    /// Layout suggested from the chosen language: highlighted, never selected.
     pub keyboard_suggested: Option<usize>,
-    /// The "prueba" field holds the focus (below the list).
     pub key_test_focus: bool,
     pub key_test: Input,
-    /// Floating layout selector (F2). `None` when closed.
     pub key_modal: Option<Picker>,
     pub keyboard_active: String,
     pub keyboard_layout: String,
     pub keyboard_variant: String,
 
-    // disk / summary
     pub host: HostState,
     pub disks: DiskState,
     pub enc: EncState,
 
-    // installing / done
     pub install: InstallView,
     install_rx: Option<Receiver<InstallMsg>>,
     net_rx: Option<Receiver<(String, std::result::Result<bool, String>)>>,
-    /// Ctrl+C on Installing: the "¿Cancelar?" confirmation is showing.
     pub install_cancel: bool,
-    /// `v` on Instalando: show the running stage's last log lines.
     pub install_log_view: bool,
-    /// `c` on Instalando: show the last executed commands at the box's foot.
     pub install_commands: bool,
-    /// The stages box follows the running stage (or the error) until scrolled.
     pub install_follow: bool,
-    /// Box scroll offset (rows) and its maximum, recomputed on every draw.
     pub install_log_scroll: usize,
     pub install_max_scroll: usize,
 
-    /// Button selection index. `focus_buttons` is false while the content
-    /// (a field or the list) holds the focus.
     pub button_focus: usize,
     pub focus_buttons: bool,
-    /// On a list screen, whether the list (rather than the search box) holds
-    /// the content focus.
     pub list_focus: bool,
     pub show_commands: bool,
     pub status: Option<String>,
     pub quit: Option<Quit>,
     pub should_quit: bool,
-    /// Wipe the terminal before the next draw (a child may have printed).
     pub force_clear: bool,
     pub tick: u64,
 }
@@ -723,8 +616,6 @@ impl App {
             Err(_) => (Settings::fallback(), false),
         };
         let secure_boot = detect::secure_boot();
-        // Everything else starts empty (only stateVersion is kept from the
-        // repo); the hostname is set on the Equipo screen.
         settings.host_name = String::new();
         settings.username = None;
         settings.userdescription = None;
@@ -741,24 +632,17 @@ impl App {
         settings.keyboard_variant = kb_variant.clone();
 
         let mut disks = detect::disks();
-        // Simulation always appends the virtual disks so the flow is
-        // reproducible; they never exist in a real install.
         if dry_run {
             disks.extend(detect::test_disks());
         }
-        // Select the first usable disk (a test one when the real disks are all
-        // in use), so the flow can advance without touching anything.
         let disk_index = disks
             .iter()
             .position(|d| d.unusable_reason().is_none())
             .unwrap_or(0);
-        // Detect the machine model in the background so startup is never blocked.
         let (model_tx, model_rx) = mpsc::channel();
         std::thread::spawn(move || {
             let _ = model_tx.send(detect::machine_model());
         });
-        // The Red screen only appears when there is no connection yet; the
-        // simulation always shows it so the flow is reproducible.
         let show_network = dry_run || !net::connection_up();
         let mut app = Self {
             palette,
@@ -790,8 +674,6 @@ impl App {
                 bar_focus: false,
                 encrypt: true,
             },
-            // TPM auto-unlock needs Secure Boot; never offer it on the VM, even
-            // if a virtual TPM is reported.
             enc: EncState::new(detect::tpm2_present() && secure_boot),
             net: NetState {
                 backend: net::backend(dry_run),
@@ -829,7 +711,6 @@ impl App {
             install_log_scroll: 0,
             install_max_scroll: 0,
             button_focus: 0,
-            // Inicio has no content, so the buttons start focused.
             focus_buttons: true,
             list_focus: false,
             show_commands: false,
@@ -861,7 +742,6 @@ impl App {
             if ratatui::crossterm::event::poll(Duration::from_millis(100))? {
                 let event = ratatui::crossterm::event::read()?;
                 if let ratatui::crossterm::event::Event::Resize(_, _) = event {
-                    // A stray line from a child process may be on screen; wipe it.
                     terminal.clear()?;
                 }
                 self.handle_event(event);
@@ -879,8 +759,6 @@ impl App {
         }
         Ok(())
     }
-
-    // -- data -----------------------------------------------------------------
 
     pub fn cycle_disk(&mut self, delta: isize) {
         if self.disks.disks.is_empty() {
@@ -901,7 +779,6 @@ impl App {
         self.disks.refresh_decision();
     }
 
-    /// Whether the Disk screen's choice is complete.
     fn disk_ready(&self) -> bool {
         let Some(disk) = self.selected_disk() else {
             return false;
@@ -915,7 +792,6 @@ impl App {
             )
     }
 
-    /// Moves the shrink bar by `delta_gb` (10 GB steps), clamped to the bounds.
     pub fn adjust_shrink(&mut self, delta_gb: i64) {
         let DiskDecision::Shrink {
             min_free, max_free, ..
@@ -981,13 +857,10 @@ impl App {
             return;
         }
         let items = self.keyboard_items();
-        // Nothing is selected by default; the language's suggestion is only
-        // highlighted.
         self.keyboards = Some(Picker::new(items));
         self.keyboard_suggested = self.suggested_keyboard();
     }
 
-    /// Index (into `keyboard::all`) of the layout suggested by the language.
     fn suggested_keyboard(&self) -> Option<usize> {
         let code = keyboard::suggest(&self.settings.default_locale)?;
         keyboard::all().iter().position(|l| l.code == code)
@@ -1002,8 +875,6 @@ impl App {
         self.key_modal = Some(picker);
     }
 
-    /// Applies a keyboard layout: immediately on the Linux console, or just
-    /// saved inside a graphical terminal (which owns the layout).
     pub fn apply_keyboard(&mut self, id: &str) {
         self.apply_keyboard_q(id, true);
     }
@@ -1031,14 +902,12 @@ impl App {
         } else if announce {
             self.status = Some("la distribución la controla tu escritorio".into());
         }
-        // Refresh the list so the "· actual" marker moves, keeping the cursor.
         let items = self.keyboard_items();
         if let Some(picker) = self.keyboards.as_mut() {
             picker.items = items;
         }
     }
 
-    /// The panel title, which for Contraseña names the resulting user.
     pub fn screen_title(&self) -> String {
         match self.screen {
             Screen::License => "Licencia · GNU GPL v2.0".to_string(),
@@ -1046,8 +915,6 @@ impl App {
         }
     }
 
-    /// The network name that will be used: the hand-written one, or the one
-    /// generated from the detected model.
     pub fn final_host_name(&self) -> String {
         if self.host.custom && !self.host.name.value().is_empty() {
             self.host.name.value().to_string()
@@ -1061,8 +928,6 @@ impl App {
         }
     }
 
-    /// Why the hand-written network name is rejected, if it is. An empty field
-    /// is valid (the generated hostname is used).
     pub fn host_name_error(&self) -> Option<&'static str> {
         if !self.host.custom || self.host.name.value().is_empty() {
             return None;
@@ -1102,15 +967,10 @@ impl App {
         self.disks.disks.get(self.disks.index)
     }
 
-    // -- install --------------------------------------------------------------
-
     pub fn start_install(&mut self) {
         self.start_install_from(Step::Disk);
     }
 
-    /// Starts (or resumes) the install. `resume` is the first step to run: on a
-    /// retry it is the step that failed, so the disk is reattached rather than
-    /// reformatted.
     pub fn start_install_from(&mut self, resume: Step) {
         let Some(disk) = self.selected_disk().cloned() else {
             self.status = Some("no hay disco seleccionado".into());
@@ -1136,8 +996,6 @@ impl App {
             _ => None,
         };
 
-        // The LUKS2 passphrase typed on the Cifrado screen travels over stdin,
-        // never argv.
         let encrypt = self.disks.encrypt;
         let luks_passphrase = Zeroizing::new(self.enc.pass.value().to_string());
         let recovery_key = Zeroizing::new(if encrypt {
@@ -1146,7 +1004,6 @@ impl App {
             String::new()
         });
 
-        // How the disk is prepared, from the Disco screen's decision.
         let disk_mode = match self.disks.effective() {
             DiskDecision::WholeDisk => install::DiskMode::Whole,
             DiskDecision::FreeSpace { reuse_efi } => install::DiskMode::Alongside {
@@ -1233,7 +1090,6 @@ impl App {
                         }
                     }
                     if ok {
-                        // Force the bar to 100 % for the closing second.
                         self.install.built = self.install.total;
                     }
                     self.install.log_path = Some(log_path);
@@ -1247,7 +1103,6 @@ impl App {
             if ok {
                 self.install.finished_at = Some(Instant::now());
             } else {
-                // Open the log at the end and focus its buttons.
                 self.focus_buttons = true;
                 self.button_focus = 0;
                 self.install_follow = true;
@@ -1257,7 +1112,6 @@ impl App {
         }
     }
 
-    /// Leaves Instalando for Listo ~1 s after a successful build.
     fn maybe_finish_install(&mut self) {
         if self.screen != Screen::Installing
             || !self.install.finished
@@ -1274,39 +1128,32 @@ impl App {
         }
     }
 
-    // -- events ---------------------------------------------------------------
-
     pub fn handle_event(&mut self, event: Event) {
         let Event::Key(key) = event else { return };
         if key.kind != KeyEventKind::Press && key.kind != KeyEventKind::Repeat {
             return;
         }
 
-        // Quit confirmation modal owns the keyboard.
         if self.quit.is_some() {
             self.handle_quit(key);
             return;
         }
 
-        // Floating keyboard-layout selector (F2).
         if self.key_modal.is_some() {
             self.key_modal_key(key);
             return;
         }
 
-        // The "guardar en USB" picker on the Cifrado screen owns the keyboard.
         if self.enc.usb_open {
             crate::screens::encryption::usb_key(self, key);
             return;
         }
 
-        // The license confirmation dialog owns the keyboard while open.
         if self.license_modal {
             crate::screens::license::modal_key(self, key);
             return;
         }
 
-        // F2 opens it on any screen except Inicio / Instalando / Listo.
         if key.code == KeyCode::F(2)
             && !matches!(
                 self.screen,
@@ -1326,7 +1173,6 @@ impl App {
             return;
         }
 
-        // Screen-local handling (text fields, list nav, search) first.
         if self.route_screen_key(key) {
             return;
         }
@@ -1338,8 +1184,6 @@ impl App {
             KeyCode::Char('q') if self.screen != Screen::Installing => {
                 self.quit = Some(Quit::Normal);
             }
-            // Tab / Shift+Tab move between content and buttons and between
-            // buttons; ←/→ sneak into the buttons from the content.
             KeyCode::Tab => self.tab_focus(false),
             KeyCode::BackTab => self.tab_focus(true),
             KeyCode::Left | KeyCode::Right => {
@@ -1361,7 +1205,6 @@ impl App {
         }
     }
 
-    /// Enter on the content: advance, or jump to the first thing missing.
     fn enter_content(&mut self) {
         match self.focus_kind() {
             FocusKind::Field { last: true } => {
@@ -1380,7 +1223,6 @@ impl App {
         }
     }
 
-    /// Moves the focus to the first field that is not yet valid.
     fn focus_first_incomplete(&mut self) {
         match self.screen {
             Screen::Host => {
@@ -1399,7 +1241,6 @@ impl App {
         }
     }
 
-    /// Clears a list screen's search text, if any. Esc uses this first.
     fn clear_search(&mut self) -> bool {
         let picker = match self.screen {
             Screen::Locale => self.loc.as_mut(),
@@ -1418,7 +1259,6 @@ impl App {
         false
     }
 
-    /// Ctrl+C on Instalando opens the cancel confirmation (focus on Seguir).
     fn open_install_cancel(&mut self) {
         if self.screen == Screen::Installing {
             self.install_cancel = true;
@@ -1445,7 +1285,6 @@ impl App {
         }
     }
 
-    /// Index of the primary button (first enabled primary, else first enabled).
     fn primary_index(&self) -> usize {
         let buttons = self.buttons();
         buttons
@@ -1455,13 +1294,11 @@ impl App {
             .unwrap_or(0)
     }
 
-    /// Moves the focus to the primary button.
     pub fn focus_buttons_on_primary(&mut self) {
         self.focus_buttons = true;
         self.button_focus = self.primary_index();
     }
 
-    /// The next enabled button in `dir` (skipping the current one), if any.
     fn next_enabled(&self, from: usize, dir: isize) -> Option<usize> {
         let buttons = self.buttons();
         let n = buttons.len();
@@ -1494,7 +1331,6 @@ impl App {
         let mut idx = self.button_focus as isize;
         for _ in 0..n {
             idx += dir;
-            // Past an edge, leave the button row and return to the content.
             if idx < 0 || idx >= n as isize {
                 self.focus_buttons = false;
                 return;
@@ -1555,7 +1391,6 @@ impl App {
         }
     }
 
-    /// Selects a keyboard row and applies it.
     pub fn choose_keyboard(&mut self, index: usize) {
         if let Some(picker) = self.keyboards.as_mut() {
             picker.selected = Some(index);
@@ -1606,7 +1441,6 @@ impl App {
         }
     }
 
-    /// Keys for the floating keyboard-layout selector.
     fn key_modal_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Esc | KeyCode::Char('q') => self.key_modal = None,
@@ -1629,13 +1463,10 @@ impl App {
         }
     }
 
-    /// Points the button focus at the primary button of the current screen.
     pub fn focus_primary(&mut self) {
         self.button_focus = self.primary_index();
     }
 
-    /// A modal dialog is open: the screen behind it is drawn without any focus
-    /// (no button capsule, no field cursor) before being dimmed.
     pub fn no_focus(&self) -> bool {
         self.license_modal
             || self.quit.is_some()
@@ -1645,12 +1476,10 @@ impl App {
             || self.key_modal.is_some()
     }
 
-    /// The 500 ms cursor blink, driven by the event-loop tick.
     pub fn blink(&self) -> bool {
         (self.tick / 5).is_multiple_of(2)
     }
 
-    /// Renders the current screen's buttons on a raw row (chromeless screens).
     pub fn draw_buttons(&self, f: &mut Frame, area: Rect) {
         let enabled = self.primary_enabled();
         let buttons: Vec<Btn> = self
@@ -1675,14 +1504,8 @@ impl App {
         f.render_widget(row, area);
     }
 
-    /// Resets the focus when entering a screen: the content (a field or the
-    /// list) holds it, except on screens without content (Inicio, Listo) where
-    /// the buttons start focused.
     pub fn reset_focus(&mut self) {
         self.button_focus = self.primary_index();
-        // The advance button takes the focus when the screen is already
-        // complete; otherwise the first editable field does. On the list
-        // screens the list holds it.
         self.list_focus = matches!(
             self.screen,
             Screen::Locale | Screen::Keyboard | Screen::Timezone | Screen::Network
@@ -1710,7 +1533,6 @@ impl App {
         }
     }
 
-    /// Opens the "guardar en USB" media list on the Cifrado screen.
     pub fn open_usb_modal(&mut self) {
         let target = self.selected_disk().map(|d| d.path()).unwrap_or_default();
         self.enc.usb = detect::removable_media(&target);
@@ -1719,7 +1541,6 @@ impl App {
     }
 
     pub fn go_back(&mut self) {
-        // The Cifrado screen does not exist when encryption is off.
         let prev = if self.screen == Screen::Summary && !self.disks.encrypt {
             Some(Screen::Disk)
         } else {
@@ -1737,11 +1558,9 @@ impl App {
         if !self.primary_enabled() {
             return;
         }
-        // Accepting the license kicks off the repo evaluation in the background.
         if self.screen == Screen::License {
             self.spawn_source_check();
         }
-        // Skip Cifrado entirely when the user unchecked "Cifrar System HD".
         let next = if self.screen == Screen::Disk && !self.disks.encrypt {
             Some(Screen::Summary)
         } else {
@@ -1769,7 +1588,6 @@ impl App {
         }
     }
 
-    /// Clears the transient install-screen state before (re)starting a run.
     fn reset_install_view(&mut self) {
         self.focus_buttons = false;
         self.button_focus = 0;
@@ -1781,8 +1599,6 @@ impl App {
         self.install_max_scroll = 0;
     }
 
-    /// Retries from the step that failed, used by the error screen's
-    /// "Reintentar" button. If the disk step already finished it is not redone.
     pub fn restart_install(&mut self) {
         self.reset_install_view();
         let resume = self.install.failed.unwrap_or(Step::Disk);
@@ -1806,8 +1622,6 @@ impl App {
         self.net.phase = RedFase::Lista;
     }
 
-    /// Starts a connection attempt on a worker thread (non-blocking), with the
-    /// password never touching the log.
     pub fn start_net_connect(&mut self, ssid: String, pass: String) {
         let backend = self.net.backend.clone();
         let (tx, rx) = mpsc::channel();
@@ -1844,7 +1658,6 @@ impl App {
                 },
                 Err(msg) => RedFase::Error { ssid, msg },
             };
-            // On success the Red screen is done: advance straight to Lenguaje.
             if self.net.phase.is_connected() {
                 self.advance();
             } else {
@@ -1866,7 +1679,6 @@ impl App {
         }
     }
 
-    /// What is still missing to advance, shown under the buttons.
     pub fn faltante(&self) -> Option<String> {
         match self.screen {
             Screen::Splash | Screen::License | Screen::Installing | Screen::Done => None,
@@ -1943,7 +1755,6 @@ impl App {
                 .map(|p| p.selected.is_some())
                 .unwrap_or(false),
             Screen::Host => self.host_name_valid(),
-            // Install is refused if the repo evaluation already failed.
             Screen::Summary => !matches!(self.source_check, CheckState::Failed(_)),
             Screen::Disk => self.disk_ready(),
             Screen::Encryption => self.enc.ready(),
@@ -1951,8 +1762,6 @@ impl App {
         }
     }
 
-    /// Launches the repo evaluation in the background; its result shows on the
-    /// Resumen screen. Called when the license is accepted.
     pub fn spawn_source_check(&mut self) {
         if self.source_check != CheckState::Idle {
             return;
@@ -1996,7 +1805,6 @@ impl App {
         }
     }
 
-    /// Picks up the model detected in the background at startup.
     fn poll_model(&mut self) {
         let Some(rx) = self.model_rx.take() else {
             return;
@@ -2008,8 +1816,6 @@ impl App {
         }
     }
 
-    // -- rendering ------------------------------------------------------------
-
     pub fn draw(&mut self, f: &mut Frame) {
         let area = f.area();
         f.render_widget(
@@ -2017,7 +1823,6 @@ impl App {
             area,
         );
 
-        // Minimum supported size: show a warning instead of a broken layout.
         if area.width < 64 || area.height < 20 {
             f.render_widget(
                 Paragraph::new(Line::from(Span::styled(
@@ -2040,7 +1845,6 @@ impl App {
             return;
         }
 
-        // Instalando and Listo are chromeless: centered, no panel or chrome.
         if self.screen == Screen::Installing {
             self.draw_installing(f, area);
             if self.install_cancel {
@@ -2053,7 +1857,6 @@ impl App {
             return;
         }
 
-        // Licencia is chromeless: a centered logo, the text box and the pills.
         if self.screen == Screen::License {
             crate::screens::license::draw(f, self, area);
             if self.quit.is_some() {
@@ -2062,7 +1865,6 @@ impl App {
             return;
         }
 
-        // Disco is chromeless too: no box, its own centered card row.
         if self.screen == Screen::Disk {
             let layout = widgets::StepLayout::compute(area, 0, 0);
             self.draw_progress(f, layout.progress);
@@ -2082,7 +1884,6 @@ impl App {
             }
             return;
         }
-        // Every wizard screen shares the same centered StepLayout.
         let commands_lines = self.command_list();
         let commands_h = if self.show_commands {
             (commands_lines.len() as u16 + 2).clamp(2, area.height / 2)
@@ -2126,7 +1927,6 @@ impl App {
         }
     }
 
-    /// The bold, centered screen name shown above the content box.
     fn draw_heading(&self, f: &mut Frame, area: Rect) {
         let mut text = self.screen_title();
         if self.dry_run {
@@ -2144,7 +1944,6 @@ impl App {
         );
     }
 
-    /// Lines reserved between the box and the buttons for a screen's note.
     fn note_height(&self) -> u16 {
         match self.screen {
             Screen::Locale => 1,
@@ -2153,7 +1952,6 @@ impl App {
         }
     }
 
-    /// The optional line(s) drawn between the box and the buttons.
     fn draw_note(&self, f: &mut Frame, area: Rect) {
         if area.height == 0 {
             return;
@@ -2188,7 +1986,6 @@ impl App {
         }
     }
 
-    /// Floating keyboard-layout selector.
     fn draw_key_modal(&self, f: &mut Frame, area: Rect) {
         widgets::dim_buffer(f, &self.palette);
         let w = 54.min(area.width);
@@ -2227,15 +2024,10 @@ impl App {
         );
     }
 
-    /// The startup splash: NixOS logo + prompt + a single Continuar button,
-    /// centered. No header, progress, shortcuts or commands panel.
     fn draw_splash(&mut self, f: &mut Frame, area: Rect) {
         let console = theme::console::is_linux_console();
         let show_logo = area.height >= 24 && area.width >= 40;
 
-        // The logo art carries its own leading columns, so it must be
-        // left-aligned as a block and the block centered as a whole (centering
-        // each line separately would distort it).
         let logo: Vec<Line> = if show_logo {
             crate::logo::nixos_logo(console)
         } else {
@@ -2253,9 +2045,7 @@ impl App {
             .unwrap_or(0) as u16;
         let logo_h = logo.len() as u16;
 
-        // Blank lines between the logo and the prompt (leave some air).
         let gap_after_logo: u16 = if show_logo { 3 } else { 1 };
-        // logo + gap + welcome + subtitle + blank + prompt + blank + button
         let total_h = logo_h + gap_after_logo + 2 + 1 + 1 + 1 + 1;
         let mut y = area.y + area.height.saturating_sub(total_h) / 2;
 
@@ -2286,7 +2076,7 @@ impl App {
             .alignment(Alignment::Center),
             Rect::new(area.x, y, area.width, 1),
         );
-        y += 2; // subtitle + blank
+        y += 2;
 
         f.render_widget(
             Paragraph::new(Line::from(vec![
@@ -2305,21 +2095,16 @@ impl App {
             .alignment(Alignment::Center),
             Rect::new(area.x, y, area.width, 1),
         );
-        y += 2; // prompt + blank
+        y += 2;
 
         self.draw_buttons(f, Rect::new(area.x, y, area.width, 1));
     }
 
-    /// The single Instalando view: header, progress bar and the stages box.
-    /// The running stage shows its last log lines with `v`; a failed stage
-    /// always shows the error; `c` adds the last executed commands at the foot.
-    /// `↑/↓` scroll the box, which otherwise follows the running stage.
     fn draw_installing(&mut self, f: &mut Frame, area: Rect) {
         f.render_widget(Clear, area);
         let width = (area.width * 80 / 100).clamp(40, 100).min(area.width);
         let x = area.x + area.width.saturating_sub(width) / 2;
 
-        // The cancel dialog draws its own buttons.
         let buttons: Vec<Btn> = if self.install_cancel {
             Vec::new()
         } else {
@@ -2328,8 +2113,6 @@ impl App {
         let has_buttons = !buttons.is_empty();
         let has_error = self.install.error.is_some();
 
-        // Header, blank, bar, blank, box, then optional blank + gray line,
-        // optional blank + buttons, and a blank + shortcut line.
         let mut below = 2u16;
         if has_error {
             below += 2;
@@ -2339,7 +2122,6 @@ impl App {
         }
         let max_box_h = area.height.saturating_sub(4 + below).max(4);
 
-        // The box inner content: border (2) + 1-row / 3-column margin.
         let inner_w = width.saturating_sub(8) as usize;
         let rows = self.install_rows(inner_w);
         let box_h = (rows.len() as u16 + 4).min(max_box_h);
@@ -2353,7 +2135,6 @@ impl App {
         let content_h = 4 + box_h + below;
         let top = area.y + area.height.saturating_sub(content_h) / 2;
 
-        // 1. Header: title left, percentage (bold) + ETA right.
         let pct = crate::screens::installing::overall_percent(self);
         let eta = self
             .install
@@ -2386,7 +2167,6 @@ impl App {
             Rect::new(x, top, width, 1),
         );
 
-        // 2. Progress bar, full width.
         let bar_y = top + 2;
         let filled = (pct as usize * width as usize / 100).min(width as usize);
         f.render_widget(
@@ -2403,7 +2183,6 @@ impl App {
             Rect::new(x, bar_y, width, 1),
         );
 
-        // 3. The stages box.
         let box_y = bar_y + 2;
         let box_rect = Rect::new(x, box_y, width, box_h);
         let block = Block::default()
@@ -2430,7 +2209,6 @@ impl App {
             visible as u16,
         );
 
-        // 4. Below the box: the log path, the buttons and the shortcut line.
         let mut y = box_y + box_h;
         if has_error {
             y += 1;
@@ -2462,9 +2240,6 @@ impl App {
         );
     }
 
-    /// The stages box rows: one line per stage, a blank between stages, the
-    /// running stage's log lines and a failed stage's error glued under it, and
-    /// the last commands after a separator when `c` is on.
     fn install_rows(&self, width: usize) -> Vec<Line<'static>> {
         let current = self.install.current;
         let spinner = ["|", "/", "-", "\\"][(self.tick as usize) % 4];
@@ -2560,8 +2335,6 @@ impl App {
         rows
     }
 
-    /// The full error message under the failed stage: the failure and, when it
-    /// differs, the last real nix cause.
     fn error_lines(&self) -> Vec<String> {
         let mut out: Vec<String> = Vec::new();
         if let Some(err) = &self.install.error {
@@ -2581,7 +2354,6 @@ impl App {
         out
     }
 
-    /// The last four executed `$ …` commands, oldest first.
     fn command_lines(&self) -> Vec<String> {
         let mut cmds: Vec<String> = self
             .install
@@ -2594,8 +2366,6 @@ impl App {
         cmds.split_off(n.saturating_sub(4))
     }
 
-    /// Shortens the temp install root to `/mnt` and hides any secret a command
-    /// might carry.
     fn shorten_command(&self, line: &str) -> String {
         let root = std::env::temp_dir().join("keel-mnt");
         let mut s = line.replace(&root.to_string_lossy().to_string(), "/mnt");
@@ -2610,8 +2380,6 @@ impl App {
         s
     }
 
-    /// The summary line under each stage. The running stage describes what is
-    /// happening right now; the others show what they will do (or did).
     fn step_summary(&self, step: Step) -> String {
         if self.install.current == Some(step) {
             if let Some(activity) = self.last_activity() {
@@ -2660,7 +2428,6 @@ impl App {
         }
     }
 
-    /// The running step's latest meaningful log line, in plain language.
     fn last_activity(&self) -> Option<String> {
         self.install.log.iter().rev().find_map(|line| {
             if line.starts_with('\u{1}') {
@@ -2675,7 +2442,6 @@ impl App {
         })
     }
 
-    /// The running step's last six messages, in plain language.
     fn sub_steps(&self) -> Vec<String> {
         self.install
             .log
@@ -2700,7 +2466,6 @@ impl App {
     }
 
     fn draw_progress(&self, f: &mut Frame, area: Rect) {
-        // The bar spans the whole box width; the count sits at the right.
         let flow = Screen::flow(self.show_network);
         let total = flow.len().max(1);
         let step = flow
@@ -2718,7 +2483,6 @@ impl App {
             ),
             Span::styled(
                 "─".repeat(bar_w - filled),
-                // LBG, not muted.
                 Style::default().fg(self.palette.row_bg),
             ),
             Span::styled(format!(" {count}"), Style::default().fg(self.palette.muted)),
@@ -2726,7 +2490,6 @@ impl App {
         f.render_widget(Paragraph::new(line), area);
     }
 
-    /// Draws the content box: a rounded `#55657e` border, no title.
     fn draw_body(&self, f: &mut Frame, area: Rect) {
         let block = Block::default()
             .borders(Borders::ALL)
@@ -2736,7 +2499,6 @@ impl App {
         f.render_widget(block, area);
     }
 
-    /// The context hints for the focused element, with `⏎` in accent.
     fn context_hints(&self) -> Vec<Span<'static>> {
         let muted = Style::default().fg(self.palette.muted);
         let accent = Style::default()
@@ -2799,8 +2561,6 @@ impl App {
         spans
     }
 
-    /// The gray «falta: …» line under the buttons (empty when nothing is
-    /// missing, but always one row so nothing moves).
     fn draw_faltante(&self, f: &mut Frame, area: Rect) {
         if let Some(text) = self.faltante() {
             f.render_widget(
@@ -2875,7 +2635,6 @@ impl App {
         for line in raw {
             self.log_rows(&line, width, &mut rows);
         }
-        // Keep the most recent rows visible when the wrapped log overflows.
         let rows = rows.split_off(rows.len().saturating_sub(inner.height as usize));
         f.render_widget(Paragraph::new(rows), inner);
     }
@@ -2897,8 +2656,6 @@ impl App {
         Line::from(Span::styled(line.to_string(), Style::default().fg(color)))
     }
 
-    /// Wraps one log line into `out`, keeping the embedded line breaks. A whole
-    /// error block (`\u{1}`-prefixed) is red and indented two spaces.
     fn log_rows(&self, line: &str, width: usize, out: &mut Vec<Line>) {
         let is_error = line.starts_with('\u{1}');
         let text = line.strip_prefix('\u{1}').unwrap_or(line);
@@ -2937,7 +2694,6 @@ impl App {
         });
     }
 
-    /// Ctrl+C on Instalando: confirm over the dimmed progress screen.
     fn draw_install_cancel(&self, f: &mut Frame, over: Rect) {
         let palette = self.palette;
         let buttons: Vec<Btn> = self.buttons().into_iter().map(|(b, _)| b).collect();
@@ -2976,7 +2732,6 @@ impl App {
     }
 }
 
-/// Uppercases the first letter of a step label.
 fn capitalize(s: &str) -> String {
     let mut chars = s.chars();
     match chars.next() {
@@ -2985,7 +2740,6 @@ fn capitalize(s: &str) -> String {
     }
 }
 
-/// `12s`, `1m 20s`.
 fn human_duration(d: Duration) -> String {
     let secs = d.as_secs();
     if secs < 60 {
@@ -2995,8 +2749,6 @@ fn human_duration(d: Duration) -> String {
     }
 }
 
-/// Lowercases and strips the common Latin accents, so a search for «espanol»
-/// finds «Español».
 fn fold(s: &str) -> String {
     s.chars()
         .flat_map(|c| c.to_lowercase())
@@ -3013,12 +2765,10 @@ fn fold(s: &str) -> String {
         .collect()
 }
 
-/// A logged command line (`$ …`, or `[simulación] $ …` in a dry run).
 fn is_command(line: &str) -> bool {
     line.starts_with('$') || line.starts_with("[simulación] $")
 }
 
-/// Clips `s` to `width` columns, ending with '…' when it had to cut.
 fn truncate_ellipsis(s: &str, width: usize) -> String {
     let chars: Vec<char> = s.chars().collect();
     if chars.len() <= width {
@@ -3032,8 +2782,6 @@ fn truncate_ellipsis(s: &str, width: usize) -> String {
     out
 }
 
-/// Hard-wraps `s` into chunks of at most `width` chars (no word trimming), so a
-/// long command line never spills past its panel and leaves stale cells behind.
 fn hard_wrap(s: &str, width: usize) -> Vec<String> {
     if width == 0 {
         return vec![s.to_string()];

@@ -11,7 +11,6 @@ let
   timeZoneAuto = osConfig.services.automatic-timezoned.enable or false;
   colorScheme = prefs.colorScheme or null;
   accentColor = prefs.accentColor or null;
-  # Ids válidos de accent-color de GNOME: «neptunia» no se escribe.
   gnomeAccents = [
     "blue"
     "teal"
@@ -26,13 +25,11 @@ let
 in
 
 {
-  # Desktop-user bits shared by both hosts: the WezTerm configuration.
   programs.wezterm = {
     enable = true;
     extraConfig = builtins.readFile ./wezterm.lua;
   };
 
-  # Ajustes de GNOME del usuario. Sólo se escriben las claves activadas.
   dconf.settings = {
     "org/gnome/desktop/interface" =
       lib.optionalAttrs (on "largeText") { text-scaling-factor = 1.25; }

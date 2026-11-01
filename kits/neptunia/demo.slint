@@ -1,7 +1,4 @@
-// Galería de Neptunia para ajustar a ojo, sin compilar Rust:
-//   slint-viewer --auto-reload kits/neptunia/demo.slint
-// Los componentes de aquí son de referencia: la librería real (triton/) debe
-// copiar estas medidas, que salen de Metrics y Theme (generados desde los JSON).
+// Neptunia component gallery for live preview with `slint-viewer`.
 import { Theme, Metrics, NeptuniaMode } from "generated/neptunia.slint";
 
 component Caption inherits Text {
@@ -51,7 +48,7 @@ export component NpSwitch inherits Rectangle {
 
 export component NpButton inherits Rectangle {
     in property <string> text;
-    in property <string> kind: "secondary"; // primary | secondary | danger | plain
+    in property <string> kind: "secondary";
     callback clicked;
     height: Metrics.button-height;
     min-width: label.preferred-width + 2 * Metrics.button-padding-x;
@@ -75,7 +72,6 @@ export component NpButton inherits Rectangle {
     ta := TouchArea { clicked => { root.clicked(); } }
 }
 
-// Segmentado rectangular (aprobado): pista radio 8, segmentos radio 6.
 export component NpSegmented inherits Rectangle {
     in property <[string]> items;
     in-out property <int> current;
@@ -112,7 +108,6 @@ export component NpSegmented inherits Rectangle {
     }
 }
 
-// Pestañas de barra de herramientas (aprobado): icono de 20 sobre texto de 11.
 export struct ToolTab { label: string, icon: string }
 
 export component NpToolbarTabs inherits Rectangle {
@@ -166,9 +161,8 @@ export component NpToolbarTabs inherits Rectangle {
     }
 }
 
-// Deslizador: la perilla se mueve en (ancho − perilla) y nunca sale de la pista.
 export component NpSlider inherits Rectangle {
-    in-out property <float> value: 0.5; // 0–1
+    in-out property <float> value: 0.5;
     height: Metrics.slider-height;
     min-width: 160px;
     Rectangle {

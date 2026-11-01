@@ -1,15 +1,4 @@
-//! `crewd` — servicio de sistema para gestionar cuentas de Keel.
-//!
-//! Habla por D-Bus del sistema (`io.github.HBlanqueto.Keel.Crew1`) y exige la acción polkit
-//! `io.github.HBlanqueto.Keel.crew.manage` para cualquier cambio. Los datos se escriben en
-//! `/persist/keel/users/<usuario>.toml` y el hash en `/persist/secrets`; el
-//! sistema se reconstruye **desde la referencia instalada** (`/etc/keel/`),
-//! nunca desde el repo de trabajo, con la misma protección que `steward rebuild`.
-//!
-//! Las operaciones largas devuelven un id de trabajo al instante y publican su
-//! avance, fin, aviso o error por señales; la reconstrucción corre siempre en un
-//! hilo bloqueante.
-
+//! `crewd`: system D-Bus service that manages user accounts.
 use std::collections::HashMap;
 use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
@@ -60,7 +49,6 @@ trait DBus {
 }
 
 struct Inner {
-    /// Una sola operación de gestión a la vez.
     lock: Mutex<()>,
     next_job: AtomicU32,
 }
@@ -94,7 +82,6 @@ impl Users {
             .unwrap_or_default()
     }
 
-    /// Devuelve el id de trabajo. El resultado llega por señales.
     async fn create_user(
         &self,
         #[zbus(header)] header: Header<'_>,
@@ -119,7 +106,6 @@ impl Users {
         Ok(job)
     }
 
-    /// Devuelve el id de trabajo.
     async fn delete_user(
         &self,
         #[zbus(header)] header: Header<'_>,
@@ -140,7 +126,6 @@ impl Users {
         Ok(job)
     }
 
-    /// Devuelve el id de trabajo.
     async fn set_admin(
         &self,
         #[zbus(header)] header: Header<'_>,
@@ -161,7 +146,6 @@ impl Users {
         Ok(job)
     }
 
-    /// Devuelve el id de trabajo.
     async fn set_full_name(
         &self,
         #[zbus(header)] header: Header<'_>,
@@ -183,7 +167,6 @@ impl Users {
         Ok(job)
     }
 
-    /// Devuelve el id de trabajo.
     async fn set_password(
         &self,
         #[zbus(header)] header: Header<'_>,
@@ -208,7 +191,6 @@ impl Users {
         Ok(job)
     }
 
-    /// Borra la semilla de prefs. Solo el propio usuario (o root/admin) puede.
     async fn delete_prefs_seed(
         &self,
         #[zbus(header)] header: Header<'_>,
@@ -283,8 +265,6 @@ async fn main() -> Result<()> {
     std::future::pending::<()>().await;
     Ok(())
 }
-
-// ---------------------------------------------------------------- operaciones
 
 async fn create(
     username: &str,
@@ -436,8 +416,6 @@ async fn apply(
     Ok(())
 }
 
-// ------------------------------------------------------------ señales / rebuild
-
 async fn finish(emitter: &SignalEmitter<'static>, job: u32, action: &str, result: Result<()>) {
     match result {
         Ok(()) => {
@@ -460,7 +438,6 @@ async fn progress(
     let _ = Users::progress(emitter, job, action, phase, percent, message).await;
 }
 
-/// Reconstruye en un hilo bloqueante y avisa de unidades en fallo (código 4).
 async fn rebuild_system(
     emitter: &SignalEmitter<'static>,
     job: u32,
@@ -486,8 +463,6 @@ async fn warn_failed(emitter: &SignalEmitter<'static>, job: u32, action: &str, o
     );
     let _ = Users::warning(emitter, job, action, &message).await;
 }
-
-// ---------------------------------------------------------------- validación
 
 fn validate_username(username: &str) -> fdo::Result<()> {
     if let Some(err) = user::username_error(username) {
@@ -561,8 +536,6 @@ fn user_has_processes(username: &str) -> Result<bool> {
     Ok(false)
 }
 
-// ---------------------------------------------------------------- archivos
-
 fn hash_path(username: &str) -> PathBuf {
     paths::secrets().join(format!("{username}.hash"))
 }
@@ -599,8 +572,6 @@ fn restore(username: &str, user: Option<&str>, hash: Option<&[u8]>, prefs: Optio
         let _ = std::fs::write(user_data::prefs_path_for(username), text);
     }
 }
-
-// ---------------------------------------------------------------- polkit
 
 fn sender(header: &Header<'_>) -> fdo::Result<String> {
     header

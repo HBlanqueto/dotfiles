@@ -1,9 +1,7 @@
-# Plantilla «raft»: fish, starship, git y el tema neptunia; sin apps ni IA.
+# Home template "raft": fish, starship, git and theme only.
 { config, pkgs, ... }:
 
 let
-  # starship sin iconos (preset oficial `plain-text-symbols`) para la TTY, cuya
-  # fuente XNU solo tiene los 256 glifos Latin-1.
   starshipPlain = pkgs.runCommand "starship-plain-text-symbols.toml" { } ''
     ${pkgs.starship}/bin/starship preset plain-text-symbols -o $out
   '';

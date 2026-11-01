@@ -1,8 +1,4 @@
-//! Generates the locale name table from the glibc source locale files
-//! (`LC_ADDRESS`'s `country_name` and `lang_name`), so the UI can show
-//! «Español (Bolivia)» instead of «es_BO». The path comes from
-//! `KEEL_LOCALE_DIR` (the full glibc locales directory).
-
+//! Generates the locale name table from glibc locale files.
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
@@ -42,7 +38,6 @@ fn main() {
     std::fs::write(&out, src).expect("write locale_names.rs");
 }
 
-/// The first quoted value of a `key` line inside the locale file.
 fn field(text: &str, key: &str) -> Option<String> {
     for line in text.lines() {
         let line = line.trim();
@@ -60,8 +55,6 @@ fn field(text: &str, key: &str) -> Option<String> {
     None
 }
 
-/// glibc writes non-ASCII names with `<Uxxxx>` escapes (p. ej. el siriaco);
-/// los convierte a caracteres UTF-8 reales.
 fn decode_glibc(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut rest = s;

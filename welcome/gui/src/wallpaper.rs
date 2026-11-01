@@ -1,13 +1,4 @@
-//! Fondo desenfocado una sola vez al arrancar (nunca por fotograma).
-//!
-//! Reduce la imagen a 1/4, le aplica un desenfoque gaussiano (~40 px) y la
-//! escala de nuevo. El PNG resultante se guarda en caché en
-//! `/run/psamathe/wallpaper-blur.png` y se muestra como `Image`.
-//!
-//! El repo solo trae el fondo ya desenfocado del mockup
-//! (`ui/firstboot-blur.jpg`); `KEEL_WALLPAPER` permite apuntar a la imagen
-//! real sin desenfocar si está disponible.
-
+//! Blurred wallpaper generated once at startup.
 use std::path::Path;
 
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
@@ -15,8 +6,6 @@ use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 const SOURCE: &[u8] = include_bytes!("../ui/firstboot-blur.jpg");
 const CACHE: &str = "/run/psamathe/wallpaper-blur.png";
 
-/// Devuelve el fondo listo para mostrar: la caché si existe, o la imagen
-/// desenfocada (que además se guarda en caché) si no.
 pub fn load() -> Option<Image> {
     if let Ok(bytes) = std::fs::read(CACHE) {
         if let Ok(img) = image::load_from_memory_with_format(&bytes, image::ImageFormat::Png) {
@@ -50,7 +39,6 @@ pub fn load() -> Option<Image> {
     to_slint(full)
 }
 
-/// Los bytes del fondo: `KEEL_WALLPAPER` si se indicó, o el jpg embebido.
 fn source_bytes() -> Vec<u8> {
     match std::env::var_os("KEEL_WALLPAPER") {
         Some(path) => std::fs::read(path).unwrap_or_else(|_| SOURCE.to_vec()),

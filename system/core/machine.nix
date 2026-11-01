@@ -1,8 +1,4 @@
-# Per-machine facts that are not committed to the repo. system/lib/data.nix reads them
-# from ${KEEL_ROOT}/persist/keel/machine.toml and mkHost exposes them as
-# `data.machine`. In a pure evaluation (CI, `nix flake check`), or for a host
-# with its own hardware file, `data.machine` is { }, so every option below falls
-# back to a safe default: no encryption, no Secure Boot, no extra peripherals.
+# Per-machine facts that are not committed to the repo.
 {
   config,
   lib,
@@ -58,8 +54,6 @@
 
     assertions = [
       {
-        # El desbloqueo por TPM2 lo inscribe lanzaboote (measured boot),
-        # que solo existe con Secure Boot.
         assertion = !config.keel.machine.tpmUnlock || config.keel.machine.secureBoot;
         message = "keel.machine.tpmUnlock requiere keel.machine.secureBoot";
       }

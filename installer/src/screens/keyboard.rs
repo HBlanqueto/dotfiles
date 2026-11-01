@@ -1,6 +1,4 @@
-//! "Teclado": a searchable list of layouts in the shared box, the language's
-//! suggestion highlighted, and a test field under the box.
-
+//! Keyboard layout screen.
 use crate::app::{Action, App};
 use crate::widgets::{self, Btn};
 use ratatui::crossterm::event::{Event, KeyCode, KeyEvent};
@@ -37,7 +35,6 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         app.keyboard_suggested,
         app.list_focus && !app.focus_buttons && !app.no_focus(),
     );
-    // The test field sits at the bottom of the box, below the list.
     let test = widgets::text_field(
         &app.palette,
         "Prueba el teclado",

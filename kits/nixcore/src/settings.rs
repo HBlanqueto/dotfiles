@@ -1,42 +1,27 @@
 //! Reads the flake's `system/lib/defaults.nix`.
-//!
-//! The installer only needs `stateVersion` from there (the rest of the system
-//! data comes from `machine.toml`); the file is never rewritten.
-
 use color_eyre::eyre::{eyre, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-/// Mirror of `system/lib/defaults.nix` used while reading it. `hashedPasswordFile` is
-/// intentionally absent: it is derived from `username` elsewhere.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
     pub state_version: String,
-    /// The chosen hostname. Not stored in system/lib/defaults.nix anymore (the machine's
-    /// name lives in machine.toml); kept here as the installer's current
-    /// selection.
     #[serde(default)]
     pub host_name: String,
     pub time_zone: String,
     pub default_locale: String,
-    /// Optional: the first-boot assistant runs before the account exists. `None`
-    /// means the key is not written at all, which is how `first-boot.nix` knows
-    /// there is no account yet (`settings.username or null`).
     #[serde(default)]
     pub username: Option<String>,
     #[serde(default)]
     pub userdescription: Option<String>,
-    /// macOS-style visible name («ThinkPad L14 de Humberto»). Empty on old
-    /// system/lib/defaults.nix files, in which case the line is not written.
     #[serde(default)]
     pub pretty_host_name: String,
     #[serde(default = "default_keyboard")]
     pub keyboard_layout: String,
     #[serde(default)]
     pub keyboard_variant: String,
-    /// `null` when git is left unconfigured by the installer.
     #[serde(default)]
     pub git_name: Option<String>,
     #[serde(default)]
@@ -48,12 +33,6 @@ fn default_keyboard() -> String {
 }
 
 impl Settings {
-    /// Values used when `system/lib/defaults.nix` cannot be evaluated (e.g. the simulation
-    /// run on a machine without nix). Mirrors the repo's defaults.
-    ///
-    /// Personal fields stay empty: the installer and the first-boot assistant
-    /// start every user field blank, and the public repo must not carry anyone's
-    /// name or e-mail.
     pub fn fallback() -> Self {
         Self {
             state_version: "26.05".into(),
@@ -70,7 +49,6 @@ impl Settings {
         }
     }
 
-    /// `nix eval --json -f system/lib/defaults.nix`.
     pub fn read(repo: &Path) -> Result<Self> {
         let file = repo.join("system/lib/defaults.nix");
         let output = Command::new("nix")
@@ -92,8 +70,6 @@ impl Settings {
         }
         let mut settings: Self = serde_json::from_slice(&output.stdout)
             .wrap_err("system/lib/defaults.nix no tiene el formato esperado")?;
-        // An empty string counts as absent, so `settings.username or null` stays
-        // null (otherwise the first-boot assistant would never open).
         settings.username = settings.username.filter(|value| !value.is_empty());
         settings.userdescription = settings.userdescription.filter(|value| !value.is_empty());
         Ok(settings)

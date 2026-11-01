@@ -18,7 +18,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let mut lines = vec![readonly_row(app, "Modelo", app.model.clone(), w)];
     lines.push(Line::from(""));
 
-    // Network name: the generated one (read-only) or a hand-written one.
     let generated = app.final_host_name();
     if !app.host.custom {
         lines.push(readonly_row(
@@ -78,7 +77,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     widgets::draw_scrollbar(f, &app.palette, area, lines.len(), scroll, area.height);
 }
 
-/// A read-only `label … value` row: the label left, the value right-aligned.
 fn readonly_row(app: &App, label: &str, value: String, width: u16) -> Line<'static> {
     let value = if value.is_empty() {
         "—".to_string()
@@ -123,8 +121,6 @@ pub fn key(app: &mut App, key: KeyEvent) -> bool {
     false
 }
 
-/// Moves the focus to the next visible target: 0 casilla, 1 nombre manual (si
-/// `custom`); past the last one, to the buttons.
 fn focus_next(app: &mut App) {
     if app.host.focus == 0 && app.host.custom {
         app.host.focus = 1;
@@ -139,8 +135,6 @@ fn focus_prev(app: &mut App) {
     }
 }
 
-/// The hand-written network name only accepts ASCII letters, digits and `-`;
-/// other characters are dropped as they are typed (validation flags the rest).
 fn edit_host_name(app: &mut App, key: KeyEvent) {
     if let KeyCode::Char(c) = key.code {
         if !(c.is_ascii_alphanumeric() || c == '-') {

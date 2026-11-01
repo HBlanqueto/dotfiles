@@ -1,15 +1,4 @@
 #!/bin/sh
-#
-# dev.sh — atajos de desarrollo de Keel.
-#
-# Uso:
-#   ./dev.sh sim installer [--here]   # instalador en simulación
-#   ./dev.sh sim setup [--here]       # asistente Slint en simulación
-#   ./dev.sh vm [x86_64|aarch64]      # VM del primer arranque
-#   ./dev.sh test [--no-build]        # lints, tests, flake, TUI por pty
-#   ./dev.sh -h|--help
-#
-# Nada de esto toca discos ni necesita root.
 set -eu
 
 REPO=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -30,13 +19,10 @@ require() {
     command -v "$1" >/dev/null 2>&1 || die 1 "falta $1"
 }
 
-# Ejecuta la orden en esta terminal.
 here() {
     exec nix develop --command "$@"
 }
 
-# Ventana WezTerm independiente con watchexec; $1 clase, $2 rutas -w,
-# $3 extensiones, el resto es la orden.
 run_window() {
     class=$1
     watches=$2
@@ -53,7 +39,6 @@ run_window() {
         exit 0
     fi
 
-    # Sin comillas en $watches: son varios argumentos -w.
     setsid -f wezterm start --always-new-process --class "$class" \
         --cwd "$REPO" -- nix develop --command \
         watchexec -r -c $watches -e "$exts" -- "$@"
@@ -89,8 +74,6 @@ vm() {
         *) die 2 "uso: $0 vm [x86_64|aarch64]" ;;
     esac
 
-    # Directorio vacío: el flake no encuentra user.json y la VM arranca el
-    # asistente.
     KEEL_ROOT=$(mktemp -d)
     export KEEL_ROOT
 
@@ -137,8 +120,6 @@ run_test() {
     nix develop -c cargo test --workspace
     ok "tests"
 
-    # La evaluación pura no puede leer user.json: los hosts reales abortan, así
-    # que el chequeo va con --impure (y --no-build: solo evalúa).
     say "nix flake check --impure --no-build"
     nix flake check --impure --no-build
     ok "flake"
@@ -151,7 +132,6 @@ run_test() {
     installer="$REPO/result/bin/nixdots-installer"
     [ -x "$installer" ] || fail "no se encontró $installer (¿falta --no-build?)"
 
-    # pty driver: runs the installer, sends keys, prints the raw output.
     driver() {
         python3 - "$1" "$2" <<'PY'
 import os, pty, sys, time, fcntl, termios, struct, select
@@ -194,15 +174,12 @@ def wait_for_any(markers, timeout=15):
             return True
     return False
 
-# Inicio (splash) -> Licencia
 wait_for("Continuar")
 send(b"\r")
-# Licencia: Intro abre el diálogo (Acepto enfocado) y otro Intro lo acepta.
 wait_for("Para continuar con la instalación")
 send(b"\r")
 wait_for("Leí y acepto")
 send(b"\r")                       # Acepto -> Red
-# Red: elegir la primera red (WPA), escribir la frase y conectar
 wait_for("Red")
 send(b"\r")
 wait_for("contraseña")
@@ -210,7 +187,6 @@ for c in b"contrasena-larga":
     send(bytes([c]), 0.05)
 send(b"\r")                       # Conectando
 wait_for("conectando a", 12)      # al conectar avanza solo a Lenguaje
-# Lenguaje -> Teclado -> Zona horaria (elegir la primera entrada de cada lista)
 wait_for("Lenguaje")
 send(b"\x1b[B")
 send(b"\r")
@@ -226,7 +202,6 @@ wait_for("Equipo")
 send(b"\r")                       # -> Disco
 wait_for("Disco")
 send(b"\r")                       # -> Cifrado
-# Cifrado: frase, confirmar y marcar «La anoté en un lugar seguro»
 wait_for("Cifrado")
 for c in b"frase-larga-123":
     send(bytes([c]), 0.05)
@@ -254,10 +229,8 @@ sys.stdout.buffer.write(bytes(buf))
 PY
     }
 
-    # Capture with retries: crossterm only emits changed cells, so a title can
-    # occasionally land between frames. Prints the raw capture on success.
     MISSING=""
-    capture() { # binary
+    capture() {
         bin=$1
         out=$(mktemp)
         attempt=1

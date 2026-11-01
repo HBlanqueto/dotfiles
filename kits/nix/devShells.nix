@@ -1,6 +1,4 @@
-# Un único devShell para el instalador, el asistente Slint y las herramientas
-# del repo. `setup` es el CLI nixdots-setup de la misma arquitectura, que el
-# asistente usa para «Aplicar» en simulación.
+# Dev shell for the installer, the wizard and repo tools.
 {
   pkgs,
   tablesEnv,
@@ -18,8 +16,6 @@
         clippy
         watchexec
         gcc
-        # The released musl binaries link with clang + lld
-        # (see .cargo/config.toml).
         clang
         lld
         pkg-config
@@ -37,8 +33,6 @@
         deadnix
         nil
       ];
-      # winit/femtovg cargan libwayland, libEGL… con dlopen, que no mira el
-      # PATH: hacen falta en el loader path.
       LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (
         with pkgs;
         [

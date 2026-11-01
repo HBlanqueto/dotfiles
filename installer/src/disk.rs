@@ -1,25 +1,17 @@
-//! Disk helpers: deciding how to install on a disk, alone or alongside an
-//! existing system.
-
+//! Disk helpers: choosing how to install on a disk.
 use crate::detect::{self, Disk};
 
 pub const GIB: u64 = 1024 * 1024 * 1024;
-/// Minimum space Keel needs.
 pub const MIN_GIB: u64 = 40;
-/// Safety margin kept for Windows when shrinking its NTFS.
 pub const SHRINK_MARGIN: u64 = 10 * GIB;
-/// Minimum free space for a reusable EFI System Partition.
 pub const EFI_MIN_FREE: u64 = 260 * 1024 * 1024;
 
-/// How the installer will use the chosen disk.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DiskDecision {
-    /// No other system: take the whole disk.
     WholeDisk,
-    /// Windows present with enough unallocated space.
-    FreeSpace { reuse_efi: bool },
-    /// Windows present without enough free space: shrink the largest NTFS.
-    /// `min_free`/`max_free` bound the freed space (bytes).
+    FreeSpace {
+        reuse_efi: bool,
+    },
     Shrink {
         ntfs: String,
         volume: u64,
@@ -27,14 +19,13 @@ pub enum DiskDecision {
         max_free: u64,
         reuse_efi: bool,
     },
-    /// Not enough room.
-    TooSmall { missing: u64 },
-    /// Windows blocks an automatic decision (BitLocker, dirty volume).
+    TooSmall {
+        missing: u64,
+    },
     Blocked(String),
 }
 
 impl DiskDecision {
-    /// The freed space, in bytes, the shrink bar currently selects.
     pub fn clamp_shrink(&self, bytes: u64) -> u64 {
         match self {
             DiskDecision::Shrink {
@@ -49,7 +40,6 @@ impl DiskDecision {
     }
 }
 
-/// Decides how to install on `disk` from what is already there.
 pub fn decide(disk: &Disk) -> DiskDecision {
     let need = MIN_GIB * GIB;
     if !disk.available {
@@ -70,8 +60,6 @@ pub fn decide(disk: &Disk) -> DiskDecision {
             .unwrap_or(false);
         return DiskDecision::FreeSpace { reuse_efi };
     }
-    // A simulated Windows disk has no real NTFS to probe: assume a clean
-    // volume that can be shrunk down to the minimum.
     if disk.test {
         let volume = disk.size;
         let max_free = volume.saturating_sub(need + SHRINK_MARGIN);
@@ -124,7 +112,6 @@ pub fn decide(disk: &Disk) -> DiskDecision {
     }
 }
 
-/// Byte size of a disko size string (`1G`, `500M`, `100%`).
 pub fn parse_size(size: &str, total: u64) -> u64 {
     let size = size.trim();
     if let Some(percent) = size.strip_suffix('%') {
@@ -146,7 +133,6 @@ pub fn parse_size(size: &str, total: u64) -> u64 {
     (value * multiplier as f64) as u64
 }
 
-/// Proportional block widths (in cells) for a partition bar of `width` cells.
 pub fn block_widths(sizes: &[u64], width: usize) -> Vec<usize> {
     let total: u64 = sizes.iter().sum();
     if total == 0 || width == 0 {
@@ -157,7 +143,6 @@ pub fn block_widths(sizes: &[u64], width: usize) -> Vec<usize> {
         .map(|&s| ((s as f64 / total as f64) * width as f64).floor() as usize)
         .collect();
 
-    // Hand out the leftover cells to the largest fractions.
     let used: usize = widths.iter().sum();
     let mut leftover = width.saturating_sub(used);
     let mut order: Vec<usize> = (0..sizes.len()).collect();

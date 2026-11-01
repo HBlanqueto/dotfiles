@@ -2,12 +2,10 @@
   description = "Mi home de Keel";
 
   inputs = {
-    # Fijado a la revisión del sistema; `steward home prepare` lo ajusta al crearlo.
     keel.url = "github:HBlanqueto/dotfiles";
 
     nixpkgs.follows = "keel/nixpkgs";
 
-    # La misma revisión de home-manager que usa Keel.
     home-manager.follows = "keel/home";
   };
 
@@ -19,7 +17,6 @@
       ...
     }:
     let
-      # steward home prepare sustituye SYSTEM por la arquitectura real del sistema.
       system = "SYSTEM";
     in
     {
@@ -29,8 +26,6 @@
 
           config.allowUnfree = true;
 
-          # brave-previews publica brave-origin-beta usando `xorg.libxcb`, que
-          # nixpkgs renombró; el alias evita el aviso y el overlay da el paquete.
           overlays = [
             keel.overlays.brave
             (_final: prev: {
@@ -41,9 +36,6 @@
           ];
         };
 
-        # `keel` (el flake) lo usa apps.nix para las herramientas del sistema.
-        # `prefs` sale de ./prefs.toml (apariencia y accesibilidad), que
-        # `steward home prepare` copia aquí; sin él, valores por defecto.
         extraSpecialArgs = {
           inherit keel;
           prefs =
@@ -54,8 +46,6 @@
         };
 
         modules = [
-          # Cambia esta línea por keel.homeModules.raft si prefieres el home
-          # mínimo (fish, starship, git y el tema neptunia).
           keel.homeModules.deck
           ./home.nix
         ];

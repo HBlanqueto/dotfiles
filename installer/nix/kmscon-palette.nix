@@ -1,8 +1,4 @@
-# Renders the neptunia palette as kmscon `--palette*` CLI arguments, one per
-# line, generated from `kits/neptunia/neptunia.nix`. This is the single source
-# of truth for the colors used by both the `nix run .#installer` launcher and
-# the standalone `install.sh` bootstrap (which reads the committed file
-# `kits/neptunia/generated/kmscon-palette`).
+# Renders the neptunia palette as kmscon `--palette*` arguments.
 { pkgs, theme }:
 
 let

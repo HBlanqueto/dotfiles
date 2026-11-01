@@ -1,7 +1,4 @@
-//! "Disco": the disk picker. Not inside the shared box: the progress bar, a
-//! title, a centered carousel of 26-column disk cards, the automatic-decision
-//! sentence and the buttons.
-
+//! Disk picker screen.
 use crate::app::{Action, App};
 use crate::detect::{human_size, Disk};
 use crate::disk::{self as diskplan, DiskDecision};
@@ -13,17 +10,13 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
-/// The disk icon: a small rounded box with bars and a light.
 const ICON: [&str; 3] = ["╭────────────╮", "│ ▂▂▂▂▂▂▂  ● │", "╰────────────╯"];
-/// Fallback for the Linux console, which has no block/braille glyphs.
 const ICON_ASCII: [&str; 3] = ["+------------+", "| =======  o |", "+------------+"];
 
 const CARD_W: u16 = 26;
 const CARD_GAP: u16 = 3;
-/// icon (3) + name + real size + up to two state lines, plus the borders.
 const CARD_H: u16 = 9;
 const ARROW_W: u16 = 3;
-/// The inner width of a card (26 minus the two borders).
 const CARD_INNER: usize = (CARD_W - 2) as usize;
 
 pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
@@ -39,7 +32,6 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     } else {
         0
     };
-    // title + sub + gap + cards (+ dots) + gap + sentence (+ shrink + link + details)
     let mut total = 1 + 1 + 1 + CARD_H + 1 + 1;
     if carousel {
         total += 1;
@@ -82,7 +74,6 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     }
     y += 1;
 
-    // Decision sentence.
     let (text, color) = sentence(app);
     f.render_widget(
         Paragraph::new(Span::styled(text, Style::default().fg(color))).alignment(Alignment::Center),
@@ -90,7 +81,6 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     );
     y += 1;
 
-    // Shrink distribution bar.
     if shrink_case {
         if let DiskDecision::Shrink {
             volume, max_free, ..
@@ -107,7 +97,6 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         }
     }
 
-    // "o borrar todo el disco" (only with Windows, and not already chosen).
     if link_case {
         let link = "o borrar todo el disco";
         let pad = (area.width as usize).saturating_sub(link.chars().count()) / 2;
@@ -121,7 +110,6 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         y += 1;
     }
 
-    // Details (`d`).
     if app.disks.details {
         for line in details(app) {
             f.render_widget(
@@ -138,8 +126,6 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 
-/// How many cards fit: the row plus three columns of arrow on each side, up to
-/// three cards and at least one.
 fn visible_count(width: u16, total: usize) -> usize {
     let max = total.clamp(1, 3);
     for n in (1..=max).rev() {
@@ -152,15 +138,12 @@ fn visible_count(width: u16, total: usize) -> usize {
     1
 }
 
-/// The first visible disk: the window follows the selection.
 fn window_start(index: usize, visible: usize, total: usize) -> usize {
     index
         .saturating_sub(visible / 2)
         .min(total.saturating_sub(visible))
 }
 
-/// The row of cards, centered with a `Fill` on each side, with the `‹`/`›`
-/// arrows in their reserved columns.
 fn draw_carousel(f: &mut Frame, app: &App, area: Rect, visible: usize, start: usize) {
     let total = app.disks.disks.len();
     let cards_w = visible as u16 * CARD_W + (visible as u16 - 1) * CARD_GAP;
@@ -213,7 +196,6 @@ fn arrow(f: &mut Frame, app: &App, area: Rect, glyph: &str, on: bool) {
     );
 }
 
-/// The `○ ○ ● ○` dots and the `N de M` counter under the row.
 fn draw_dots(f: &mut Frame, app: &App, area: Rect, total: usize) {
     let mut spans: Vec<Span> = Vec::new();
     for i in 0..total {
@@ -237,8 +219,6 @@ fn draw_dots(f: &mut Frame, app: &App, area: Rect, total: usize) {
     );
 }
 
-/// One disk card: the icon, the name, the real size and the state (up to two
-/// lines). Unusable disks are dimmed and their state names the reason.
 fn draw_card(f: &mut Frame, app: &App, rect: Rect, i: usize) {
     let Some(disk) = app.disks.disks.get(i) else {
         return;
@@ -316,8 +296,6 @@ fn draw_card(f: &mut Frame, app: &App, rect: Rect, i: usize) {
     f.render_widget(Paragraph::new(lines), inner);
 }
 
-/// Wraps `text` into at most two centered lines, never cutting a word; the
-/// second line ends in `…` when it still does not fit.
 fn wrap_state(text: &str, width: usize) -> Vec<String> {
     let mut lines: Vec<String> = Vec::new();
     let mut current = String::new();
@@ -370,7 +348,6 @@ fn gb(bytes: u64) -> String {
     format!("{:.0} GB", bytes as f64 / 1_000_000_000.0)
 }
 
-/// The automatic decision sentence and its color.
 fn sentence(app: &App) -> (String, ratatui::style::Color) {
     if !has_usable_disk(app) {
         return (
@@ -402,7 +379,6 @@ fn sentence(app: &App) -> (String, ratatui::style::Color) {
     }
 }
 
-/// Whether at least one disk can be installed to.
 pub fn has_usable_disk(app: &App) -> bool {
     app.disks
         .disks
@@ -410,7 +386,6 @@ pub fn has_usable_disk(app: &App) -> bool {
         .any(|d| d.unusable_reason().is_none())
 }
 
-/// `Windows ████ Keel ████` with ‹ › steppers.
 fn draw_shrink(f: &mut Frame, app: &App, area: Rect, volume: u64, max_free: u64) {
     let freed = app.disks.shrink_bytes;
     let windows = volume.saturating_sub(freed);
@@ -437,7 +412,6 @@ fn draw_shrink(f: &mut Frame, app: &App, area: Rect, volume: u64, max_free: u64)
         area,
     );
 
-    // ‹ › steppers at both ends.
     let left = Rect::new(area.x + 2, area.y, 1, 1);
     let right = Rect::new(area.right().saturating_sub(3), area.y, 1, 1);
     f.render_widget(
@@ -460,7 +434,6 @@ fn draw_shrink(f: &mut Frame, app: &App, area: Rect, volume: u64, max_free: u64)
     );
 }
 
-/// The `d` details: two gray lines.
 fn details(app: &App) -> Vec<String> {
     let size = match app.disks.effective() {
         DiskDecision::Shrink { .. } => app.disks.shrink_bytes,
@@ -484,8 +457,6 @@ fn details(app: &App) -> Vec<String> {
     ]
 }
 
-/// The "borrar todo" confirmation, over the dimmed disk picker. `area` is the
-/// box content, so the dialog is centered over the box itself.
 fn draw_erase_modal(f: &mut Frame, app: &mut App, area: Rect) {
     let palette = app.palette;
     let buttons = vec![Btn::new("No"), Btn::danger("Borrar todo")];

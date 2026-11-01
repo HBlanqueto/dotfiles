@@ -1,11 +1,4 @@
-//! The actual installation: a sequence of steps that shell out to `disko`,
-//! `nixos-facter`, `sbctl`, `nix` and `nixos-install`, streaming their
-//! output to the UI.
-//!
-//! In dry-run the same steps run, but every command is only *displayed* (with
-//! simulated output) and all writes go to the working copy inside a temporary
-//! directory.
-
+//! Runs the installation steps and streams their output to the UI.
 use crate::detect;
 use crate::runner::{self, Cmd, Stream};
 use crate::settings::Settings;
@@ -19,10 +12,6 @@ use std::thread;
 use std::time::Duration;
 use zeroize::Zeroizing;
 
-/// The install steps shown in the UI, in order. The many real sub-steps are
-/// grouped into these four phases; `arranque` covers the bootloader (systemd-boot
-/// on the VM, lanzaboote/sbctl keys on x86_64 bare metal), never a "secure boot"
-/// step.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Step {
     Disk,
@@ -44,50 +33,36 @@ impl Step {
     }
 }
 
-/// The Wi-Fi connection to persist into the installed system.
 #[derive(Debug, Clone)]
 pub struct WifiSave {
     pub ssid: String,
-    /// `true` when NetworkManager made the connection (then its profile can be
-    /// copied); otherwise the user must reconnect with iwd/wpa_supplicant.
     pub networkmanager: bool,
 }
 
-/// How the chosen disk is prepared.
 #[derive(Debug, Clone)]
 pub enum DiskMode {
-    /// No other system: disko destroys and formats the whole disk.
     Whole,
-    /// Keep what is already on the disk: use unallocated space, optionally
-    /// after shrinking an NTFS partition.
     Alongside {
-        /// Existing EFI System Partition to reuse (device path), or `None` to
-        /// create a new one.
         reuse_efi: Option<String>,
         shrink: Option<ShrinkSpec>,
     },
 }
 
-/// An NTFS shrink to run before creating the new partitions.
 #[derive(Debug, Clone)]
 pub struct ShrinkSpec {
     pub ntfs: String,
-    /// Space to free for Keel, in bytes.
     pub free_bytes: u64,
 }
 
-/// Messages sent from the install thread to the UI.
 #[derive(Debug, Clone)]
 pub enum Msg {
     Step(Step),
     Log(String),
-    /// A level-0 nix message line; shown in red.
     Error(String),
     Progress {
         built: u64,
         total: u64,
     },
-    /// A child process finished; the UI should wipe and fully redraw.
     Repaint,
     Finished {
         ok: bool,
@@ -96,42 +71,25 @@ pub enum Msg {
     },
 }
 
-/// Everything the installer needs to run.
 #[derive(Debug, Clone)]
 pub struct Plan {
-    /// Source repo (already cloned/available), read-only.
     pub source: PathBuf,
-    /// Mount root (`/mnt` for real, a temp dir in dry-run).
     pub root: PathBuf,
     pub settings: Settings,
-    /// Whether the System HD partition is wrapped in LUKS2.
     pub encrypt: bool,
-    // Passphrase for the LUKS-encrypted root, typed on the Cifrado screen.
-    // Never logged, only fed over stdin.
     pub luks_passphrase: Zeroizing<String>,
-    /// Recovery key enrolled as a second LUKS slot. Wiped after use.
     pub recovery_key: Zeroizing<String>,
-    /// Written to machine.toml as `tpmUnlock`: the installer enrolls a TPM2
-    /// bridge token (no PCRs) so lanzaboote's measured boot (pcrlock) can
-    /// unlock and re-enroll on first boot.
     pub luks_tpm: bool,
     pub device: String,
     pub dry_run: bool,
-    /// How the chosen disk is prepared (whole disk vs. alongside Windows).
     pub disk_mode: DiskMode,
-    /// Whether to install Lanzaboote/sbctl (x86_64 bare metal). Written to
-    /// machine.toml as `secureBoot`.
     pub secure_boot: bool,
-    /// Wi-Fi connection to persist into /persist, if any.
     pub wifi: Option<WifiSave>,
-    /// First step to run. On a retry this is the step that failed, so the disk
-    /// is reattached instead of reformatted.
     pub resume_from: Step,
 }
 
 impl Plan {
     pub fn installed_repo(&self) -> PathBuf {
-        // El repo vive en /persist (persistente), no en el home del usuario.
         self.root.join("persist/keel/repo")
     }
 
@@ -139,10 +97,6 @@ impl Plan {
         PathBuf::from("/tmp/keel-install.log")
     }
 
-    /// UUID of the reused Windows ESP, or empty when a new one is created. The
-    /// installed system mounts /boot by this UUID: a reused ESP keeps whatever
-    /// label it already had (it is never relabelled), so by-label/BOOT would
-    /// point at the wrong filesystem.
     fn esp_uuid(&self) -> String {
         match &self.disk_mode {
             DiskMode::Alongside {
@@ -153,8 +107,6 @@ impl Plan {
         }
     }
 
-    /// Git identity for the installer's commits: the Git screen's when set,
-    /// else a throwaway one.
     fn git_identity(&self) -> (String, String) {
         (
             self.settings
@@ -169,8 +121,6 @@ impl Plan {
     }
 }
 
-/// A `git` invocation rooted at `repo`, with `safe.directory` set per call (the
-/// repo belongs to the user but the installer runs as root).
 fn git_cmd(repo: &Path, args: &[&str]) -> Cmd {
     let mut cmd = Cmd::new("git")
         .arg("-c")
@@ -183,7 +133,6 @@ fn git_cmd(repo: &Path, args: &[&str]) -> Cmd {
     cmd
 }
 
-/// Starts the install on a worker thread.
 pub fn spawn(plan: Plan, tx: Sender<Msg>) -> thread::JoinHandle<()> {
     thread::spawn(move || run(plan, tx))
 }
@@ -200,12 +149,10 @@ impl Reporter {
         self.write(&line);
     }
 
-    /// Writes a line to the on-disk log only (raw nix output, unfiltered).
     fn raw(&mut self, line: &str) {
         self.write(line);
     }
 
-    /// Sends a filtered display line to the UI, without touching the file.
     fn emit(&mut self, line: String, is_error: bool) {
         let msg = if is_error {
             Msg::Error(line)
@@ -246,7 +193,6 @@ fn run(plan: Plan, tx: Sender<Msg>) {
         file,
     };
 
-    // Kept in the on-disk log only; the UI log starts with the steps.
     report.raw("== Keel installer ==");
     report.raw(&format!(
         "modo: {}",
@@ -274,7 +220,6 @@ fn run(plan: Plan, tx: Sender<Msg>) {
         }
         Err(err) => {
             report.log(format!("error: {err}"));
-            // Keep a copy of the full log on the target too, when /mnt is up.
             if !plan.dry_run {
                 copy_log_to_persist(&plan, &mut report);
             }
@@ -286,14 +231,9 @@ fn run(plan: Plan, tx: Sender<Msg>) {
         }
     }
 
-    // The build's scratch dirs live on the target disk; drop them when done.
     if !plan.dry_run {
         let _ = fs::remove_dir_all(plan.root.join("tmp"));
         let _ = fs::remove_dir_all(target_build_dir(&plan));
-        // The LUKS passphrase and recovery key live in /run/keel (the live
-        // ISO's tmpfs) and each SecretFile shreds its own file on drop; drop the
-        // whole directory too in case a run was interrupted. They are never
-        // written under /mnt, so they never reach /persist.
         let _ = fs::remove_dir_all("/run/keel");
     }
 
@@ -305,8 +245,6 @@ fn run(plan: Plan, tx: Sender<Msg>) {
 fn run_steps(plan: &Plan, report: &mut Reporter) -> Result<()> {
     let resume = plan.resume_from;
 
-    // Disk is only formatted when it is the (re)starting point. When resuming
-    // from a later step the prepared disk is reattached, never reformatted.
     let luks =
         if resume <= Step::Disk {
             report.step(Step::Disk);
@@ -322,7 +260,6 @@ fn run_steps(plan: &Plan, report: &mut Reporter) -> Result<()> {
             }
         };
 
-    // Scratch space on the target disk (not the ISO's RAM store) for the build.
     prepare_target_tmp(plan, report)?;
 
     if resume <= Step::Settings {
@@ -335,8 +272,6 @@ fn run_steps(plan: &Plan, report: &mut Reporter) -> Result<()> {
 
     if resume <= Step::System {
         ensure_target_space(plan)?;
-        // Kept alive for the whole system build; dropped (swapoff + delete) when
-        // this block ends, so it is also recreated on every retry.
         let _swap = ensure_build_memory(plan, report)?;
         report.step(Step::System);
         step_system(plan, report)?;
@@ -349,7 +284,6 @@ fn run_steps(plan: &Plan, report: &mut Reporter) -> Result<()> {
     Ok(())
 }
 
-/// Whether `path` is a mount point, per `/proc/mounts` (its second field).
 fn is_mounted(path: &str) -> bool {
     fs::read_to_string("/proc/mounts")
         .map(|mounts| {
@@ -360,14 +294,6 @@ fn is_mounted(path: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Creates the build's scratch dirs on the target and points `TMPDIR` at one of
-/// them, so every child process (`nix`, `nixos-install`, …) keeps its scratch
-/// data on the target disk instead of the live ISO's RAM-backed `/tmp`.
-///
-/// Nix refuses a `build-dir` that is world-writable or a symlink, so the two
-/// uses are split: a private 0700 [`target_build_dir`] for nix, and a plain
-/// root-owned 0755 `<root>/tmp` for `TMPDIR`. Permissions are reset on every
-/// run, so a Retry after a previous attempt just works.
 fn prepare_target_tmp(plan: &Plan, report: &mut Reporter) -> Result<()> {
     let tmp = plan.root.join("tmp");
     let build = target_build_dir(plan);
@@ -378,25 +304,17 @@ fn prepare_target_tmp(plan: &Plan, report: &mut Reporter) -> Result<()> {
         set_mode_dir(&build, 0o700)?;
     }
     std::env::set_var("TMPDIR", &tmp);
-    // The external data the flake reads (machine.toml, facter.json) lives under
-    // `${KEEL_ROOT}/persist/keel`; point it at the target.
     std::env::set_var("KEEL_ROOT", &plan.root);
     report.log(format!("$ TMPDIR={}", tmp.display()));
     Ok(())
 }
 
-/// Nix's build directory on the target. Private (0700) and created by us, so it
-/// is neither world-writable nor a symlink (nix refuses both).
 fn target_build_dir(plan: &Plan) -> PathBuf {
     plan.root.join("nix/var/nix/builds")
 }
 
-/// Minimum free space on the target before building the system: the closure is
-/// large (kernel, desktop, …) and is realised in the target store.
 const MIN_TARGET_GIB: u64 = 25;
 
-/// Fails early, in Spanish, when the target has less than [`MIN_TARGET_GIB`] of
-/// free space, instead of letting `nixos-install` die with `ENOSPC` halfway.
 fn ensure_target_space(plan: &Plan) -> Result<()> {
     if plan.dry_run {
         return Ok(());
@@ -413,7 +331,6 @@ fn ensure_target_space(plan: &Plan) -> Result<()> {
     Ok(())
 }
 
-/// Free space (GiB) on the filesystem holding `root`, via `df`.
 fn target_free_gib(root: &Path) -> Result<u64> {
     let out = runner::capture(&Cmd::new("df").arg("-Pk").arg_path(root))?;
     let text = String::from_utf8_lossy(&out.stdout);
@@ -426,8 +343,6 @@ fn target_free_gib(root: &Path) -> Result<u64> {
     Ok(avail_kb / 1024 / 1024)
 }
 
-/// Total RAM in GiB, read from `MemTotal` in `/proc/meminfo`. `None` when it
-/// cannot be read, which callers treat as "little RAM".
 fn mem_total_gib() -> Option<u64> {
     let text = fs::read_to_string("/proc/meminfo").ok()?;
     let kb: u64 = text
@@ -440,12 +355,8 @@ fn mem_total_gib() -> Option<u64> {
     Some(kb / 1024 / 1024)
 }
 
-/// Below this much RAM the build is throttled and a temporary swap is enabled.
 const LOW_MEM_GIB: u64 = 12;
 
-/// A temporary 8 GiB swapfile on the target disk, alive only while the system is
-/// built. `swapoff` and deletion happen on drop, so it never reaches the
-/// installed system whether the step succeeds or fails.
 struct TempSwap {
     path: PathBuf,
 }
@@ -453,8 +364,6 @@ struct TempSwap {
 impl TempSwap {
     fn create(plan: &Plan, report: &mut Reporter) -> Result<Self> {
         let path = plan.root.join("persist/.keel-install.swap");
-        // Clear any leftover from an attempt that was cut short; it may still be
-        // active. Failures are ignored (nothing to clean on a first run).
         let mut sink = |_: Stream| {};
         let _ = runner::run(&Cmd::new("swapoff").arg_path(&path), &mut sink);
         let _ = fs::remove_file(&path);
@@ -492,10 +401,6 @@ impl Drop for TempSwap {
     }
 }
 
-/// Frees memory for the build on small machines. On the live ISO the store and
-/// `/tmp` live in RAM and `nixos-install` unpacks many paths at once, so the OOM
-/// killer can hit it (exit 137). Under [`LOW_MEM_GIB`] we turn on a temporary
-/// swapfile on the target disk; with plenty of RAM nothing changes.
 fn ensure_build_memory(plan: &Plan, report: &mut Reporter) -> Result<Option<TempSwap>> {
     if plan.dry_run {
         return Ok(None);
@@ -508,7 +413,6 @@ fn ensure_build_memory(plan: &Plan, report: &mut Reporter) -> Result<Option<Temp
         .map(|g| format!("{g} GiB"))
         .unwrap_or_else(|| "desconocida".to_string());
 
-    // The swapfile and the build's closure both live on the target disk.
     let needed = MIN_TARGET_GIB + 8;
     let free = target_free_gib(&plan.root)?;
     if free < needed {
@@ -526,10 +430,6 @@ fn ensure_build_memory(plan: &Plan, report: &mut Reporter) -> Result<Option<Temp
     Ok(Some(TempSwap::create(plan, report)?))
 }
 
-/// Reattaches the already-prepared disk for a retry: if `/mnt` is not mounted
-/// (or `cryptroot` is closed) it re-opens and mounts the existing filesystems
-/// with `disko --mode mount`, which never formats. The passphrase comes from the
-/// in-memory plan, so the disk is left exactly as the disk step left it.
 fn ensure_disk_ready(plan: &Plan, report: &mut Reporter) -> Result<()> {
     if let DiskMode::Alongside { reuse_efi, .. } = &plan.disk_mode {
         return ensure_alongside_ready(plan, report, reuse_efi.as_deref());
@@ -583,7 +483,6 @@ fn ensure_disk_ready(plan: &Plan, report: &mut Reporter) -> Result<()> {
     )
 }
 
-/// Reattaches the existing alongside layout for a retry, without reformatting.
 fn ensure_alongside_ready(
     plan: &Plan,
     report: &mut Reporter,
@@ -625,8 +524,6 @@ fn ensure_alongside_ready(
     mount_alongside(plan, report, &data, &esp)
 }
 
-/// The final `arranque` phase: lanzaboote's sbctl keys on x86_64 bare metal;
-/// plain systemd-boot (already installed with the system) elsewhere.
 fn step_boot(plan: &Plan, report: &mut Reporter) -> Result<()> {
     if plan.secure_boot {
         report.log("instalando lanzaboote en /boot");
@@ -648,18 +545,11 @@ fn step_disk(plan: &Plan, report: &mut Reporter) -> Result<Option<detect::LuksPa
     }
 }
 
-/// Whole-disk install: disko destroys and formats the disk.
 fn step_disk_whole(plan: &Plan, report: &mut Reporter) -> Result<Option<detect::LuksPartition>> {
-    // A retry can find /mnt still mounted and `cryptroot` open from the run that
-    // failed; clear everything so disko starts from a clean slate instead of
-    // choking on a half-prepared disk.
     if !plan.dry_run {
         clean_target(plan, report);
     }
 
-    // The passphrase is written once, verbatim (no trailing newline), and reused
-    // by disko, the slot check and luksAddKey. Nothing else
-    // writes it; `SecretFile` shreds it when this function returns.
     report.log("creando las particiones y formateando el disco");
     let pass = if plan.encrypt && !plan.dry_run {
         Some(SecretFile::write("luks.pass", &plan.luks_passphrase)?)
@@ -694,8 +584,6 @@ fn step_disk_whole(plan: &Plan, report: &mut Reporter) -> Result<Option<detect::
         ));
     }
 
-    // disko reads the passphrase from `luksPasswordFile` and runs luksFormat
-    // itself; the installer never formats the container.
     ensure_ok(
         exec(plan, report, &cmd, &plan.source)?,
         if plan.encrypt {
@@ -715,9 +603,6 @@ fn step_disk_whole(plan: &Plan, report: &mut Reporter) -> Result<Option<detect::
             uuid: "00000000-0000-0000-0000-000000000000".to_string(),
         }
     } else {
-        // Identify the LUKS partition by its filesystem type, never by a label:
-        // udev escapes spaces in `by-partlabel` (`System\x20HD`) and disko names
-        // the GPT label `disk-<disk>-<name>` by default.
         detect::luks_partition(&plan.device)
             .ok_or_else(|| eyre!("no se encontró la partición cifrada en {}", plan.device))?
     };
@@ -728,7 +613,6 @@ fn step_disk_whole(plan: &Plan, report: &mut Reporter) -> Result<Option<detect::
 
     let pass_path = pass.as_ref().map(SecretFile::path);
     if let Some(pass_path) = pass_path {
-        // Bail out before touching any slot if disko's key and ours disagree.
         verify_key(
             report,
             &luks.path,
@@ -738,19 +622,12 @@ fn step_disk_whole(plan: &Plan, report: &mut Reporter) -> Result<Option<detect::
     }
 
     step_recovery_key(plan, report, &luks.path, pass_path)?;
-    // Token puente: sin PCRs, para que lanzaboote (measuredBoot.autoCryptenroll)
-    // pueda desbloquear en el primer arranque, donde lo borra con
-    // --wipe-slot=tpm2 y reinscribe la política pcrlock (PCR 0 4 7). Un
-    // `--tpm2-pcrs=7` estático no serviría: PCR7 cambia en cuanto lanzaboote
-    // inscribe las claves.
     if plan.luks_tpm {
         step_tpm_enroll(plan, report, &luks.path, pass_path)?;
     }
     Ok(Some(luks))
 }
 
-/// Alongside install: keep the existing system, use unallocated space (after
-/// shrinking an NTFS partition when needed) and mount the new btrfs there.
 fn step_disk_alongside(
     plan: &Plan,
     report: &mut Reporter,
@@ -771,7 +648,6 @@ fn step_disk_alongside(
 
     clean_target(plan, report);
 
-    // 1. Free the space by shrinking Windows' NTFS.
     if let Some(spec) = shrink {
         shrink_ntfs(plan, report, spec)?;
     }
@@ -782,7 +658,6 @@ fn step_disk_alongside(
         None
     };
 
-    // 2. Create the ESP (unless reusing Windows') and the System HD partition.
     let esp = match reuse_efi {
         Some(path) => {
             report.log(format!("EFI de Windows reutilizada: {path}"));
@@ -792,7 +667,6 @@ fn step_disk_alongside(
     };
     let system = create_partition(plan, report, "0", "8300", "System HD")?;
 
-    // 3. Format.
     if reuse_efi.is_none() {
         run_ok(
             plan,
@@ -859,7 +733,6 @@ fn step_disk_alongside(
     Ok(luks)
 }
 
-/// Runs `ntfsresize` (dry-run then real) and shrinks the partition with sgdisk.
 fn shrink_ntfs(plan: &Plan, report: &mut Reporter, spec: &ShrinkSpec) -> Result<()> {
     let current = current_ntfs_size(&spec.ntfs);
     let target = current.saturating_sub(spec.free_bytes);
@@ -872,7 +745,6 @@ fn shrink_ntfs(plan: &Plan, report: &mut Reporter, spec: &ShrinkSpec) -> Result<
         return Err(eyre!("no se pudo calcular el tamaño final de Windows"));
     }
 
-    // Check first (no action), then resize for real.
     let check = Cmd::new("ntfsresize")
         .arg("--no-action")
         .arg("--force")
@@ -892,7 +764,6 @@ fn shrink_ntfs(plan: &Plan, report: &mut Reporter, spec: &ShrinkSpec) -> Result<
         .arg(&spec.ntfs);
     run_ok(plan, report, &real, "no se pudo reducir Windows")?;
 
-    // Resize the GPT entry: keep the start sector, set the new end.
     let index = partition_index(&spec.ntfs)
         .ok_or_else(|| eyre!("no se pudo leer el número de partición de {}", spec.ntfs))?;
     let start = partition_start(plan, report, &plan.device, index)?;
@@ -921,7 +792,6 @@ fn shrink_ntfs(plan: &Plan, report: &mut Reporter, spec: &ShrinkSpec) -> Result<
     Ok(())
 }
 
-/// The current size of an NTFS volume, in bytes (`blockdev --getsize64`).
 fn current_ntfs_size(ntfs: &str) -> u64 {
     runner::capture(&Cmd::new("blockdev").arg("--getsize64").arg(ntfs))
         .ok()
@@ -934,7 +804,6 @@ fn current_ntfs_size(ntfs: &str) -> u64 {
         .unwrap_or(0)
 }
 
-/// Creates a partition with `sgdisk --new=0:0:<size>` and returns its device.
 fn create_partition(
     plan: &Plan,
     report: &mut Reporter,
@@ -958,7 +827,6 @@ fn create_partition(
         .ok_or_else(|| eyre!("no se encontró la partición nueva {label}"))
 }
 
-/// Finds a partition device by its GPT partition label.
 fn find_partition(device: &str, label: &str) -> Option<String> {
     let out = runner::capture(
         &Cmd::new("lsblk")
@@ -982,7 +850,6 @@ fn find_partition(device: &str, label: &str) -> Option<String> {
     None
 }
 
-/// The partition number of a device node (`/dev/nvme0n1p3` → `3`).
 fn partition_index(device: &str) -> Option<u32> {
     let digits: String = device
         .chars()
@@ -993,7 +860,6 @@ fn partition_index(device: &str) -> Option<u32> {
     digits.parse().ok()
 }
 
-/// The first sector of partition `index` (`sgdisk -i`).
 fn partition_start(plan: &Plan, report: &mut Reporter, device: &str, index: u32) -> Result<String> {
     let out = runner::capture(&Cmd::new("sgdisk").arg(format!("-i={index}")).arg(device))?;
     let text = String::from_utf8_lossy(&out.stdout);
@@ -1024,7 +890,6 @@ fn rescan(plan: &Plan, report: &mut Reporter) {
     report.repaint();
 }
 
-/// Creates the btrfs subvolumes and the read-only `@rootfs-blank` template.
 fn setup_subvolumes(plan: &Plan, report: &mut Reporter, data: &str) -> Result<()> {
     run_ok(
         plan,
@@ -1066,7 +931,6 @@ fn setup_subvolumes(plan: &Plan, report: &mut Reporter, data: &str) -> Result<()
     Ok(())
 }
 
-/// Mounts the new subvolumes and the ESP at `plan.root`.
 fn mount_alongside(plan: &Plan, report: &mut Reporter, data: &str, esp: &str) -> Result<()> {
     let opts = "noatime,compress=zstd";
     let mounts = [
@@ -1111,9 +975,6 @@ fn human_gib(bytes: u64) -> String {
     format!("{:.0} GB", bytes as f64 / 1_000_000_000.0)
 }
 
-/// Unmounts the target, closes the LUKS mapper and wipes any LUKS header left
-/// behind by a previous attempt. Failures are ignored: on a first run there is
-/// nothing to clean.
 fn clean_target(plan: &Plan, report: &mut Reporter) {
     report.log(
         "$ umount -R /mnt; cryptsetup close cryptroot; wipefs -a <partición>   (limpieza previa)",
@@ -1127,13 +988,9 @@ fn clean_target(plan: &Plan, report: &mut Reporter) {
     if let Some(luks) = detect::luks_partition(&plan.device) {
         let _ = runner::run(&Cmd::new("wipefs").arg("-a").arg(&luks.path), &mut sink);
     }
-    // Drop stale /run secrets; the next step rewrites the ones it needs.
     let _ = fs::remove_dir_all("/run/keel");
 }
 
-/// Runs `cryptsetup open --test-passphrase` with `key_file`, so a key that does
-/// not match the header is caught before any slot is touched. `what` is the
-/// failure message.
 fn verify_key(report: &mut Reporter, device: &str, key_file: &Path, what: &str) -> Result<()> {
     let cmd = Cmd::new("cryptsetup")
         .arg("open")
@@ -1152,12 +1009,6 @@ fn verify_key(report: &mut Reporter, device: &str, key_file: &Path, what: &str) 
     ensure_ok(code, what)
 }
 
-/// A root-only secret written to `/run` (tmpfs) and `shred -u`d the moment it
-/// goes out of scope, so it never survives on disk even when the step fails.
-///
-/// The bytes are written *verbatim*: `cryptsetup --key-file` consumes the whole
-/// file, so a trailing newline would become part of the passphrase and no longer
-/// match what disko's `cat`-based key file (or the user at boot) uses.
 struct SecretFile {
     path: PathBuf,
 }
@@ -1198,7 +1049,6 @@ impl Drop for SecretFile {
     }
 }
 
-/// Whether this cryptsetup supports `--new-keyfile` for `luksAddKey` (2.7+).
 fn cryptsetup_has_new_keyfile() -> bool {
     static CACHE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CACHE.get_or_init(|| {
@@ -1217,11 +1067,6 @@ fn cryptsetup_has_new_keyfile() -> bool {
     })
 }
 
-/// Adds the recovery key generated on the Cifrado screen as a second LUKS slot
-/// on `device`, unlocking with the shared `pass_path` file. The new key is the
-/// exact text shown on screen (no trailing newline), so what the user types at
-/// boot matches. Both files are short-lived `/run` files removed by
-/// [`SecretFile`] on the way out. Nothing is logged.
 fn step_recovery_key(
     plan: &Plan,
     report: &mut Reporter,
@@ -1248,7 +1093,6 @@ fn step_recovery_key(
             .arg_path(recovery.path())
             .arg(device);
     } else {
-        // Older cryptsetup: the new key is the trailing positional argument.
         cmd = cmd
             .arg("--key-file")
             .arg_path(pass_path)
@@ -1281,7 +1125,6 @@ fn step_recovery_key(
         &format!("no se pudo añadir la clave de recuperación a {device}"),
     )?;
 
-    // Prove the new slot opens with the exact bytes we wrote.
     verify_key(
         report,
         device,
@@ -1290,13 +1133,6 @@ fn step_recovery_key(
     )
 }
 
-/// Enrolls a TPM2 bridge token (no PCRs) on `device`, unlocking with the shared
-/// passphrase file before it is shredded. It is the token lanzaboote's
-/// autoCryptenroll needs to unlock on the first boot, where it wipes this slot
-/// and re-enrolls the pcrlock policy (PCRs 0 4 7). Until then the bridge token
-/// checks no measurement: anyone with the disk and the same TPM could unlock it.
-/// A `--tpm2-pcrs=7` binding would not survive first boot (lanzaboote enrolls
-/// the Secure Boot keys and PCR7 changes).
 fn step_tpm_enroll(
     plan: &Plan,
     report: &mut Reporter,
@@ -1359,8 +1195,6 @@ fn step_repo(plan: &Plan, report: &mut Reporter) -> Result<()> {
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent)?;
     }
-    // A retry can find the previous copy in place; replace it so `cp -a` does
-    // not nest the repo inside itself.
     if dest.exists() {
         fs::remove_dir_all(&dest)?;
     }
@@ -1384,9 +1218,6 @@ fn step_repo(plan: &Plan, report: &mut Reporter) -> Result<()> {
     Ok(())
 }
 
-/// Makes the repo copied into `/mnt` usable by the flake. A snapshot copied from
-/// the ISO (`/etc/keel/repo`, a read-only store path) arrives read-only and
-/// without `.git`; give it write permission and an initial commit.
 fn ensure_repo_ready(plan: &Plan, report: &mut Reporter, repo: &Path) -> Result<()> {
     let chmod = Cmd::new("chmod")
         .arg("-R")
@@ -1427,8 +1258,6 @@ fn ensure_repo_ready(plan: &Plan, report: &mut Reporter, repo: &Path) -> Result<
 }
 
 fn step_license(plan: &Plan, report: &mut Reporter) -> Result<()> {
-    // El repo no se toca: locale, zona, teclado y prettyHostName ya van a
-    // machine.toml, y el flake lee el resto de system/lib/defaults.nix tal cual.
     let repo = plan.installed_repo();
     let lic_dst = plan.root.join("etc/keel");
     let lic_src = repo.join("LICENSE");
@@ -1444,11 +1273,6 @@ fn step_license(plan: &Plan, report: &mut Reporter) -> Result<()> {
     Ok(())
 }
 
-/// Detects the hardware with `nixos-facter` and writes the per-machine data the
-/// flake reads: `facter.json` (the hardware report) and `machine.toml` (the
-/// installer's choices), both under /persist/keel. `KEEL_ROOT` already
-/// points at the target (prepare_target_tmp), so the flake picks them up when
-/// the system is built.
 fn step_hardware(
     plan: &Plan,
     report: &mut Reporter,
@@ -1471,9 +1295,6 @@ fn step_hardware(
     }
 
     let machine = dir.join("machine.toml");
-    // machine.toml es el archivo del sistema: hostName/cifrado/extras y los
-    // campos de sistema (locale, zona, teclado, prettyHostName). Se fusiona
-    // para no pisar claves ajenas; el asistente añadirá las suyas.
     let mut fields = serde_json::Map::new();
     fields.insert("hostName".into(), plan.settings.host_name.clone().into());
     fields.insert("encrypt".into(), plan.encrypt.into());
@@ -1518,9 +1339,6 @@ fn step_hardware(
     Ok(())
 }
 
-/// Creates the /persist layout declared by `environment.persistence`, the
-/// secrets directory and (when NetworkManager connected) the saved Wi-Fi
-/// profile. Runs after the disk is mounted and before nixos-install.
 fn step_persist(plan: &Plan, report: &mut Reporter) -> Result<()> {
     let repo = plan.installed_repo();
     let persist = plan.root.join("persist");
@@ -1530,9 +1348,6 @@ fn step_persist(plan: &Plan, report: &mut Reporter) -> Result<()> {
         repo.display(),
         plan.settings.host_name
     );
-    // Impermanence declares some options (allowOther, method, …) as *removed*:
-    // forcing them throws. A plain `--json` dump of the whole attrset forces
-    // every option, so project each entry down to just the fields we use.
     let apply = r#"p: { "/persist" = let e = p."/persist" or {}; in { directories = map (d: { directory = d.directory; user = d.user or null; group = d.group or null; mode = d.mode or null; }) (e.directories or []); files = map (f: { file = f.file; }) (e.files or []); }; }"#;
     let cmd = Cmd::new("nix")
         .arg("eval")
@@ -1576,8 +1391,6 @@ fn step_persist(plan: &Plan, report: &mut Reporter) -> Result<()> {
             }
             create_persist_dir(plan, report, &persist, entry)?;
         }
-        // Detected by evaluating the config, not hardcoded: the @log subvolume
-        // already keeps /var/log, so listing it here too is redundant.
         if log_dup {
             report.log("aviso: /var/log definido dos veces: subvolumen @log e impermanence");
         }
@@ -1588,8 +1401,6 @@ fn step_persist(plan: &Plan, report: &mut Reporter) -> Result<()> {
         }
     }
 
-    // Secrets live next to the persisted tree. 0711 keeps the hash file
-    // unreadable while still letting the unprivileged `nix` evaluation stat it.
     let secrets = persist.join("secrets");
     fs::create_dir_all(&secrets)?;
     set_mode_dir(&secrets, 0o711)?;
@@ -1621,7 +1432,6 @@ fn create_persist_dir(
     };
     let target = persist.join(path.trim_start_matches('/'));
     fs::create_dir_all(&target)?;
-    // The NetworkManager connections directory is private.
     let mode = if path.contains("NetworkManager/system-connections") {
         0o700
     } else {
@@ -1657,7 +1467,6 @@ fn create_persist_file(
         return Ok(());
     };
     if path.ends_with("etc/machine-id") {
-        // A fresh machine-id must exist before the first boot.
         report.log("$ systemd-machine-id-setup --root=/mnt/persist");
         let code = runner::run(
             &Cmd::new("systemd-machine-id-setup")
@@ -1667,7 +1476,6 @@ fn create_persist_file(
             &mut |_| {},
         );
         if code != 0 {
-            // Fall back to an empty file so the mount is at least present.
             let target = persist.join(path.trim_start_matches('/'));
             if let Some(parent) = target.parent() {
                 fs::create_dir_all(parent)?;
@@ -1686,8 +1494,6 @@ fn create_persist_file(
     Ok(())
 }
 
-/// Copies the Wi-Fi connection into /persist when NetworkManager is in use;
-/// otherwise just notes that the VM/user must reconnect.
 fn persist_wifi(plan: &Plan, report: &mut Reporter) -> Result<()> {
     let Some(wifi) = &plan.wifi else {
         return Ok(());
@@ -1736,7 +1542,6 @@ fn chown(path: &Path, owner: &str) -> std::io::Result<()> {
 }
 
 fn step_secure_boot(plan: &Plan, report: &mut Reporter) -> Result<()> {
-    // lanzaboote (systemd-boot) only targets x86_64.
     let system = detect::nix_system().unwrap_or_default();
     if !system.starts_with("x86_64") {
         return Err(eyre!(
@@ -1764,15 +1569,9 @@ fn step_secure_boot(plan: &Plan, report: &mut Reporter) -> Result<()> {
 
 fn step_system(plan: &Plan, report: &mut Reporter) -> Result<()> {
     let repo = plan.installed_repo();
-    // The single generic configuration; the machine's hostname lives in
-    // machine.toml, not in the flake output name.
     let flake = format!("{}#keel", repo.display());
     let build = target_build_dir(plan);
 
-    // `nixos-install --flake` builds the system with `--store /mnt`, so the
-    // closure lands on the target disk, never in the live ISO's RAM-backed
-    // store. `--option build-dir` and `TMPDIR` keep the build's scratch there
-    // too. No separate `nix build` runs in the ISO store.
     let mut cmd = Cmd::new("nixos-install")
         .arg("--flake")
         .arg(&flake)
@@ -1792,7 +1591,6 @@ fn step_system(plan: &Plan, report: &mut Reporter) -> Result<()> {
         build.display()
     );
 
-    // On little RAM, build fewer things at once so the OOM killer stays away.
     if mem_total_gib().is_none_or(|g| g < LOW_MEM_GIB) {
         cmd = cmd
             .arg("--max-jobs")
@@ -1818,8 +1616,6 @@ fn step_system(plan: &Plan, report: &mut Reporter) -> Result<()> {
     Ok(())
 }
 
-/// Runs `cmd`, streaming its output and updating the build progress bar from
-/// nix's `internal-json` log format. In dry-run nothing is executed.
 fn run_with_progress(plan: &Plan, report: &mut Reporter, cmd: &Cmd) -> i32 {
     report.log(format!("$ {}", cmd.display));
     if plan.dry_run {
@@ -1846,13 +1642,10 @@ fn run_with_progress(plan: &Plan, report: &mut Reporter, cmd: &Cmd) -> i32 {
     code
 }
 
-// -- command execution helpers ------------------------------------------------
-
 fn exec(plan: &Plan, report: &mut Reporter, cmd: &Cmd, cwd: &Path) -> Result<i32> {
     exec_in(plan, report, cmd, cwd)
 }
 
-/// A logged command line, marked `[simulación]` when it is only shown.
 fn command_line(plan: &Plan, cmd: &Cmd) -> String {
     if plan.dry_run {
         format!("[simulación] $ {}", cmd.display)
@@ -1864,14 +1657,11 @@ fn command_line(plan: &Plan, cmd: &Cmd) -> String {
 fn exec_in(plan: &Plan, report: &mut Reporter, cmd: &Cmd, cwd: &Path) -> Result<i32> {
     report.log(command_line(plan, cmd));
     if plan.dry_run {
-        // Simulated, deterministic output; nothing is touched. The pause keeps
-        // the simulation in the ~20–30 s range so the whole screen is legible.
         report.log("(simulación) comando no ejecutado");
         thread::sleep(Duration::from_millis(500));
         return Ok(0);
     }
 
-    // `runner::run` has no working-directory support, so cd inside a shell.
     let wrapped = Cmd::new("sh")
         .arg("-c")
         .arg(format!(
@@ -1938,8 +1728,6 @@ fn exec_capture(
     Ok(code)
 }
 
-/// On an evaluation failure, points at the missing file (nix reports
-/// `path '…' does not exist`) and prints the installed repo's commit.
 fn report_eval_failure(plan: &Plan, report: &mut Reporter, repo: &Path, err: &str) {
     match missing_path_hint(err) {
         Some(path) => report.log(format!(
@@ -1960,7 +1748,6 @@ fn report_eval_failure(plan: &Plan, report: &mut Reporter, repo: &Path, err: &st
     }
 }
 
-/// Extracts the path from nix's `error: path '/nix/store/…' does not exist`.
 fn missing_path_hint(stderr: &str) -> Option<String> {
     for line in stderr.lines() {
         if !line.contains("does not exist") {
@@ -1984,21 +1771,14 @@ fn ensure_ok(code: i32, what: &str) -> Result<()> {
     }
 }
 
-/// Translates nix's `internal-json` log into clean lines plus a global build
-/// progress. Activity types: 103 CopyPaths, 104 Builds, 105 Build, 108
-/// Substitute. Only a `result` 105 of a Builds/CopyPaths activity is real
-/// progress (fields = [done, expected]); a download's `result` 105 is bytes.
 #[derive(Default)]
 struct NixLog {
     activities: std::collections::HashMap<u64, u64>,
 }
 
-/// [`NixLog::feed`]'s result: display lines (each with an error flag) plus the
-/// optional `(built, total)` progress.
 type NixLogOut = (Vec<(bool, String)>, Option<(u64, u64)>);
 
 impl NixLog {
-    /// Returns the display lines (each with an error flag) and the progress.
     fn feed(&mut self, line: &str) -> NixLogOut {
         let line = line.trim_end();
         let Some(json) = line.strip_prefix("@nix ") else {
@@ -2027,8 +1807,6 @@ impl NixLog {
                     108 => field(0).map(|p| {
                         let name = store_name(&p);
                         match field(1) {
-                            // From the ISO's own store to the target's: not a
-                            // download, just a local copy.
                             Some(src) if src.starts_with("local://") => {
                                 format!("copiando {name}")
                             }
@@ -2053,7 +1831,6 @@ impl NixLog {
                 (Vec::new(), None)
             }
             Some("msg") => {
-                // Levels: 0 error, 1 warn, 2 notice, 3 info; 4+ is noise.
                 let level = v.get("level").and_then(|l| l.as_u64()).unwrap_or(3);
                 if level > 3 {
                     return (Vec::new(), None);
@@ -2074,9 +1851,6 @@ impl NixLog {
     }
 }
 
-/// Translates the plain `building '…drv'` / `copying path '…'` lines nix still
-/// prints outside its JSON log format, so a hash or a `.drv` never reaches the
-/// screen. Returns `None` for anything else.
 fn translate_plain(line: &str) -> Option<String> {
     let (verb, rest) = if let Some(rest) = line.strip_prefix("building '") {
         ("compilando", rest)
@@ -2088,7 +1862,6 @@ fn translate_plain(line: &str) -> Option<String> {
     Some(format!("{verb} {name}"))
 }
 
-/// The `-name` part of a `/nix/store/<hash>-<name>` path.
 fn store_name(p: &str) -> String {
     let base = p.rsplit('/').next().unwrap_or(p);
     match base.split_once('-') {
@@ -2097,8 +1870,6 @@ fn store_name(p: &str) -> String {
     }
 }
 
-/// The host of a substitution cache URL: `https://cache.nixos.org/x` →
-/// `cache.nixos.org`. A value without a scheme is returned unchanged.
 fn cache_host(url: &str) -> String {
     let rest = url
         .strip_prefix("https://")
@@ -2107,7 +1878,6 @@ fn cache_host(url: &str) -> String {
     rest.split('/').next().unwrap_or(rest).to_string()
 }
 
-/// Removes ANSI CSI escape sequences (`\x1b[…m` and friends).
 fn strip_ansi(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
@@ -2142,8 +1912,6 @@ fn shell_command(cmd: &Cmd) -> String {
     parts.join(" ")
 }
 
-/// Evaluates the repo in a temporary copy to catch configuration errors before
-/// the install starts, without touching the real target.
 pub fn check_source(repo: &Path) -> Result<(), String> {
     let tmp = std::env::temp_dir().join("keel-eval");
     let _ = fs::remove_dir_all(&tmp);
@@ -2153,8 +1921,6 @@ pub fn check_source(repo: &Path) -> Result<(), String> {
         .arg(&tmp)
         .status();
 
-    // Sin cuentas (KEEL_ROOT=tmp) el config no declara usuario, así que no
-    // hace falta un hash marcador: la evaluación solo valida la estructura.
     ensure_git_tree(&tmp);
 
     let expr = format!(
@@ -2182,7 +1948,6 @@ pub fn check_source(repo: &Path) -> Result<(), String> {
     }
 }
 
-/// Copies `src` into `dest` (which must not exist) with `cp -a`.
 fn copy_tree(src: &Path, dest: &Path) -> Result<(), std::io::Error> {
     let status = std::process::Command::new("cp")
         .arg("-a")
@@ -2196,7 +1961,6 @@ fn copy_tree(src: &Path, dest: &Path) -> Result<(), std::io::Error> {
     }
 }
 
-/// Gives the temporary copy a git tree, since a flake evaluation needs one.
 fn ensure_git_tree(repo: &Path) {
     if repo.join(".git").exists() {
         return;
@@ -2224,7 +1988,6 @@ fn ensure_git_tree(repo: &Path) {
     ]);
 }
 
-/// The last `error: …` line of nix's stderr, or its last non-empty line.
 fn last_error_line(stderr: &str) -> String {
     let lines: Vec<&str> = stderr.lines().filter(|l| !l.trim().is_empty()).collect();
     lines
@@ -2236,7 +1999,6 @@ fn last_error_line(stderr: &str) -> String {
         .unwrap_or_else(|| "la configuración no evalúa".to_string())
 }
 
-// -- misc ---------------------------------------------------------------------
 fn set_mode_dir(path: &Path, mode: u32) -> Result<()> {
     let mut perms = fs::metadata(path)?.permissions();
     perms.set_mode(mode);
@@ -2261,7 +2023,6 @@ fn copy_log_to_persist(plan: &Plan, report: &mut Reporter) {
 }
 
 fn simulate_build(report: &mut Reporter) {
-    // Real package names, so the demo screen never shows a hash or a `.drv`.
     const PKGS: [&str; 8] = [
         "glibc-2.42",
         "gcc-15.2.0",

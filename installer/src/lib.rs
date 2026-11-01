@@ -1,5 +1,3 @@
-//! Library for the nixdots installer (`nixdots-installer`).
-
 pub mod app;
 pub mod detect;
 pub mod disk;
@@ -11,6 +9,4 @@ pub mod screens;
 pub mod theme;
 pub mod widgets;
 
-// Shared, TUI-free logic lives in nixcore (also used by the first-boot
-// assistant); re-exported so `crate::settings`/`runner`/`crypto` keep resolving.
 pub use nixcore::{crypto, runner, settings};

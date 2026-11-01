@@ -1,25 +1,15 @@
-/* Psamathe — asistente de primer arranque. Solo lo propio de esta pantalla;
-   todo lo demás sale de ds/neptunia/tokens.css y components/bundle.css. */
-
-/* Saludo: cursiva de trazo continuo (Dancing Script 600). Cada 2,6 s el
-   saludo, el texto del botón y la ayuda se funden al siguiente idioma; el
-   botón en sí no se mueve ni se desvanece. */
+/* Styles specific to the first-boot screen. */
 .fb-greet { transition: opacity 450ms ease, transform 450ms ease; }
 
-/* Botón del saludo: el botón principal de Neptunia (np-btn np-btn--lg
-   np-btn--primary: accent, texto blanco, 38 px, radius-md). Ancho fijo para
-   que no cambie de tamaño con cada idioma; solo su texto se funde. */
 .fb-cta { width: 180px; gap: 8px; box-shadow: 0 4px 16px rgba(13, 18, 25, 0.25); }
 .fb-cta:focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; }
 
 @keyframes fb-spin { to { transform: rotate(360deg); } }
 @keyframes fb-fill { from { width: 4%; } to { width: 100%; } }
 
-/* Capas apiladas: cada pantalla o paso es una capa que entra y sale. */
 .fb-layer { position: absolute; inset: 0; display: flex; transition: opacity var(--dur-base) ease, transform var(--dur-base) ease; }
 .fb-screen { transition: opacity var(--dur-slow) ease, transform var(--dur-slow) ease; }
 
-/* Diálogo: bg-window en claro; bg-raised con línea interior en oscuro. */
 .fb-dialog { position: relative; width: 560px; box-sizing: border-box; border-radius: var(--radius-xl); background: var(--bg-window);
   box-shadow: var(--shadow-window); padding: 36px 48px 28px; display: flex; flex-direction: column; gap: 20px;
   transition: background var(--dur-base) ease; }
@@ -27,7 +17,6 @@
 .fb-dialog::after { content: ""; position: absolute; inset: 1px; border-radius: calc(var(--radius-xl) - 1px);
   box-shadow: inset 0 0 0 1px var(--window-inner); pointer-events: none; }
 
-/* Cabecera de cada paso: icono → título → descripción. */
 .fb-icon { width: 44px; height: 44px; border-radius: var(--radius-md); background: var(--accent-soft); color: var(--accent-strong);
   display: grid; place-items: center; flex: none; }
 .fb-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -38,7 +27,6 @@
 .fb-list .np-listrow.is-selected { color: var(--on-accent); }
 .fb-check { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
-/* Saludo y pantallas completas sobre el wallpaper. */
 .fb-go { width: 52px; height: 52px; border-radius: var(--radius-pill); display: grid; place-items: center; padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.45); background: rgba(13, 18, 25, 0.22); color: #ffffff; cursor: default;
   transition: background var(--dur-fast); }
@@ -46,7 +34,6 @@
 .fb-glass { box-sizing: border-box; border-radius: var(--radius-lg); background: rgba(13, 18, 25, 0.36);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16); }
 
-/* Apariencia. */
 .fb-mode { appearance: none; border: 0; background: transparent; padding: 4px; border-radius: var(--radius-lg); display: flex; flex-direction: column;
   align-items: center; gap: 8px; font: 500 13px/18px var(--font-sans); color: var(--ink); cursor: default; }
 .fb-swatch { appearance: none; border: 0; padding: 0; width: 24px; height: 24px; border-radius: var(--radius-pill); cursor: default; }

@@ -1,7 +1,4 @@
-//! Shared rendering and key handling for the searchable list pickers used by
-//! the timezone and locale screens. The search field is always visible with a
-//! placeholder; the list starts at the top with nothing preselected.
-
+//! Shared drawing and key handling for searchable list pickers.
 use crate::app::Picker;
 use crate::theme::Palette;
 use crate::widgets;
@@ -15,10 +12,6 @@ use tui_input::backend::crossterm::EventHandler;
 
 pub const ROWS: usize = 8;
 
-/// A centered, searchable list with centered names, an accent capsule across
-/// the whole row on the chosen entry and a `█`/`│` scrollbar. `suggested`
-/// highlights a row without selecting it. The box border is drawn by the
-/// screen's `StepLayout`; the list fills all of `area`.
 pub fn draw_centered(
     f: &mut Frame,
     palette: &Palette,
@@ -41,8 +34,6 @@ pub fn draw_centered(
 
     let rows = inner.height as usize;
     let total = picker.filtered.len();
-    // With nothing chosen, scroll to the suggested row so it is visible (it
-    // stays unselected).
     let anchor = picker
         .selected
         .or_else(|| suggested.and_then(|s| picker.filtered.iter().position(|&i| i == s)));
@@ -91,7 +82,6 @@ pub fn draw_centered(
     scrollbar(f, palette, inner, start, rows, total);
 }
 
-/// The timezone list: the zone on the left, its local time on the right.
 pub fn draw(f: &mut Frame, palette: &Palette, area: Rect, picker: &Picker, focused: bool) {
     let block = Block::default()
         .borders(Borders::ALL)
@@ -164,7 +154,6 @@ pub fn draw(f: &mut Frame, palette: &Palette, area: Rect, picker: &Picker, focus
     scrollbar(f, palette, inner, start, rows, total);
 }
 
-/// A `█`/`│` scrollbar on the last column of `area`, full height.
 fn scrollbar(
     f: &mut Frame,
     palette: &Palette,
@@ -198,7 +187,6 @@ fn scrollbar(
     }
 }
 
-/// Renders the `Buscar` box into `area` (four rows).
 pub fn search_box(
     f: &mut Frame,
     palette: &Palette,
@@ -223,8 +211,6 @@ pub fn search_box(
     f.render_widget(Paragraph::new(search), area);
 }
 
-/// Renders the search box (a TextField) at the top of `area` and returns the
-/// rectangle left for the list below it.
 pub fn draw_search(
     f: &mut Frame,
     palette: &Palette,
@@ -243,7 +229,6 @@ pub fn draw_search(
     chunks[2]
 }
 
-/// Updates `list_focus`: typing focuses the search, arrows the list.
 pub fn update_list_focus(app: &mut crate::app::App, key: &KeyEvent) {
     if super::is_edit_key(key) {
         app.list_focus = false;
@@ -260,7 +245,6 @@ pub fn update_list_focus(app: &mut crate::app::App, key: &KeyEvent) {
     }
 }
 
-/// Handles typing, filtering and list navigation. Returns true if consumed.
 pub fn key(picker: &mut Picker, key: KeyEvent) -> bool {
     match key.code {
         KeyCode::Up => {

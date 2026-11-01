@@ -1,10 +1,4 @@
-//! The NixOS logo, embedded from the ANSI logo shipped next to the crate and converted to
-//! ratatui `Text`.
-//!
-//! The art uses the two official NixOS blues (#5277c3 dark, #7fb7ff light) —
-//! the only colors outside the neptunia palette. On the Linux console they are
-//! mapped to the palette slots we reprogram (c4 / c12).
-
+//! NixOS logo converted to ratatui text.
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 
@@ -17,7 +11,6 @@ fn blue(rgb: (u8, u8, u8), console: bool) -> Color {
     if !console {
         return Color::Rgb(rgb.0, rgb.1, rgb.2);
     }
-    // On the Linux console use the reprogrammed palette slots.
     if rgb == DARK_RGB {
         Color::Indexed(4)
     } else {
@@ -25,7 +18,6 @@ fn blue(rgb: (u8, u8, u8), console: bool) -> Color {
     }
 }
 
-/// Parses the embedded ANSI art into 16 terminal lines of `Span`s.
 pub fn nixos_logo(console: bool) -> Vec<Line<'static>> {
     let dark = blue(DARK_RGB, console);
     let light = blue(LIGHT_RGB, console);
@@ -76,7 +68,6 @@ fn flush(spans: &mut Vec<Span<'static>>, run: &mut String, style: Style) {
 }
 
 fn apply_sgr(seq: &str, fg: &mut Color, bg: &mut Color, dark: Color, light: Color) {
-    // `seq` still carries the leading '[' of the CSI (ESC '[' ... 'm').
     let seq = seq.strip_prefix('[').unwrap_or(seq);
     let params: Vec<&str> = seq.split(';').collect();
     match params.as_slice() {

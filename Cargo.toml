@@ -2,14 +2,9 @@
 resolver = "2"
 members = ["installer", "kits/nixcore", "system/services/crewd", "system/services/home-init", "welcome/cli", "kits/localekit", "welcome/gui"]
 
-# Nix compila con `release`: se queda en lo justo para no cambiar el
-# comportamiento (los binarios abortan en vez de desenrollar).
 [profile.release]
 panic = "abort"
 
-# Perfil de las releases de GitHub (`--profile dist`): pequeño y autocontenido,
-# aunque tarde más en compilar. `strip` y `opt-level = "z"` son solo para esos
-# binarios; Nix no los usa.
 [profile.dist]
 inherits = "release"
 opt-level = "z"

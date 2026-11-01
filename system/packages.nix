@@ -1,7 +1,6 @@
 { pkgs, mkRustTool }:
 
 {
-  # Servicio D-Bus de gestión de cuentas.
   crewd = mkRustTool {
     pname = "nixdots-userd";
     subdir = "system/services/crewd";
@@ -20,9 +19,7 @@
     ];
   };
 
-  # Safe wrapper around nixos-rebuild (system/packages/nixdots-rebuild.*).
   nixdots-rebuild = pkgs.callPackage ./packages/nixdots-rebuild.nix { };
 
-  # The macOS XNU console font, as PSF2 (kernel and kmscon).
   xnu-console-font = pkgs.callPackage ./packages/xnu-console-font.nix { };
 }

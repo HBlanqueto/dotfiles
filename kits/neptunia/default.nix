@@ -1,16 +1,4 @@
-# Neptunia: la única fuente de tema y diseño de Keel.
-#
-# tokens.json y components.json son los datos (neutros, sin framework). Este
-# archivo los traduce a cada formato y compone también la paleta de terminal
-# (colors/filecolors/vscode). Usa únicamente builtins, así que se evalúa sin
-# nixpkgs:
-#
-#   nix eval --raw -f kits/neptunia slint > generated/neptunia.slint
-#   nix eval --raw -f kits/neptunia css   > generated/neptunia.css
-#   nix eval --raw -f kits/neptunia qml   > generated/Neptunia.qml
-#
-# Desde un módulo: (import ./kits/neptunia).slint, o `files pkgs` para una
-# derivación con los archivos generados.
+# Neptunia design system: translates tokens into each output format.
 let
   colors = import ./neptunia.nix;
   tokens = builtins.fromJSON (builtins.readFile ./tokens.json);
@@ -36,7 +24,6 @@ let
   ident = s: builtins.replaceStrings [ "-" ] [ "_" ] s;
   firstFamily = f: let parts = builtins.split "," f; in
     builtins.replaceStrings [ "\"" ] [ "" ] (builtins.head parts);
-  # QML expects #aarrggbb; the JSON/slint/css use #rrggbbaa.
   qmlColor = c:
     if builtins.stringLength c == 9
     then "#${builtins.substring 7 2 c}${builtins.substring 1 6 c}"
@@ -54,7 +41,6 @@ let
         clean = builtins.filter builtins.isString parts;
     in builtins.foldl' (acc: k: acc.${k}) tokens.shadow.layers clean;
 
-  # Medidas numéricas de components.json, aplanadas: switch.small.width → switch-small-width
   flatten =
     prefix: set:
     builtins.concatLists (
@@ -75,7 +61,6 @@ let
               duration = false;
             }
           ]
-        # "radius.sm", "duration.fast"… se resuelven contra tokens.json
         else if ref != null then
           [
             {
@@ -309,8 +294,6 @@ rec {
   filecolors = import ./filecolors.nix;
   vscode = import ./vscode.nix { inherit colors; };
 
-  # Derivación con los archivos generados, para home-manager o un paquete:
-  #   xdg.configFile."neptunia".source = (import ./kits/neptunia).files pkgs;
   files =
     pkgs:
     pkgs.runCommand "neptunia-design" { } ''

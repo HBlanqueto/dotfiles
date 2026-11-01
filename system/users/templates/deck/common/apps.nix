@@ -10,12 +10,9 @@
 let
   yaziConfig = import ./config/yazi { inherit theme; };
 
-  # rgba() a partir del rgb de la paleta (misma fuente que la consola).
   palette = import ../../../../../kits/neptunia/palette.nix { inherit theme; };
   rgba = hex: alpha: "rgba(${palette.rgb hex},${alpha})";
 
-  # starship sin iconos (preset oficial `plain-text-symbols`) para la TTY, cuya
-  # fuente XNU solo tiene los 256 glifos Latin-1.
   starshipPlain = pkgs.runCommand "starship-plain-text-symbols.toml" { } ''
     ${pkgs.starship}/bin/starship preset plain-text-symbols -o $out
   '';
@@ -153,7 +150,6 @@ in
     packages =
       with pkgs;
       [
-        # Herramientas de terminal que antes vivían en systemPackages.
         fastfetch
         eza
         luajit
@@ -175,21 +171,14 @@ in
         quickemu
       ]
       ++ lib.optionals pkgs.stdenv.hostPlatform.isx86_64 [
-        # OnlyOffice ships no aarch64 build in nixpkgs.
         onlyoffice-desktopeditors
       ]
       ++ lib.optional (prefs.a11y.screenReader or false) pkgs.orca;
   };
 
   programs = {
-    # Brave is only published for x86_64-linux by the brave-previews input;
-    # the aarch64 VM uses the shared Firefox above instead.
     brave = lib.mkIf pkgs.stdenv.hostPlatform.isx86_64 {
       enable = true;
-      # The drishal brave-origin-beta wrapper drops the ozone hint (its
-      # nested ${NIXOS_OZONE_WL:+${WAYLAND_DISPLAY:+...}} expansion is
-      # stripped by makeShellWrapper), so Brave would fall back to
-      # XWayland. Force native Wayland here.
       package = pkgs.brave-origin-beta.overrideAttrs (old: {
         preFixup =
           (old.preFixup or "") + "\ngappsWrapperArgs+=(\"--add-flags\" \"--ozone-platform-hint=auto\")\n";
@@ -237,8 +226,6 @@ in
       inherit (yaziConfig) settings theme;
     };
 
-    # mpv exposes MPRIS (and mpris:artUrl from embedded/folder art) only
-    # through the mpv-mpris plugin.
     mpv = {
       enable = true;
       scripts = [ pkgs.mpvScripts.mpris ];
@@ -250,9 +237,6 @@ in
         set -g fish_greeting
         set -g fish_color_command --bold green
 
-        # La TTY usa la XNU (solo Latin-1): el prompt va sin iconos,
-        # pero eza decide con --icons=auto (no dibuja los que no
-        # existen en la fuente).
         if test "$XDG_SESSION_TYPE" = tty
             set -gx STARSHIP_CONFIG ${starshipPlain}
         end
@@ -264,7 +248,6 @@ in
         alias lt "ls --tree"
       '';
       shellAliases = {
-        # Home independiente (~/.config/home-manager).
         home-update = "nix flake update --flake $HOME/.config/home-manager keel && home-manager switch -b backup --flake $HOME/.config/home-manager#default";
 
         g = "git";

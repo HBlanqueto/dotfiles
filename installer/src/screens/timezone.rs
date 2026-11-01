@@ -54,8 +54,6 @@ pub fn commands(app: &App) -> Vec<String> {
     )]
 }
 
-/// Builds the timezone list with each zone's current local time; las zonas
-/// vienen de la tabla compartida (`localekit`).
 pub fn load_items() -> Vec<PickItem> {
     let zones = localekit::timezone::zones();
     let times = zone_times(&zones);

@@ -1,14 +1,9 @@
-//! Ejecuta el CLI `nixdots-setup apply`, con la contraseña por stdin.
-//!
-//! Fase 4a: siempre `--dry-run`. Transmite la salida línea a línea (para el
-//! registro y para deducir la fase) y avisa al terminar.
-
+//! Runs the `nixdots-setup apply` CLI and streams its output.
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 
-/// Escribe el JSON en un directorio temporal único (0700) con el archivo 0600.
 fn write_json(json: &str) -> std::io::Result<PathBuf> {
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -28,8 +23,6 @@ fn set_mode(path: &std::path::Path, mode: u32) -> std::io::Result<()> {
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
 }
 
-/// El binario del CLI: hermano del propio ejecutable (cargo run / paquete) o,
-/// si no, `nixdots-setup` del PATH.
 fn cli() -> std::ffi::OsString {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
@@ -54,8 +47,6 @@ fn pump<R: Read + Send + 'static>(
     })
 }
 
-/// Lanza `nixdots-setup apply <json>`; llama a `on_line` por cada línea (desde
-/// hilos de lectura) y a `on_done` con el éxito al terminar.
 pub fn start<F, D>(
     json: &str,
     repo: &str,
@@ -71,7 +62,6 @@ where
     let path = write_json(json).map_err(|e| format!("no se pudo escribir los datos: {e}"))?;
 
     let mut cmd = Command::new(cli());
-    // Sin color en la salida (además la GUI filtra secuencias ANSI).
     cmd.env("NO_COLOR", "1");
     cmd.arg("apply").arg(&path);
     if !repo.is_empty() {
@@ -87,7 +77,6 @@ where
         .spawn()
         .map_err(|e| format!("no se pudo ejecutar el CLI: {e}"))?;
 
-    // Contraseña por stdin y cierre inmediato (el CLI lee hasta EOF).
     {
         let mut stdin = child.stdin.take().ok_or("sin stdin del CLI")?;
         stdin

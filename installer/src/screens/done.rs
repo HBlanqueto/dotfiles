@@ -9,7 +9,6 @@ use ratatui::Frame;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-/// The Salir / Reiniciar capsule row, centered, with the first-boot notice.
 pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     let y = area.y + area.height / 2;
     if y > area.y {
@@ -40,7 +39,6 @@ pub fn buttons(_app: &App) -> Vec<(Btn, Action)> {
     ]
 }
 
-/// Copies the install log into /mnt/persist when that mount exists.
 fn copy_log(app: &App) {
     if app.dry_run {
         return;
@@ -61,7 +59,6 @@ fn umount() {
         .status();
 }
 
-/// Reiniciar: copy the log, unmount and reboot (simulation just closes).
 pub fn restart(app: &mut App) {
     copy_log(app);
     if app.dry_run {
@@ -73,7 +70,6 @@ pub fn restart(app: &mut App) {
     app.should_quit = true;
 }
 
-/// Salir: copy the log, unmount and drop to the shell without rebooting.
 pub fn salir(app: &mut App) {
     copy_log(app);
     if !app.dry_run {

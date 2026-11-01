@@ -1,7 +1,4 @@
-# Optional peripherals and roles, one switch per feature. Defaults come from
-# data.machine.extras (machine.toml); a host may still override any of them.
-# Everything is off when the data is missing (CI, pure evaluation), so the
-# existing hosts are unaffected.
+# Optional peripherals and roles, one switch per feature.
 {
   config,
   lib,
@@ -46,15 +43,12 @@ in
 
     keel.chimeCard = lib.mkDefault (extraData.chimeCard or 1);
 
-    # Epson L3250: printing plus the in-tree sane backend. State under
-    # /var/lib/cups survives the impermanence rollback.
     services = {
       printing = lib.mkIf cfg.epson {
         enable = true;
         drivers = [ pkgs.epson-escpr ];
       };
       trezord.enable = cfg.trezor;
-      # udev rule (brightnessctl) for the panel backlight hotkeys.
       udev.packages = lib.mkIf cfg.brightnessctl [ pkgs.brightnessctl ];
     };
     hardware.sane = lib.mkIf cfg.epson {
@@ -62,8 +56,6 @@ in
       extraBackends = [ pkgs.epsonscan2 ];
     };
 
-    # El chime suena al arrancar; usa el wav del store, sin depender de
-    # ninguna cuenta ni del home-manager de un usuario.
     systemd.services.chime = lib.mkIf cfg.chime {
       description = "Boot up";
       wants = [ "sound.target" ];
@@ -85,7 +77,6 @@ in
     virtualisation.libvirtd.enable = cfg.libvirt;
     programs.virt-manager.enable = cfg.libvirt;
     networking.firewall.trustedInterfaces = lib.mkIf cfg.libvirt [ "virbr0" ];
-    # libvirtd se añade a todas las cuentas admin, no a una en concreto.
     users.users = lib.mapAttrs (
       _: u:
       lib.mkIf (cfg.libvirt && (u.admin or false)) {
@@ -96,9 +87,6 @@ in
     environment.systemPackages =
       lib.optionals cfg.brightnessctl [ pkgs.brightnessctl ]
       ++ lib.optionals cfg.remoteAccess [
-        # Clientes de escritorio: Remmina (VNC) y RustDesk. El otro
-        # extremo (un Mac mini sin Nix) se configura a mano, ver
-        # .github/docs/system.md.
         pkgs.remmina
         pkgs.rustdesk-flutter
       ];

@@ -1,7 +1,6 @@
 { pkgs, theme, ... }:
 
 let
-  # Mismas claves que la tabla Lua esperaba: 4 nombres fijos + c0..c15.
   themeKeys = [
     "dbg"
     "lbg"

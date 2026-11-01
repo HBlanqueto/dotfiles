@@ -1,6 +1,6 @@
 rec {
-  dbg = "0d1219"; # Darker BG
-  lbg = "212b38"; # Lighter BG
+  dbg = "0d1219";
+  lbg = "212b38";
 
   fg = "adbac7";
   bg = "13171d";
@@ -33,10 +33,8 @@ rec {
   inactiveBorderColor = muted;
   highlightColor = primary;
 
-  # Tonos de interfaz (no son colores ANSI): los usan el instalador y el
-  # toolkit Neptunia para estados que la paleta de 16 no cubre.
-  uiDim = "1c2430"; # superficie elevada / fondo atenuado tras un diálogo
-  uiRule = "2a3442"; # subrayado de un campo de texto
-  uiDisabled = "2f3a49"; # control desactivado
-  logoLight = "7fb7ff"; # azul claro oficial del logo de NixOS
+  uiDim = "1c2430";
+  uiRule = "2a3442";
+  uiDisabled = "2f3a49";
+  logoLight = "7fb7ff";
 }

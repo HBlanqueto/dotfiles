@@ -1,7 +1,4 @@
-//! One module per screen. Each exposes `draw`, `key`, `height`, `commands` and
-//! `buttons`. `key` returns whether it consumed the event (text fields, list
-//! navigation, search); otherwise the app handles globals.
-
+//! Installer screens; each exposes `draw`, `key`, `height`, `commands` and `buttons`.
 pub mod disk;
 pub mod done;
 pub mod encryption;
@@ -17,7 +14,6 @@ pub mod timezone;
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-/// True when the key should be delivered to a text field.
 pub fn is_edit_key(key: &KeyEvent) -> bool {
     !key.modifiers.contains(KeyModifiers::CONTROL)
         && !matches!(

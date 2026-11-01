@@ -8,13 +8,7 @@ build = "build.rs"
 nixcore = { path = "../../kits/nixcore" }
 localekit = { path = "../../kits/localekit" }
 serde_json = "1.0.154"
-# Desenfoque gaussiano del fondo una sola vez al arrancar (ver src/wallpaper.rs).
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
-# Slint, backend winit con los renderizadores femtovg y software.
-# OJO licencia: Slint es GPL-3.0-only o comercial; el flake declara gpl2Only.
-# GPLv2-only es incompatible con GPLv3, así que mientras se use Slint hay que
-# o bien seguir la licencia royalty-free/comercial de Slint, o subir nixdots a
-# GPLv3-compatible. Ver el comentario en flake.nix.
 slint = { version = "1.18.1", default-features = false, features = [
     "std",
     "backend-winit",

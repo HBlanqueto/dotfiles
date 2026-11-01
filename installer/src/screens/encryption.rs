@@ -1,10 +1,4 @@
-//! The Cifrado screen: choose the LUKS2 passphrase, the recovery key and the
-//! TPM unlock for the `System HD` partition.
-//!
-//! The recovery key is generated in memory ([`crate::crypto`]), shown once and
-//! enrolled during the install; it is never written to the disk, the log or the
-//! command panel.
-
+//! Encryption screen: LUKS passphrase, recovery key and TPM unlock.
 use crate::app::{Action, App, ENC_CONFIRM, ENC_NOTED, ENC_PASS, ENC_TPM};
 use crate::runner::{self, Cmd};
 use crate::widgets::{self, Btn};
@@ -23,7 +17,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let mut lines: Vec<Line> = Vec::new();
     let mut slots: Vec<(usize, u16)> = Vec::new();
 
-    // 1. The LUKS passphrase (always required).
     slots.push((ENC_PASS, lines.len() as u16));
     lines.extend(widgets::text_field(
         &app.palette,
@@ -73,7 +66,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     ));
     lines.push(Line::from(""));
 
-    // It is typed at boot, with the selected keyboard layout.
     let id = crate::keyboard::display(
         &app.settings.keyboard_layout,
         &app.settings.keyboard_variant,
@@ -92,7 +84,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     }
     lines.push(Line::from(""));
 
-    // 2. TPM auto-unlock (only when a TPM 2.0 is present).
     if app.enc.tpm_present {
         slots.push((ENC_TPM, lines.len() as u16));
         lines.push(widgets::checkbox(
@@ -108,7 +99,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from(""));
     }
 
-    // 4. The recovery key: read-only, in a yellow box.
     lines.push(Line::from(Span::styled(
         "clave de recuperación · anótala, no se volverá a mostrar",
         Style::default().fg(app.palette.muted),
@@ -147,7 +137,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     widgets::draw_scrollbar(f, &app.palette, area, lines.len(), scroll, area.height);
 }
 
-/// The strength bar note for the passphrase field: `████░░ buena`.
 fn strength_note(app: &App) -> Line<'static> {
     let (filled, label, color) = strength(app.enc.pass.value(), &app.palette);
     Line::from(vec![
@@ -163,7 +152,6 @@ fn strength_note(app: &App) -> Line<'static> {
     ])
 }
 
-/// The read-only recovery key in its yellow box, centered.
 fn key_box_lines(app: &App, width: u16) -> Vec<Line<'static>> {
     let key = app.enc.recovery.as_str();
     let w = (key.chars().count() as u16 + 4).min(width);
@@ -197,7 +185,6 @@ fn pass_has_non_ascii(app: &App) -> bool {
     !app.enc.pass.value().is_ascii()
 }
 
-/// (filled cells out of 12, label, colour) for the strength bar.
 fn strength(pass: &str, palette: &crate::theme::Palette) -> (usize, &'static str, Color) {
     let n = pass.chars().count();
     let mut classes = 0;
@@ -406,9 +393,6 @@ pub fn draw_usb(f: &mut Frame, app: &App, area: Rect) {
     );
 }
 
-/// Writes the recovery key to the chosen medium as
-/// `keel-recovery-<hostname>.txt`. The key is the only secret ever written
-/// to a removable disk; it never touches the target disk.
 fn save_recovery(app: &mut App) {
     let Some(medium) = app.enc.usb.get(app.enc.usb_index).cloned() else {
         return;

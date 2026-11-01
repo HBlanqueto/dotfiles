@@ -1,7 +1,4 @@
-//! Small shared widgets: buttons, editable fields, list rows and the dialog
-//! dimmer. Everything is a single text size, rounded borders, and marks focus
-//! with a cell background color.
-
+//! Small shared widgets: buttons, fields, list rows and dialog dimmer.
 use crate::theme::Palette;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
@@ -14,7 +11,6 @@ use ratatui::Frame;
 pub struct Btn {
     pub label: String,
     pub enabled: bool,
-    /// A destructive action ("Borrar todo"): red text while unfocused.
     pub danger: bool,
 }
 
@@ -36,35 +32,25 @@ impl Btn {
     }
 }
 
-/// The layout shared by every wizard screen: a progress bar, a bold title, a
-/// proportional rounded box, an optional line outside it, the buttons and the
-/// shortcut line. The box is the same size on every screen (60 % of the width,
-/// 64–90 columns; 50 % of the height, 14–24 rows) and never depends on the
-/// content, which scrolls inside it.
 pub struct StepLayout {
     pub progress: Rect,
     pub title: Rect,
     pub body: Rect,
-    /// Inside the border, after the 1-row / 3-column margin.
     pub content: Rect,
     pub note: Rect,
     pub buttons: Rect,
-    /// The always-present line under the buttons («falta: …»).
     pub faltante: Rect,
     pub shortcuts: Rect,
     pub commands: Rect,
 }
 
 impl StepLayout {
-    /// `note_h` reserves lines between the box and the buttons; `commands_h`
-    /// appends the `v` commands column.
     pub fn compute(area: Rect, note_h: u16, commands_h: u16) -> Self {
         let width = (area.width * 60 / 100).clamp(64, 90).min(area.width);
         let height = (area.height * 50 / 100).clamp(14, 24).min(area.height);
         let x = area.x + area.width.saturating_sub(width) / 2;
         let gap: u16 = 1;
         let shortcuts_h = u16::from(area.height >= 30);
-        // progress + title + body + buttons + faltante (always one row)
         let mut total = 1 + gap + 1 + gap + height + gap + 1 + gap + 1;
         if note_h > 0 {
             total += note_h + gap;
@@ -88,7 +74,6 @@ impl StepLayout {
             body.width.saturating_sub(2),
             body.height.saturating_sub(2),
         );
-        // 1-row and 3-column inner margin.
         let content = Rect::new(
             inside.x + 3,
             inside.y + 1,
@@ -124,14 +109,10 @@ impl StepLayout {
     }
 }
 
-/// The scroll offset that keeps the focused row range visible: 0 while it fits,
-/// otherwise just enough to bring its bottom to the last visible row.
 pub fn scroll_to_show(focus_y: u16, focus_h: u16, visible: u16) -> u16 {
     (focus_y + focus_h).saturating_sub(visible)
 }
 
-/// A `█`/`│` scrollbar in the right margin of `area`, drawn only when the
-/// content overflows.
 pub fn draw_scrollbar(
     f: &mut Frame,
     palette: &Palette,
@@ -166,11 +147,6 @@ pub fn draw_scrollbar(
     }
 }
 
-/// Dims the whole frame behind a dialog: every cell keeps its glyph but takes
-/// the muted foreground, loses the bold/underline weights and any background
-/// other than the app's base is darkened, so the screen (logo, text, buttons)
-/// is still legible underneath. Half-block glyphs get both halves in the same
-/// color so the logo stays uniform.
 pub fn dim_buffer(f: &mut Frame, palette: &Palette) {
     let area = f.area();
     let base = palette.reset;
@@ -182,8 +158,6 @@ pub fn dim_buffer(f: &mut Frame, palette: &Palette) {
                 cell.fg = palette.disabled;
                 cell.modifier.remove(Modifier::BOLD | Modifier::UNDERLINED);
                 if cell.bg != base {
-                    // A half block paints fg on one half and bg on the other;
-                    // use the dimmed foreground on both so it reads as one tone.
                     cell.bg = if half_block {
                         palette.disabled
                     } else {
@@ -195,11 +169,6 @@ pub fn dim_buffer(f: &mut Frame, palette: &Palette) {
     }
 }
 
-/// Dims the frame and draws a dialog centered over `over` (the screen's main
-/// box, so the title is never covered): a rounded accent border on the well
-/// background, a centered message and a button row. Height is fixed at seven
-/// rows (border, blank, text, blank, buttons, blank, border); the width is the
-/// message plus an 8-column margin, clamped to 44..=60 % of the terminal.
 pub fn draw_dialog(
     f: &mut Frame,
     over: Rect,
@@ -235,12 +204,6 @@ pub fn draw_dialog(
     buttons(f, Rect::new(inner.x, inner.y + 3, inner.width, 1));
 }
 
-/// A centered row of buttons, shared by every screen and dialog.
-///
-/// Every button is plain muted text by default; only the focused one becomes a
-/// capsule with the accent fill, white bold text (Nerd Font rounded ends on a
-/// real terminal, `‹ text ›` on the Linux console). A disabled button is dim
-/// and never takes the focus.
 pub struct ButtonRow<'a> {
     pub buttons: &'a [Btn],
     pub focus: usize,
@@ -283,15 +246,10 @@ impl Widget for ButtonRow<'_> {
     }
 }
 
-/// Appends one button's spans: just the label, no arrows or capsule ends.
-/// The focused button is marked only by its accent background.
 fn push_button(flat: &mut Vec<Span<'static>>, label: &str, text: Style) {
     flat.push(Span::styled(format!(" {label} "), text));
 }
 
-/// An editable text field drawn as a "cajita": a label row (with an optional
-/// right-aligned note), a rounded box whose value is inset by one column, and
-/// the box's bottom border. Returns the four lines to push into the box.
 #[allow(clippy::too_many_arguments)]
 pub fn text_field(
     palette: &Palette,
@@ -386,7 +344,6 @@ pub fn text_field(
     vec![label_line, top, value_line, bottom]
 }
 
-/// A tick box: `[ ]` / `[x]`, the mark in accent, the label in text.
 pub fn checkbox(palette: &Palette, checked: bool, label: &str, focused: bool) -> Line<'static> {
     let mark = if checked { "[x]" } else { "[ ]" };
     let mark_style = Style::default().fg(if checked {
@@ -405,8 +362,6 @@ pub fn checkbox(palette: &Palette, checked: bool, label: &str, focused: bool) ->
     ])
 }
 
-/// A selectable list row: an accent capsule with white bold text when selected,
-/// plain `#adbac7` otherwise. No focus marker. The trailing text is muted.
 pub fn list_row(
     palette: &Palette,
     selected: bool,

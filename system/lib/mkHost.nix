@@ -1,9 +1,4 @@
-# Builds the nixosConfiguration for the single generic profile.
-#
-# `system` comes from the caller (builtins.currentSystem with --impure, a fixed
-# value in pure evaluation), never hardcoded, so the flake can emit both an
-# x86_64-linux and an aarch64-linux configuration. `data` carries
-# /persist/keel/users/*.toml/machine.toml/facter.json; hostName sale de data.machine.
+# Builds the nixosConfiguration for the generic profile.
 { inputs, theme }:
 {
   system,
@@ -14,8 +9,6 @@
 inputs.nixpkgs.lib.nixosSystem {
   inherit system;
 
-  # Todo llega por `data` (más inputs/theme); no hay argumentos sueltos. El
-  # hostName por defecto cubre CI y evaluación pura (sin machine.toml).
   specialArgs = {
     inherit inputs theme;
     data = data // {
@@ -24,20 +17,13 @@ inputs.nixpkgs.lib.nixosSystem {
   };
 
   modules = [
-    # The generic profile has no per-host hardware file, so derive the
-    # platform from the system argument — unless facter already supplies it
-    # from the report (both are mkDefault, and a string would clash with
-    # facter's platform attrs).
     ({ config, lib, ... }: {
       nixpkgs.hostPlatform = lib.mkIf (!config.hardware.facter.enable) (lib.mkDefault system);
     })
     ../core
     ../core/desktop
     ../users
-    # Sin evaluación impura no se pueden leer las cuentas; abortar en vez de
-    # tratar el host como primer arranque (que borraría la cuenta). Las
-    # salidas puras de CI (requireImpure = false) se saltan la assertion: no
-    # activan la cuenta ni el cifrado, solo sirven para `nix flake check`.
+    # Without impure eval the accounts can't be read; abort instead of treating the host as first boot (that would wipe the account).
     (_: {
       assertions = [
         {

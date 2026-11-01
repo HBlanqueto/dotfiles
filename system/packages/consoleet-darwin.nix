@@ -9,8 +9,6 @@ stdenv.mkDerivation (finalAttrs: {
   pname = "consoleet-darwin";
   version = "20211008";
 
-  # La fuente de consola de macOS (Consoleet Darwin, inai.de) en dos pesos:
-  # normal y Smooth. El normal (consoleet_xnu.otf) es el que usa Plymouth.
   src = fetchurl {
     url = "https://inai.de/files/consoleet/consoleet-darwin-${finalAttrs.version}.tar.zst";
     hash = "sha256-OStyp7CfiXnxdhn4rYDQnySy+o1lLCRTm+ExTaJ+lz0=";

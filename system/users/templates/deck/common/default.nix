@@ -9,8 +9,6 @@
 
   home = {
     sessionVariables = {
-      # Brave is x86_64-only (the brave-previews input publishes no
-      # aarch64 output); fall back to the always-present Firefox on ARM.
       BROWSER =
         if pkgs.stdenv.hostPlatform.isx86_64 then
           "${config.programs.brave.package}/bin/brave-origin-beta"

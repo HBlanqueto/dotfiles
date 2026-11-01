@@ -2,9 +2,6 @@
 
     mkdir -p /btrfs_tmp
 
-    # The btrfs lives inside the LUKS container (when encrypted); by the time
-    # this runs systemd-cryptsetup has already opened it at /dev/mapper/cryptroot,
-    # so the label (stable across reinstall) is the right handle.
     mount -t btrfs -o subvolid=5 /dev/disk/by-label/nixos /btrfs_tmp
 
     if [ -e /btrfs_tmp/@rootfs ]; then
@@ -19,15 +16,8 @@
         [ -d "$snapshot" ] || continue
         [ "$(find "$snapshot" -maxdepth 0 -mtime +30)" ] || continue
 
-        # btrfs refuses to delete a subvolume containing immutable inodes
-        # (e.g. /var/empty from openssh), so clear the attribute first.
-        # This descends into nested subvolumes too, since they share the
-        # same block device.
         chattr -R -i "$snapshot" 2>/dev/null || true
 
-        # btrfs rejects deleting a subvolume that still contains children
-        # (systemd creates srv, var/tmp, var/lib/portables, ...), so remove
-        # every nested subvolume first (deepest last) and then the snapshot.
         btrfs subvolume list -o "$snapshot" | awk '{print $NF}' | sort -r \
           | while read -r path; do
               btrfs subvolume delete "/btrfs_tmp/$path" 2>/dev/null || true

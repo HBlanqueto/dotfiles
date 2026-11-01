@@ -1,4 +1,4 @@
-# Rellena estos valores; el resto del home sale de keel.homeModules.
+# Standalone home-manager template; fill in the values.
 _:
 
 {
@@ -8,7 +8,6 @@ _:
     stateVersion = "26.05";
   };
 
-  # Identidad de git (nombre y correo).
   keel.git.name = "TU NOMBRE";
   keel.git.email = "tu@correo";
 }

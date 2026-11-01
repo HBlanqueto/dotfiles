@@ -1,31 +1,16 @@
-//! Datos del sistema fuera del repo, en
-//! `${KEEL_ROOT}/persist/keel/machine.toml` (respaldo: `machine.json`).
-//!
-//! Es el archivo del sistema (hostName, cifrado, Secure Boot, extras) más los
-//! campos de sistema que elige el asistente (prettyHostName, defaultLocale,
-//! region, timeZone, timeZoneAuto, keyboardLayout/Variant, autoLoginUser). El
-//! instalador y el asistente escriben ambos; gana el último en escribir.
-//!
-//! Nunca se deserializa a un struct: se fusiona sobre el documento TOML para
-//! conservar comentarios, orden y cualquier clave que no gestionemos.
-
+//! Machine data stored outside the repo (`machine.toml`).
 use crate::store;
 use color_eyre::eyre::Result;
 use std::path::{Path, PathBuf};
 
-/// `${KEEL_ROOT}/persist/keel/machine.toml`.
 pub fn path() -> PathBuf {
     crate::paths::persist().join("machine.toml")
 }
 
-/// Fusiona `fields` (cambiando solo esas claves) sobre el `machine.toml` que
-/// haya en [`path`]. Un valor `null` elimina la clave.
 pub fn merge_fields(fields: serde_json::Map<String, serde_json::Value>) -> Result<()> {
     merge_fields_at(&path(), fields)
 }
 
-/// Igual que [`merge_fields`] pero sobre una ruta concreta (el instalador
-/// escribe en el destino, no en `${KEEL_ROOT}`).
 pub fn merge_fields_at(
     path: &Path,
     fields: serde_json::Map<String, serde_json::Value>,

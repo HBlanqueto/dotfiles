@@ -1,20 +1,16 @@
-//! Idiomas: los locales UTF-8 de glibc, con su nombre en su propio idioma.
-
+//! Glibc UTF-8 locales with names in their own language.
 use std::collections::HashSet;
 
-/// la tabla `SUPPORTED` de glibc, embebido por el paquete (`KEEL_LOCALES`).
 const SUPPORTED: &str = include_str!(env!("KEEL_LOCALES"));
 
 include!(concat!(env!("OUT_DIR"), "/locale_names.rs"));
 
-/// Un idioma: código (`es_MX.UTF-8`) y nombre para mostrar (`Español (México)`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Locale {
     pub code: String,
     pub name: String,
 }
 
-/// Todos los locales UTF-8, ordenados por nombre y sin nombres duplicados.
 pub fn all() -> Vec<Locale> {
     let mut codes = parse_supported(SUPPORTED);
     codes.sort();
@@ -39,13 +35,10 @@ pub fn all() -> Vec<Locale> {
     items
 }
 
-/// El nombre del locale en su propio idioma, `es_MX.UTF-8` → `Español (México)`.
 pub fn display(code: &str) -> String {
     display_name(code)
 }
 
-/// Turns entries like `en_US.UTF-8/UTF-8` (and `ca_ER/UTF-8`) into locale
-/// codes, keeping only the UTF-8 ones.
 fn parse_supported(text: &str) -> Vec<String> {
     let mut codes = Vec::new();
     for token in text.split_whitespace() {
@@ -76,7 +69,6 @@ fn display_name(code: &str) -> String {
     code.to_string()
 }
 
-/// «Español (Bolivia)» from the locale's language and country names.
 fn compose(lang: &str, country: &str) -> Option<String> {
     match (lang.is_empty(), country.is_empty()) {
         (true, true) => None,

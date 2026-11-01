@@ -1,10 +1,4 @@
-# The precompiled GitHub-release binaries are linked with clang + lld: faster
-# than the default gcc + GNU ld and it needs no musl-tools (clang links against
-# the musl libc rustc already ships). Only these two musl targets are affected;
-# native and development builds are untouched.
-#
-# `target-cpu=x86-64-v2` is the safe "modern CPU" baseline (SSE4.2/POPCNT,
-# 2009+); the aarch64 baseline is left at rustc's default.
+# Cargo settings for the musl release targets.
 [target.x86_64-unknown-linux-musl]
 linker = "clang"
 rustflags = [

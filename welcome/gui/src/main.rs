@@ -1,9 +1,4 @@
-//! `nixdots-setup-gui` — asistente gráfico de primer arranque (Slint).
-//!
-//! No duplica lógica: recoge los datos del modelo de la UI, escribe un JSON
-//! temporal y ejecuta el CLI `nixdots-setup apply` (con `--dry-run` en `--sim`),
-//! mostrando su salida y deduciendo la fase.
-
+//! `nixdots-setup-gui`: graphical first-boot wizard (Slint).
 slint::include_modules!();
 
 use std::cell::Cell;
@@ -43,8 +38,6 @@ fn main() -> Result<(), slint::PlatformError> {
         return ui.run();
     }
 
-    // Lista de locales (todos los UTF-8 de glibc, nombre nativo + código) y
-    // selección inicial es_MX (o el primero).
     fill_locales(&ui, "");
     {
         let st = ui.global::<State>();
@@ -58,12 +51,8 @@ fn main() -> Result<(), slint::PlatformError> {
             st.set_lang_selected_name(l.name.clone().into());
         }
     }
-    // Lista de ciudades (filtrable) y ciudad inicial.
     fill_cities(&ui, "");
 
-    // Idioma por defecto del asistente: inglés. Se cambia en vivo al elegir
-    // idioma (las traducciones van embebidas desde i18n/*.po); si el idioma no
-    // tiene .po, se muestra la interfaz en inglés.
     let _ = slint::select_bundled_translation("en");
     ui.on_language_changed({
         let weak = ui.as_weak();
@@ -83,7 +72,6 @@ fn main() -> Result<(), slint::PlatformError> {
             }
         }
     });
-    // Buscador de idioma: filtra por nombre o código.
     ui.on_lang_search_changed({
         let weak = ui.as_weak();
         move |query| {
@@ -92,7 +80,6 @@ fn main() -> Result<(), slint::PlatformError> {
             }
         }
     });
-    // Buscador de ciudad: filtra por nombre o zona.
     ui.on_city_search_changed({
         let weak = ui.as_weak();
         move |query| {
@@ -102,16 +89,12 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     });
 
-    // Fondo desenfocado una vez (con caché en /run/psamathe).
     if let Some(image) = wallpaper::load() {
         ui.set_wallpaper(image);
     }
 
-    // Preferencia del sistema para la reducción de movimiento (GNOME).
     ui.global::<Theme>().set_reduced_motion(reduced_motion());
 
-    // «Reducir animaciones» en vivo: el saludo cambia el ritmo (palabra completa
-    // cada 2,5 s en lugar de máquina de escribir).
     let reduce = Arc::new(AtomicBool::new(
         ui.global::<Theme>().get_reduced_motion() || ui.global::<State>().get_a11y_reduce_motion(),
     ));
@@ -120,12 +103,8 @@ fn main() -> Result<(), slint::PlatformError> {
         move |on| reduce.store(on, Ordering::Relaxed)
     });
 
-    // Saludo del paso 0: máquina de escribir (letra a letra) y luego fundido.
     spawn_greeting(&ui, reduce);
 
-    // Esc cierra la ventana solo en simulación. En modo real el asistente lo
-    // relanza system/lib/data.nix al salir con 0 y reiniciaría el equipo, así que se
-    // ignora: para salir están «Apagar» y «Reiniciar».
     ui.on_quit_app({
         let weak = ui.as_weak();
         move || {
@@ -138,7 +117,6 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     });
 
-    // Validación del usuario con nixcore, y derivación desde el nombre.
     let user_edited = Rc::new(Cell::new(false));
     ui.on_username_edited({
         let user_edited = user_edited.clone();
@@ -171,7 +149,6 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     });
 
-    // Medidor de seguridad de la contraseña y coincidencia (paso Cuenta).
     ui.on_passwords_changed({
         let weak = ui.as_weak();
         move || {
@@ -185,7 +162,6 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     });
 
-    // Wi‑Fi: conecta con NetworkManager. En simulación sólo simula la espera.
     ui.on_wifi_connect({
         let weak = ui.as_weak();
         move || {
@@ -226,7 +202,6 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     });
 
-    // «Aplicar»: escribe el JSON y lanza el CLI, deduciendo la fase.
     ui.on_apply({
         let weak = ui.as_weak();
         let repo = repo.clone();
@@ -300,7 +275,6 @@ fn main() -> Result<(), slint::PlatformError> {
                         return;
                     }
                     st.set_prep_phase(4);
-                    // Fundido a negro y reinicio (en sim se vuelve al saludo).
                     let weak2 = weak.clone();
                     std::thread::spawn(move || {
                         std::thread::sleep(std::time::Duration::from_millis(1500));
@@ -348,7 +322,6 @@ fn main() -> Result<(), slint::PlatformError> {
     ui.run()
 }
 
-/// Quita secuencias ANSI (`ESC [ ... letra`) para mostrar el log limpio.
 fn strip_ansi(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
@@ -367,7 +340,6 @@ fn strip_ansi(s: &str) -> String {
     out
 }
 
-/// Aplica un cambio al `State` desde otro hilo.
 fn set_state(weak: &slint::Weak<AppWindow>, f: impl FnOnce(State) + Send + 'static) {
     let weak = weak.clone();
     let _ = slint::invoke_from_event_loop(move || {
@@ -377,10 +349,6 @@ fn set_state(weak: &slint::Weak<AppWindow>, f: impl FnOnce(State) + Send + 'stat
     });
 }
 
-/// Máquina de escribir del saludo: escribe cada palabra letra a letra (una cada
-/// 110 ms, contando caracteres Unicode, no bytes) y luego la funde 450 ms antes
-/// de pasar a la siguiente. Con «Reducir animaciones» muestra la palabra entera
-/// cada 2,5 s.
 fn spawn_greeting(ui: &AppWindow, reduce: Arc<AtomicBool>) {
     let greets = ui.global::<State>().get_greets();
     let words: Vec<String> = (0..greets.row_count())
@@ -396,12 +364,7 @@ fn spawn_greeting(ui: &AppWindow, reduce: Arc<AtomicBool>) {
     }
     let weak = ui.as_weak();
     std::thread::spawn(move || {
-        // Deja arrancar el bucle de eventos antes del primer invoke.
         std::thread::sleep(std::time::Duration::from_millis(300));
-        // Presentación «Welcome to NixOS» (siempre en inglés): funde de entrada,
-        // se queda ~2 s y funde; luego empieza la máquina de escribir. El
-        // upgrade del Weak va dentro de `set_state` (en el hilo del bucle de
-        // eventos): desde otro hilo siempre devolvería None.
         set_state(&weak, |st| st.set_intro_op(1.0));
         std::thread::sleep(std::time::Duration::from_millis(2000));
         set_state(&weak, |st| st.set_intro_op(0.0));
@@ -439,21 +402,18 @@ fn spawn_greeting(ui: &AppWindow, reduce: Arc<AtomicBool>) {
             }
             std::thread::sleep(std::time::Duration::from_millis(1800));
             set_state(&weak, |st| st.set_g_shown(false));
-            // 450 ms de fundido + 50 ms antes de la siguiente palabra.
             std::thread::sleep(std::time::Duration::from_millis(500));
             i = (i + 1) % n;
         }
     });
 }
 
-/// Construye el JSON que espera `nixdots-setup apply`.
 fn build_json(st: &State, theme: &Theme, tokens: &Tokens) -> String {
     let mut map = serde_json::Map::new();
     map.insert("fullName".into(), st.get_full_name().to_string().into());
     map.insert("username".into(), st.get_username().to_string().into());
     let locale = st.get_lang_selected().to_string();
     map.insert("locale".into(), locale.clone().into());
-    // Región y formatos = mismo locale elegido (no hay paso aparte).
     map.insert("region".into(), locale.into());
     map.insert(
         "keyboardLayout".into(),
@@ -462,7 +422,6 @@ fn build_json(st: &State, theme: &Theme, tokens: &Tokens) -> String {
     map.insert("keyboardVariant".into(), "".into());
     map.insert("timeZone".into(), st.get_city_selected().to_string().into());
     map.insert("timeZoneAuto".into(), st.get_tz_auto().into());
-    // GNOME solo distingue claro/oscuro; «dark-tint» del asistente es oscuro.
     let scheme = if tokens.get_theme() == "light" {
         "light"
     } else {
@@ -473,7 +432,6 @@ fn build_json(st: &State, theme: &Theme, tokens: &Tokens) -> String {
         "accentColor".into(),
         theme.get_accent_id().to_string().into(),
     );
-    // Color del avatar (variante A: el acento; el asistente no ofrece foto).
     map.insert(
         "avatarColor".into(),
         theme.get_accent_id().to_string().into(),
@@ -496,7 +454,6 @@ fn build_json(st: &State, theme: &Theme, tokens: &Tokens) -> String {
     serde_json::Value::Object(map).to_string()
 }
 
-/// Lee `org.gnome.desktop.interface enable-animations`; true si está desactivado.
 fn reduced_motion() -> bool {
     let out = std::process::Command::new("gsettings")
         .args(["get", "org.gnome.desktop.interface", "enable-animations"])
@@ -507,14 +464,11 @@ fn reduced_motion() -> bool {
     }
 }
 
-/// Todos los locales UTF-8, cacheados (se parsea la tabla una sola vez).
 fn locales() -> &'static [localekit::locale::Locale] {
     static CACHE: OnceLock<Vec<localekit::locale::Locale>> = OnceLock::new();
     CACHE.get_or_init(localekit::locale::all)
 }
 
-/// Rellena los modelos de la lista de idiomas filtrando por `query` (nombre o
-/// código, sin distinguir mayúsculas).
 fn fill_locales(ui: &AppWindow, query: &str) {
     let q = query.to_lowercase();
     let items: Vec<&localekit::locale::Locale> = locales()
@@ -530,7 +484,6 @@ fn fill_locales(ui: &AppWindow, query: &str) {
     st.set_lang_codes(ModelRc::from(codes.as_slice()));
 }
 
-/// Ciudades del paso Zona horaria: (nombre, zona). Se filtran en Rust.
 const CITIES: [(&str, &str); 5] = [
     ("Mérida", "America/Merida"),
     ("Ciudad de México", "America/Mexico_City"),
@@ -539,7 +492,6 @@ const CITIES: [(&str, &str); 5] = [
     ("Madrid", "Europe/Madrid"),
 ];
 
-/// Rellena los modelos de ciudades filtrando por `query` (nombre o zona).
 fn fill_cities(ui: &AppWindow, query: &str) {
     let q = query.to_lowercase();
     let items: Vec<(&str, &str)> = CITIES
@@ -566,7 +518,6 @@ fn pick(model: ModelRc<SharedString>, index: i32) -> String {
         .unwrap_or_default()
 }
 
-/// Hasta dos iniciales del nombre, en mayúsculas: «Humberto Blanqueto» → «HB».
 fn initials(name: &str) -> String {
     let mut out = String::new();
     for word in name.split_whitespace().take(2) {
@@ -581,8 +532,6 @@ fn first_word(name: &str) -> String {
     name.split_whitespace().next().unwrap_or("").to_string()
 }
 
-/// Fuerza de la contraseña (0..4): longitud ≥ 8, mayúsculas y minúsculas,
-/// números y símbolos.
 fn password_strength(p: &str) -> i32 {
     if p.is_empty() {
         return 0;
@@ -603,7 +552,6 @@ fn password_strength(p: &str) -> i32 {
     s
 }
 
-/// Conecta a una red Wi‑Fi con NetworkManager. `true` si conectó.
 fn nmcli_connect(ssid: &str, pass: &str) -> bool {
     let mut cmd = std::process::Command::new("nmcli");
     cmd.args(["device", "wifi", "connect", ssid]);
@@ -613,8 +561,6 @@ fn nmcli_connect(ssid: &str, pass: &str) -> bool {
     matches!(cmd.output(), Ok(o) if o.status.success())
 }
 
-/// Muestra la pantalla «Preparando tu escritorio» mientras ejecuta
-/// `nixdots-home-init` y traduce sus líneas `PHASE n` / `STATUS texto`.
 fn start_home_init(ui: &AppWindow) {
     {
         let st = ui.global::<State>();

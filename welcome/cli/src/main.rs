@@ -1,13 +1,4 @@
-//! `nixdots-setup` — CLI del asistente de primer arranque: aplica los datos del
-//! usuario (JSON), escribe el hash y `/persist/keel/users/<usuario>.toml` (+ su semilla
-//! `.prefs.toml`), fusiona los campos
-//! de sistema en `machine.toml` y deja la nueva generación para el próximo
-//! arranque.
-//!
-//!   nixdots-setup apply <datos.json> [--repo <ruta>] [--dry-run]
-//!
-//! La contraseña se lee de stdin (nunca del JSON ni de argv).
-
+//! `nixdots-setup`: CLI that applies the first-boot wizard data.
 use color_eyre::eyre::{bail, eyre, Context, Result};
 use nixcore::machine;
 use nixcore::runner::{self, Cmd, Stream};
@@ -55,13 +46,10 @@ struct Data {
     time_zone: String,
     #[serde(default)]
     time_zone_auto: Option<bool>,
-    /// `"light"` o `"dark"` (el asistente manda `colorScheme`).
     #[serde(default)]
     color_scheme: Option<String>,
-    /// Acento (`"neptunia"` o un id de GNOME).
     #[serde(default)]
     accent_color: Option<String>,
-    /// Color del avatar (id de acento) y, si hay foto, su ruta.
     #[serde(default)]
     avatar_color: Option<String>,
     #[serde(default)]
@@ -74,7 +62,6 @@ struct Data {
     git_name: Option<String>,
     #[serde(default)]
     git_email: Option<String>,
-    /// Primera cuenta: admin por defecto.
     #[serde(default)]
     admin: Option<bool>,
 }
@@ -82,7 +69,6 @@ struct Data {
 fn main() {
     color_eyre::install().ok();
     if let Err(err) = run() {
-        // Una sola línea legible para que la GUI muestre el motivo.
         eprintln!("ERROR: {err}");
         std::process::exit(1);
     }
@@ -127,7 +113,6 @@ fn apply(args: &[String]) -> Result<()> {
     let password = read_password()?;
     let sim_fail = std::env::var_os("KEEL_SIM_FAIL").is_some();
 
-    // 1. Hash (0600) antes de la cuenta: user.nix exige que exista.
     phase(0, dry_run);
     let hash = nixcore::crypto::hash_password(&password)?;
     let secrets = Path::new("/persist/secrets");
@@ -135,11 +120,7 @@ fn apply(args: &[String]) -> Result<()> {
     println!("$ escribir {} (0600)", hash_path.display());
     if !dry_run {
         std::fs::create_dir_all(secrets)?;
-        // 0711, igual que el instalador: el archivo sigue ilegible, pero la
-        // evaluación de nix sin privilegios (steward rebuild) puede hacerle
-        // stat; con 0700 la assertion de user.nix lo daría por inexistente.
         set_mode(secrets, 0o711)?;
-        // Creado ya con 0600: nunca existe, ni un instante, con el umask.
         {
             use std::io::Write;
             use std::os::unix::fs::OpenOptionsExt;
@@ -155,9 +136,6 @@ fn apply(args: &[String]) -> Result<()> {
         set_mode(&hash_path, 0o600)?;
     }
 
-    // 2. Datos personales a /persist/keel/users/<usuario>.toml, apariencia/accesibilidad a
-    //    /persist/keel/users/<usuario>.prefs.toml y campos de sistema a machine.toml
-    //    (fusión: conserva lo que ya escribió el instalador).
     phase(1, dry_run);
     if sim_fail {
         bail!("Fallo simulado al aplicar la configuración");
@@ -229,8 +207,6 @@ fn apply(args: &[String]) -> Result<()> {
         machine::merge_fields(fields)?;
     }
 
-    // 3. boot, no switch: activar en caliente apagaría greetd y mataría esta
-    //    misma sesión a mitad de la activación. El bucle de sesión reinicia.
     phase(2, dry_run);
     let host = hostname()?;
     let rebuild = Cmd::new("nixos-rebuild")
@@ -238,8 +214,6 @@ fn apply(args: &[String]) -> Result<()> {
         .arg(format!("{}#{host}", repo.display()));
     run_step(&rebuild, dry_run, "nixos-rebuild")?;
 
-    // ~<usuario>/dotfiles -> repo, y el repo en manos del usuario, solo cuando el
-    // rebuild ha terminado bien: si falla no se tocan permisos.
     phase(3, dry_run);
     let home_link = format!("/home/{}/dotfiles", data.username);
     println!(
@@ -254,9 +228,6 @@ fn apply(args: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// Migra el `user.json` antiguo (un único usuario con campos de sistema
-/// mezclados) a `/persist/keel/users/<usuario>.toml` + `/persist/keel/users/<usuario>.prefs.toml` +
-/// `machine.toml` y deja `user.json.bak`.
 fn migrate(args: &[String]) -> Result<()> {
     let mut dry_run = false;
     for arg in args {
@@ -362,9 +333,6 @@ fn migrate(args: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// Convierte `machine.json` y `/persist/keel/users/*.json` a `.toml` sin borrar los
-/// originales (quedan como respaldo y el sistema los sigue leyendo si falta el
-/// `.toml`). Pensado para máquinas que ya migraron a `/persist/keel/users/`.
 fn migrate_toml(args: &[String]) -> Result<()> {
     if let Some(arg) = args.first() {
         match arg.as_str() {
@@ -380,8 +348,6 @@ fn migrate_toml(args: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// Línea `PHASE n` que la GUI interpreta. En `--dry-run` (simulación) se toma
-/// un respiro antes de cada fase para que se vean todas.
 fn phase(n: u8, dry_run: bool) {
     if dry_run && n > 0 {
         std::thread::sleep(std::time::Duration::from_millis(1600));
@@ -427,18 +393,14 @@ fn validate(data: &Data) -> Result<()> {
     Ok(())
 }
 
-/// ¿El locale existe en la tabla de `localekit`?
 fn locale_known(code: &str) -> bool {
     localekit::locale::all().iter().any(|l| l.code == code)
 }
 
-/// ¿La zona horaria existe en la tabla de `localekit`?
 fn timezone_known(zone: &str) -> bool {
     localekit::timezone::zones().iter().any(|z| z == zone)
 }
 
-/// `None` para cadenas vacías: así el `//` del flake deja el valor de
-/// `system/lib/defaults.nix` en vez de sobrescribirlo con "".
 fn non_empty(value: String) -> Option<String> {
     if value.trim().is_empty() {
         None
@@ -447,8 +409,6 @@ fn non_empty(value: String) -> Option<String> {
     }
 }
 
-/// Lee toda la entrada estándar y quita el salto de línea final. El búfer y la
-/// contraseña viven en `Zeroizing`, así que se borran al salir de ámbito.
 fn read_password() -> Result<Zeroizing<String>> {
     let mut buf = Zeroizing::new(String::new());
     std::io::stdin()
@@ -471,8 +431,6 @@ fn hostname() -> Result<String> {
     Ok(name)
 }
 
-/// El nombre visible actual (`/etc/machine-info` o `hostnamectl --pretty`), que
-/// el instalador dejó con el modelo del equipo; vacío si no hay.
 fn current_pretty_hostname() -> String {
     if let Ok(text) = std::fs::read_to_string("/etc/machine-info") {
         for line in text.lines() {
@@ -498,10 +456,6 @@ fn current_pretty_hostname() -> String {
     String::new()
 }
 
-/// Nombre visible estilo macOS: «<modelo> de <Nombre>» (es), «<Nombre>'s
-/// <modelo>» (en), «<modelo> von <Nombre>» (de), «<modelo> di <Nombre>» (it).
-/// `<Nombre>` es la primera palabra del nombre completo; sin modelo, se usa
-/// solo el nombre del equipo.
 fn localized_pretty_host_name(model: &str, full_name: &str, locale: &str) -> String {
     let first = full_name.split_whitespace().next().unwrap_or("");
     let model = if model.trim().is_empty() {
@@ -523,12 +477,10 @@ fn localized_pretty_host_name(model: &str, full_name: &str, locale: &str) -> Str
     }
 }
 
-/// El idioma de un código de locale (`es_MX.UTF-8` → `es`).
 fn language_code(locale: &str) -> &str {
     locale.split(['_', '.']).next().unwrap_or("")
 }
 
-/// Imprime el comando; en real lo ejecuta y transmite el registro.
 fn run_step(cmd: &Cmd, dry_run: bool, what: &str) -> Result<()> {
     println!("$ {}", cmd.display);
     if dry_run {
@@ -551,9 +503,6 @@ fn set_mode(path: &Path, mode: u32) -> Result<()> {
     Ok(())
 }
 
-/// Deja `~<usuario>/dotfiles` como enlace al repo y pone el repo en manos del
-/// usuario. El uid está fijado a 1000 en `system/core/user.nix` (el asistente
-/// corre antes de que exista la cuenta).
 fn link_home(username: &str, repo: &Path) -> Result<()> {
     let home = format!("/home/{username}");
     std::fs::create_dir_all(&home).wrap_err_with(|| format!("no se pudo crear {home}"))?;

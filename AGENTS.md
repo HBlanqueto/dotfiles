@@ -15,8 +15,69 @@ actualiza este archivo en el mismo cambio.
 - No añadas dependencias pesadas (inputs, crates, servicios) sin justificarlo en
   el commit.
 - Si algo es ambiguo, elige la opción más simple y anótalo en el resumen final.
-- Al terminar, resume qué cambiaste, por qué y qué queda pendiente.
-- Idioma: comentarios, mensajes de la interfaz y documentación en español.
+- Al terminar, resume en 1–3 líneas qué cambiaste y qué queda pendiente.
+- Idioma: mensajes de la interfaz, documentación y los pocos comentarios que
+  se permiten, en español.
+
+## Código mínimo (reglas duras, estilo ponytail)
+
+Se cumplen al pie de la letra. Ganan el diff más corto y la respuesta más corta.
+
+1. **Reutiliza antes de escribir.** Busca con `grep` si ya existe la función, el
+   token o el módulo. Cada valor y cada regla viven en un solo sitio; nunca copies.
+2. **Nada «por si acaso».** Prohibido añadir parámetros, features, traits,
+   genéricos, opciones o ramas que hoy nadie usa. El código muerto se borra: no
+   se comenta ni se tapa con `#[allow(dead_code)]`;
+   `deadnix` y `statix` deben quedar limpios.
+3. **Lo más directo.** Nada de wrappers ni abstracciones de un solo uso. Se
+   extrae a la tercera repetición, no antes.
+4. **Una función, una tarea; un módulo, un motivo de cambio.** Si un bloque
+   necesita un comentario para entenderse, extráelo a una función con ese nombre.
+5. **Los nombres sustituyen al comentario:** `dias_transcurridos`, no `d`.
+   Booleanos con forma de pregunta: `focused`, `zoom_supported`.
+6. **Comentarios: ninguno por defecto.** Solo se permiten:
+   - `// SAFETY:` en cada `unsafe`;
+   - una línea con el *porqué* de un invariante cuya rotura desestabiliza y que
+     el código no puede expresar: orden de protocolo, rodeo de un bug externo
+     (con enlace) o seguridad. Cita el ADR si existe.
+
+   Prohibido: explicar qué hace el código, contar historia («antes…», «ahora…»),
+   `TODO` sin issue, código comentado, cabeceras decorativas y `///` que repiten
+   el nombre. Si borras docs en un crate con `#![warn(missing_docs)]`, quita el
+   lint en el mismo commit.
+7. **Diff mínimo.** Toca solo lo que pide el cambio: no reformatees ni
+   renombres de paso. El formato y los lints los ponen las herramientas.
+8. **Tests:** no se escriben nuevos salvo que se pidan (ver «Forma de
+   trabajar»). Si borras código, borra también sus tests.
+9. **Ahorra tokens.** Lee rangos, no ficheros enteros. No pegues en el chat el
+   código que ya está en el diff. Cierra con 1–3 líneas: qué cambió y qué queda.
+
+### Así se aplica en dotfiles
+
+```nix
+# ✗ copiar las opciones en disko.nix y en filesystems.nix
+mountOptions = [ "noatime" "compress=zstd" "space_cache=v2" ];
+# ✓ una lista compartida, y cada uno añade solo lo suyo
+btrfsOptions = import ../lib/btrfs-mount-options.nix ++ [ "space_cache=v2" ];
+```
+
+```nix
+# ✗ un módulo que lee /persist directamente
+users = builtins.fromTOML (builtins.readFile "/persist/keel/users/${u}.toml");
+# ✓ solo system/lib/data.nix lee archivos; los demás reciben `data`
+{ data, ... }: { … data.machine.hostName … }
+```
+
+```nix
+# ✓ comentario que se queda (mkHost.nix): su rotura borra datos
+# Sin evaluación impura no se pueden leer las cuentas; abortar en vez de
+# tratar el host como primer arranque (que borraría la cuenta).
+```
+
+- Los colores solo se definen en `kits/neptunia`. Lo de `generated/` se
+  regenera; nunca se edita a mano.
+- Las diferencias de hardware van en `hardware-detect.nix` vía facter, nunca
+  por nombre de host.
 
 ## Arquitectura (no volver atrás)
 

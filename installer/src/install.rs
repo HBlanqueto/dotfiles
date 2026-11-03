@@ -1036,19 +1036,7 @@ fn step_recovery_key(
     ));
     report.log(format!("$ {}", cmd.display));
 
-    let mut nixlog = NixLog::default();
-    let mut sink = |out: Stream| {
-        let l = match out {
-            Stream::Stdout(l) => l,
-            Stream::Stderr(l) => l,
-        };
-        report.raw(&l);
-        for (is_err, d) in nixlog.feed(&l).0 {
-            report.emit(d, is_err);
-        }
-    };
-    let code = runner::run(&cmd, &mut sink);
-    report.repaint();
+    let code = run_logged(report, &cmd, |_| {});
     ensure_ok(
         code,
         &format!("no se pudo añadir la clave de recuperación a {device}"),
@@ -1089,19 +1077,7 @@ fn step_tpm_enroll(
         ));
     report.log(format!("$ {}", cmd.display));
 
-    let mut nixlog = NixLog::default();
-    let mut sink = |out: Stream| {
-        let l = match out {
-            Stream::Stdout(l) => l,
-            Stream::Stderr(l) => l,
-        };
-        report.raw(&l);
-        for (is_err, d) in nixlog.feed(&l).0 {
-            report.emit(d, is_err);
-        }
-    };
-    let code = runner::run(&cmd, &mut sink);
-    report.repaint();
+    let code = run_logged(report, &cmd, |_| {});
     ensure_ok(
         code,
         &format!("no se pudo inscribir el token TPM2 puente de {device}"),
@@ -1542,12 +1518,14 @@ fn run_with_progress(plan: &Plan, report: &mut Reporter, cmd: &Cmd) -> i32 {
         simulate_build(report);
         return 0;
     }
+    run_logged(report, cmd, |_| {})
+}
+
+fn run_logged(report: &mut Reporter, cmd: &Cmd, mut capture: impl FnMut(&Stream)) -> i32 {
     let mut nixlog = NixLog::default();
-    let mut sink = |out: Stream| {
-        let line = match out {
-            Stream::Stdout(l) => l,
-            Stream::Stderr(l) => l,
-        };
+    let code = runner::run(cmd, &mut |out: Stream| {
+        capture(&out);
+        let (Stream::Stdout(line) | Stream::Stderr(line)) = out;
         report.raw(&line);
         let (display, progress) = nixlog.feed(&line);
         if let Some((built, total)) = progress {
@@ -1556,8 +1534,7 @@ fn run_with_progress(plan: &Plan, report: &mut Reporter, cmd: &Cmd) -> i32 {
         for (is_err, d) in display {
             report.emit(d, is_err);
         }
-    };
-    let code = runner::run(cmd, &mut sink);
+    });
     report.repaint();
     code
 }
@@ -1586,19 +1563,7 @@ fn exec_in(plan: &Plan, report: &mut Reporter, cmd: &Cmd, cwd: &Path) -> Result<
             shell_command(cmd)
         ))
         .with_display(cmd.display.clone());
-    let mut nixlog = NixLog::default();
-    let mut sink = |out: Stream| {
-        let l = match out {
-            Stream::Stdout(l) => l,
-            Stream::Stderr(l) => l,
-        };
-        report.raw(&l);
-        for (is_err, d) in nixlog.feed(&l).0 {
-            report.emit(d, is_err);
-        }
-    };
-    let code = runner::run(&wrapped, &mut sink);
-    report.repaint();
+    let code = run_logged(report, &wrapped, |_| {});
     Ok(code)
 }
 
@@ -1620,28 +1585,14 @@ fn exec_capture(
         shell_quote(&cwd.to_string_lossy()),
         shell_command(cmd)
     ));
-    let mut nixlog = NixLog::default();
-    let mut sink = |out: Stream| match out {
-        Stream::Stdout(l) => {
-            captured.push_str(&l);
-            captured.push('\n');
-            report.raw(&l);
-            for (is_err, d) in nixlog.feed(&l).0 {
-                report.emit(d, is_err);
-            }
-        }
-        Stream::Stderr(l) => {
-            err.push_str(&l);
-            err.push('\n');
-            report.raw(&l);
-            for (is_err, d) in nixlog.feed(&l).0 {
-                report.emit(d, is_err);
-            }
-        }
-    };
-    let code = runner::run(&wrapped, &mut sink);
-    report.repaint();
-    Ok(code)
+    Ok(run_logged(report, &wrapped, |out| {
+        let (buffer, line) = match out {
+            Stream::Stdout(line) => (&mut *captured, line),
+            Stream::Stderr(line) => (&mut *err, line),
+        };
+        buffer.push_str(line);
+        buffer.push('\n');
+    }))
 }
 
 fn report_eval_failure(plan: &Plan, report: &mut Reporter, repo: &Path, err: &str) {

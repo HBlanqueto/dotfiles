@@ -672,7 +672,7 @@ fn shrink_ntfs(plan: &Plan, report: &mut Reporter, spec: &ShrinkSpec) -> Result<
     let target = current.saturating_sub(spec.free_bytes);
     report.log(format!(
         "Windows: se liberarán {} reduciendo {}",
-        human_gib(spec.free_bytes),
+        detect::gb(spec.free_bytes),
         spec.ntfs
     ));
     if current == 0 || target == 0 {
@@ -902,10 +902,6 @@ fn mount_alongside(plan: &Plan, report: &mut Reporter, data: &str, esp: &str) ->
 
 fn run_ok(plan: &Plan, report: &mut Reporter, cmd: &Cmd, what: &str) -> Result<()> {
     ensure_ok(exec_in(plan, report, cmd, &plan.source)?, what)
-}
-
-fn human_gib(bytes: u64) -> String {
-    format!("{:.0} GB", bytes as f64 / 1_000_000_000.0)
 }
 
 fn clean_target(plan: &Plan, report: &mut Reporter) {
@@ -1586,7 +1582,7 @@ fn exec_in(plan: &Plan, report: &mut Reporter, cmd: &Cmd, cwd: &Path) -> Result<
         .arg("-c")
         .arg(format!(
             "cd {} && exec {}",
-            shell_quote(cwd),
+            shell_quote(&cwd.to_string_lossy()),
             shell_command(cmd)
         ))
         .with_display(cmd.display.clone());
@@ -1621,7 +1617,7 @@ fn exec_capture(
     }
     let wrapped = Cmd::new("sh").arg("-c").arg(format!(
         "cd {} && exec {}",
-        shell_quote(cwd),
+        shell_quote(&cwd.to_string_lossy()),
         shell_command(cmd)
     ));
     let mut nixlog = NixLog::default();
@@ -1819,15 +1815,14 @@ fn strip_ansi(s: &str) -> String {
     out
 }
 
-fn shell_quote(path: &Path) -> String {
-    let s = path.to_string_lossy();
-    format!("'{}'", s.replace('\'', "'\\''"))
+pub fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
 }
 
 fn shell_command(cmd: &Cmd) -> String {
-    let mut parts = vec![shell_quote(Path::new(&cmd.program))];
+    let mut parts = vec![shell_quote(&cmd.program)];
     for arg in &cmd.args {
-        parts.push(format!("'{}'", arg.replace('\'', "'\\''")));
+        parts.push(shell_quote(arg));
     }
     parts.join(" ")
 }

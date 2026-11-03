@@ -1,5 +1,5 @@
 use crate::app::{Action, App};
-use crate::detect::{human_size, Disk};
+use crate::detect::{gb, human_size, Disk};
 use crate::disk::{self as diskplan, DiskDecision};
 use crate::widgets::{self, Btn, ButtonRow};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
@@ -332,10 +332,6 @@ fn state(disk: &Disk) -> String {
     } else {
         base
     }
-}
-
-fn gb(bytes: u64) -> String {
-    format!("{:.0} GB", bytes as f64 / 1_000_000_000.0)
 }
 
 fn sentence(app: &App) -> (String, ratatui::style::Color) {

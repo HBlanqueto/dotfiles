@@ -1,4 +1,5 @@
 use crate::app::{Action, App, CheckState};
+use crate::detect::gb;
 use crate::widgets::Btn;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::layout::Rect;
@@ -6,10 +7,6 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
-
-fn gb(bytes: u64) -> String {
-    format!("{:.0} GB", bytes as f64 / 1_000_000_000.0)
-}
 
 fn row(app: &App, label: &str, value: String) -> Line<'static> {
     Line::from(vec![

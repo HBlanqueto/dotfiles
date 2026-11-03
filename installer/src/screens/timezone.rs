@@ -1,4 +1,5 @@
 use crate::app::{Action, App, PickItem};
+use crate::install::shell_quote;
 use crate::widgets::Btn;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::layout::Rect;
@@ -100,8 +101,4 @@ fn zone_times(zones: &[String]) -> Vec<(String, String)> {
             Some((zone.to_string(), time.to_string()))
         })
         .collect()
-}
-
-fn shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\\''"))
 }

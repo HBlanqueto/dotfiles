@@ -664,6 +664,10 @@ pub fn nominal_gb(bytes: u64) -> u64 {
     (bytes as f64 / 1_000_000_000.0).round() as u64
 }
 
+pub fn gb(bytes: u64) -> String {
+    format!("{:.0} GB", bytes as f64 / 1_000_000_000.0)
+}
+
 pub fn human_size(bytes: u64) -> String {
     const UNITS: [&str; 6] = ["B", "K", "M", "G", "T", "P"];
     let mut value = bytes as f64;

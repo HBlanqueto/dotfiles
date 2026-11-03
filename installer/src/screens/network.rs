@@ -121,7 +121,7 @@ fn list_frame(f: &mut Frame, app: &App, area: Rect, focused: bool) -> Rect {
 fn list_lines(app: &App, width: u16, rows: usize, focused: bool) -> Vec<Line<'static>> {
     if app.net.wifi.is_empty() {
         let msg = if app.net.backend.name() == "ninguno" {
-            "no hay backend de red (nmcli/iwctl/wpa_cli)"
+            "no hay backend de red (nmcli/iwctl)"
         } else {
             "no se encontraron redes · pulsa r"
         };
@@ -314,18 +314,6 @@ pub fn retry(app: &mut App) {
             visible: false,
         };
         app.focus_primary();
-    }
-}
-
-pub fn shortcut(app: &App) -> String {
-    match &app.net.phase {
-        RedFase::Lista => "↑/↓ red · enter elegir · r reescanear".to_string(),
-        RedFase::Contrasena { .. } => {
-            "enter conectar · esc volver a redes · tab mostrar".to_string()
-        }
-        RedFase::Conectando { .. } => "conectando…".to_string(),
-        RedFase::Error { .. } => "enter reintentar · esc volver a redes".to_string(),
-        RedFase::Conectado { .. } => "enter continuar".to_string(),
     }
 }
 

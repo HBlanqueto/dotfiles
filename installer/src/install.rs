@@ -104,19 +104,6 @@ impl Plan {
             _ => String::new(),
         }
     }
-
-    fn git_identity(&self) -> (String, String) {
-        (
-            self.settings
-                .git_name
-                .clone()
-                .unwrap_or_else(|| "nixdots-installer".to_string()),
-            self.settings
-                .git_email
-                .clone()
-                .unwrap_or_else(|| "installer@localhost".to_string()),
-        )
-    }
 }
 
 fn git_cmd(repo: &Path, args: &[&str]) -> Cmd {
@@ -1177,9 +1164,6 @@ fn ensure_repo_ready(plan: &Plan, report: &mut Reporter, repo: &Path) -> Result<
         return Ok(());
     }
 
-    let (name, email) = plan.git_identity();
-    let name_arg = format!("user.name={name}");
-    let email_arg = format!("user.email={email}");
     report.log("git: repo sin .git; se crea un commit inicial");
 
     let init = git_cmd(repo, &["init"]);
@@ -1190,9 +1174,9 @@ fn ensure_repo_ready(plan: &Plan, report: &mut Reporter, repo: &Path) -> Result<
         repo,
         &[
             "-c",
-            name_arg.as_str(),
+            "user.name=nixdots-installer",
             "-c",
-            email_arg.as_str(),
+            "user.email=installer@localhost",
             "commit",
             "-m",
             "keel: initial import",
@@ -1440,7 +1424,7 @@ fn persist_wifi(plan: &Plan, report: &mut Reporter) -> Result<()> {
     };
     if !wifi.networkmanager {
         report.log(format!(
-            "Wi-Fi {ssid}: guardada por iwd/wpa_supplicant, reconecta tras instalar",
+            "Wi-Fi {ssid}: guardada por iwd, reconecta tras instalar",
             ssid = wifi.ssid
         ));
         return Ok(());

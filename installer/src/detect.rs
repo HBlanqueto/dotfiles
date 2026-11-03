@@ -236,14 +236,6 @@ impl Disk {
         format!("/dev/{}", self.name)
     }
 
-    pub fn size_human(&self) -> String {
-        human_size(self.size)
-    }
-
-    pub fn is_windows(&self) -> bool {
-        self.windows
-    }
-
     pub fn short_name(&self) -> String {
         let size = format!("{} GB", self.nominal_gb());
         let avail = 24usize.saturating_sub(size.chars().count() + 1);
@@ -313,10 +305,6 @@ pub fn disks() -> Vec<Disk> {
         return Vec::new();
     };
     parse_disks(&json)
-}
-
-pub fn windows_present() -> bool {
-    disks().iter().any(|d| d.windows)
 }
 
 pub fn test_disks() -> Vec<Disk> {

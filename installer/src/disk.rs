@@ -25,15 +25,6 @@ pub enum DiskDecision {
 }
 
 impl DiskDecision {
-    pub fn clamp_shrink(&self, bytes: u64) -> u64 {
-        match self {
-            DiskDecision::Shrink {
-                min_free, max_free, ..
-            } => bytes.clamp(*min_free, *max_free),
-            _ => bytes,
-        }
-    }
-
     pub fn is_shrink(&self) -> bool {
         matches!(self, DiskDecision::Shrink { .. })
     }

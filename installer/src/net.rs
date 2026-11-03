@@ -47,8 +47,6 @@ pub fn backend(dry_run: bool) -> Arc<dyn WifiBackend> {
         Arc::new(Nmcli)
     } else if which("iwctl") {
         Arc::new(Iwd)
-    } else if which("wpa_cli") {
-        Arc::new(WpaCli)
     } else {
         Arc::new(Null)
     }
@@ -114,7 +112,6 @@ fn resolves(host: &str) -> bool {
 
 pub struct Nmcli;
 pub struct Iwd;
-pub struct WpaCli;
 pub struct Null;
 pub struct Sim;
 
@@ -167,23 +164,6 @@ impl WifiBackend for Iwd {
         }
         cmd.args(["station", &device, "connect", ssid]);
         run_connect(cmd)
-    }
-    fn status(&self) -> bool {
-        online()
-    }
-}
-
-impl WifiBackend for WpaCli {
-    fn name(&self) -> &'static str {
-        "wpa_cli"
-    }
-    fn scan(&self) -> Vec<Wifi> {
-        scan_wpa_cli()
-    }
-    fn connect(&self, _ssid: &str, _pass: &str) -> Result<()> {
-        Err(eyre!(
-            "wpa_cli no permite asociarse sin editar la configuración; usa nmcli"
-        ))
     }
     fn status(&self) -> bool {
         online()
@@ -323,44 +303,6 @@ fn scan_iwctl() -> Vec<Wifi> {
             },
         );
     }
-    networks
-}
-
-fn scan_wpa_cli() -> Vec<Wifi> {
-    let _ = Command::new("wpa_cli")
-        .arg("scan")
-        .stdin(Stdio::null())
-        .output();
-    let Ok(output) = Command::new("wpa_cli")
-        .arg("scan_results")
-        .stdin(Stdio::null())
-        .output()
-    else {
-        return Vec::new();
-    };
-    let mut networks = Vec::new();
-    for line in String::from_utf8_lossy(&output.stdout).lines().skip(1) {
-        let parts: Vec<&str> = line.split('\t').collect();
-        if parts.len() < 5 {
-            continue;
-        }
-        let signal = parts[2].trim().parse::<i32>().unwrap_or(-100);
-        let signal = ((signal + 100).clamp(0, 100)) as u8;
-        let secured = parts[3].contains("WPA") || parts[3].contains("WEP");
-        let ssid = parts[4].trim().to_string();
-        if ssid.is_empty() {
-            continue;
-        }
-        push_unique(
-            &mut networks,
-            Wifi {
-                ssid,
-                signal,
-                secured,
-            },
-        );
-    }
-    networks.sort_by_key(|n| std::cmp::Reverse(n.signal));
     networks
 }
 

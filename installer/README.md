@@ -70,7 +70,7 @@ seleccionar y copiar texto, la terminal sigue funcionando con normalidad).
 ## Red
 
 La ISO mínima de NixOS activa `networking.networkmanager`, así que el instalador
-usa `nmcli` (y recurre a `iwctl` → `wpa_cli` solo si faltara). No se avanza sin
+usa `nmcli` (y recurre a `iwctl` solo si faltara). No se avanza sin
 conectividad comprobada contra `cache.nixos.org`.
 
 ## Licencia

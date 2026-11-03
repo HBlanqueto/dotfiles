@@ -12,6 +12,7 @@ pub struct Cmd {
     pub program: String,
     pub args: Vec<String>,
     pub display: String,
+    pub idle_timeout: Option<Duration>,
 }
 
 impl Cmd {
@@ -21,6 +22,7 @@ impl Cmd {
             display: program.clone(),
             program,
             args: Vec::new(),
+            idle_timeout: Some(IDLE_TIMEOUT),
         }
     }
 
@@ -44,6 +46,11 @@ impl Cmd {
         for arg in args {
             self = self.arg(arg);
         }
+        self
+    }
+
+    pub fn without_idle_timeout(mut self) -> Self {
+        self.idle_timeout = None;
         self
     }
 
@@ -100,7 +107,11 @@ pub fn run(cmd: &Cmd, sink: &mut dyn FnMut(Stream)) -> i32 {
 
     let mut timed_out = false;
     loop {
-        match rx.recv_timeout(IDLE_TIMEOUT) {
+        let received = match cmd.idle_timeout {
+            Some(timeout) => rx.recv_timeout(timeout),
+            None => rx.recv().map_err(|_| RecvTimeoutError::Disconnected),
+        };
+        match received {
             Ok((is_stderr, line)) => {
                 if is_stderr {
                     sink(Stream::Stderr(line));

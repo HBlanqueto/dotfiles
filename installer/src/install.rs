@@ -75,7 +75,6 @@ pub struct Plan {
     pub source: PathBuf,
     pub root: PathBuf,
     pub settings: Settings,
-    pub encrypt: bool,
     pub luks_passphrase: Zeroizing<String>,
     pub recovery_key: Zeroizing<String>,
     pub luks_tpm: bool,
@@ -244,20 +243,14 @@ fn run(plan: Plan, tx: Sender<Msg>) {
 fn run_steps(plan: &Plan, report: &mut Reporter) -> Result<()> {
     let resume = plan.resume_from;
 
-    let luks =
-        if resume <= Step::Disk {
-            report.step(Step::Disk);
-            step_disk(plan, report)?
-        } else {
-            ensure_disk_ready(plan, report)?;
-            if plan.encrypt {
-                Some(detect::luks_partition(&plan.device).ok_or_else(|| {
-                    eyre!("no se encontró la partición cifrada en {}", plan.device)
-                })?)
-            } else {
-                None
-            }
-        };
+    let luks = if resume <= Step::Disk {
+        report.step(Step::Disk);
+        step_disk(plan, report)?
+    } else {
+        ensure_disk_ready(plan, report)?;
+        detect::luks_partition(&plan.device)
+            .ok_or_else(|| eyre!("no se encontró la partición cifrada en {}", plan.device))?
+    };
 
     prepare_target_tmp(plan, report)?;
 
@@ -265,7 +258,7 @@ fn run_steps(plan: &Plan, report: &mut Reporter) -> Result<()> {
         report.step(Step::Settings);
         step_repo(plan, report)?;
         step_license(plan, report)?;
-        step_hardware(plan, report, luks.as_ref())?;
+        step_hardware(plan, report, &luks)?;
         step_persist(plan, report)?;
     }
 
@@ -423,48 +416,34 @@ fn ensure_disk_ready(plan: &Plan, report: &mut Reporter) -> Result<()> {
     if let DiskMode::Alongside { reuse_efi, .. } = &plan.disk_mode {
         return ensure_alongside_ready(plan, report, reuse_efi.as_deref());
     }
-    let encrypted_open = !plan.encrypt || Path::new("/dev/mapper/cryptroot").exists();
-    if detect::is_mounted("/mnt") && encrypted_open {
+    if detect::is_mounted("/mnt") && Path::new("/dev/mapper/cryptroot").exists() {
         report.log("disco ya montado; se continúa sin reformatear");
         return Ok(());
     }
 
     if plan.dry_run {
         report.log(format!(
-            "[simulación] $ disko --mode mount system/disko.nix --argstr device {}{}",
-            plan.device,
-            if plan.encrypt {
-                " --argstr encrypt true"
-            } else {
-                ""
-            }
+            "[simulación] $ disko --mode mount system/disko.nix --argstr device {} --argstr encrypt true",
+            plan.device
         ));
         report.log("(simulación) disco re-montado sin formatear");
         return Ok(());
     }
 
-    let mut cmd = Cmd::new("disko")
+    let pass = SecretFile::write("luks.pass", &plan.luks_passphrase)?;
+    let cmd = Cmd::new("disko")
         .arg("--mode")
         .arg("mount")
         .arg("system/disko.nix")
         .arg("--argstr")
         .arg("device")
-        .arg(&plan.device);
-    if plan.encrypt {
-        cmd = cmd.arg("--argstr").arg("encrypt").arg("true");
-    }
-
-    let pass = if plan.encrypt {
-        Some(SecretFile::write("luks.pass", &plan.luks_passphrase)?)
-    } else {
-        None
-    };
-    if let Some(pass) = &pass {
-        cmd = cmd
-            .arg("--argstr")
-            .arg("luksPasswordFile")
-            .arg_path(pass.path());
-    }
+        .arg(&plan.device)
+        .arg("--argstr")
+        .arg("encrypt")
+        .arg("true")
+        .arg("--argstr")
+        .arg("luksPasswordFile")
+        .arg_path(pass.path());
 
     ensure_ok(
         exec(plan, report, &cmd, &plan.source)?,
@@ -477,8 +456,7 @@ fn ensure_alongside_ready(
     report: &mut Reporter,
     reuse_efi: Option<&str>,
 ) -> Result<()> {
-    let encrypted_open = !plan.encrypt || Path::new("/dev/mapper/cryptroot").exists();
-    if detect::is_mounted("/mnt") && encrypted_open {
+    if detect::is_mounted("/mnt") && Path::new("/dev/mapper/cryptroot").exists() {
         report.log("disco ya montado; se continúa sin reformatear");
         return Ok(());
     }
@@ -493,24 +471,19 @@ fn ensure_alongside_ready(
         None => find_partition(&plan.device, "BOOT")
             .ok_or_else(|| eyre!("no se encontró la EFI en {}", plan.device))?,
     };
-    let data = if plan.encrypt {
-        let pass = SecretFile::write("luks.pass", &plan.luks_passphrase)?;
-        run_ok(
-            plan,
-            report,
-            &Cmd::new("cryptsetup")
-                .arg("open")
-                .arg("--key-file")
-                .arg_path(pass.path())
-                .arg(&system)
-                .arg("cryptroot"),
-            "no se pudo abrir el contenedor cifrado",
-        )?;
-        "/dev/mapper/cryptroot".to_string()
-    } else {
-        system
-    };
-    mount_alongside(plan, report, &data, &esp)
+    let pass = SecretFile::write("luks.pass", &plan.luks_passphrase)?;
+    run_ok(
+        plan,
+        report,
+        &Cmd::new("cryptsetup")
+            .arg("open")
+            .arg("--key-file")
+            .arg_path(pass.path())
+            .arg(&system)
+            .arg("cryptroot"),
+        "no se pudo abrir el contenedor cifrado",
+    )?;
+    mount_alongside(plan, report, "/dev/mapper/cryptroot", &esp)
 }
 
 fn step_boot(plan: &Plan, report: &mut Reporter) -> Result<()> {
@@ -525,7 +498,7 @@ fn step_boot(plan: &Plan, report: &mut Reporter) -> Result<()> {
     }
 }
 
-fn step_disk(plan: &Plan, report: &mut Reporter) -> Result<Option<detect::LuksPartition>> {
+fn step_disk(plan: &Plan, report: &mut Reporter) -> Result<detect::LuksPartition> {
     match &plan.disk_mode {
         DiskMode::Whole => step_disk_whole(plan, report),
         DiskMode::Alongside { reuse_efi, shrink } => {
@@ -534,16 +507,16 @@ fn step_disk(plan: &Plan, report: &mut Reporter) -> Result<Option<detect::LuksPa
     }
 }
 
-fn step_disk_whole(plan: &Plan, report: &mut Reporter) -> Result<Option<detect::LuksPartition>> {
+fn step_disk_whole(plan: &Plan, report: &mut Reporter) -> Result<detect::LuksPartition> {
     if !plan.dry_run {
         clean_target(plan, report);
     }
 
     report.log("creando las particiones y formateando el disco");
-    let pass = if plan.encrypt && !plan.dry_run {
-        Some(SecretFile::write("luks.pass", &plan.luks_passphrase)?)
-    } else {
+    let pass = if plan.dry_run {
         None
+    } else {
+        Some(SecretFile::write("luks.pass", &plan.luks_passphrase)?)
     };
 
     let mut cmd = Cmd::new("disko")
@@ -553,38 +526,25 @@ fn step_disk_whole(plan: &Plan, report: &mut Reporter) -> Result<Option<detect::
         .arg("system/disko.nix")
         .arg("--argstr")
         .arg("device")
-        .arg(&plan.device);
-    if plan.encrypt {
-        cmd = cmd.arg("--argstr").arg("encrypt").arg("true");
-        if let Some(pass) = &pass {
-            cmd = cmd
-                .arg("--argstr")
-                .arg("luksPasswordFile")
-                .arg_path(pass.path());
-        }
-        cmd = cmd.with_display(format!(
-            "disko --mode destroy,format,mount --yes-wipe-all-disks system/disko.nix --argstr device {} --argstr encrypt true",
-            plan.device
-        ));
-    } else {
-        cmd = cmd.with_display(format!(
-            "disko --mode destroy,format,mount --yes-wipe-all-disks system/disko.nix --argstr device {}",
-            plan.device
-        ));
+        .arg(&plan.device)
+        .arg("--argstr")
+        .arg("encrypt")
+        .arg("true");
+    if let Some(pass) = &pass {
+        cmd = cmd
+            .arg("--argstr")
+            .arg("luksPasswordFile")
+            .arg_path(pass.path());
     }
+    let cmd = cmd.with_display(format!(
+        "disko --mode destroy,format,mount --yes-wipe-all-disks system/disko.nix --argstr device {} --argstr encrypt true",
+        plan.device
+    ));
 
     ensure_ok(
         exec(plan, report, &cmd, &plan.source)?,
-        if plan.encrypt {
-            "no se pudo cifrar y formatear el disco"
-        } else {
-            "no se pudo formatear el disco"
-        },
+        "no se pudo cifrar y formatear el disco",
     )?;
-
-    if !plan.encrypt {
-        return Ok(None);
-    }
 
     let luks = if plan.dry_run {
         detect::LuksPartition {
@@ -606,7 +566,7 @@ fn step_disk_whole(plan: &Plan, report: &mut Reporter) -> Result<Option<detect::
         &luks.path,
         pass.as_ref().map(SecretFile::path),
     )?;
-    Ok(Some(luks))
+    Ok(luks)
 }
 
 fn enroll_keys(
@@ -635,18 +595,15 @@ fn step_disk_alongside(
     report: &mut Reporter,
     reuse_efi: Option<&str>,
     shrink: Option<&ShrinkSpec>,
-) -> Result<Option<detect::LuksPartition>> {
+) -> Result<detect::LuksPartition> {
     if plan.dry_run {
         report.log("(simulación) particiones nuevas creadas en el espacio libre");
-        if !plan.encrypt {
-            return Ok(None);
-        }
         let luks = detect::LuksPartition {
             path: format!("{}4", plan.device),
             uuid: "00000000-0000-0000-0000-000000000000".to_string(),
         };
         enroll_keys(plan, report, &luks.path, None)?;
-        return Ok(Some(luks));
+        return Ok(luks);
     }
 
     clean_target(plan, report);
@@ -655,11 +612,7 @@ fn step_disk_alongside(
         shrink_ntfs(plan, report, spec)?;
     }
 
-    let pass = if plan.encrypt {
-        Some(SecretFile::write("luks.pass", &plan.luks_passphrase)?)
-    } else {
-        None
-    };
+    let pass = SecretFile::write("luks.pass", &plan.luks_passphrase)?;
 
     let esp = match reuse_efi {
         Some(path) => {
@@ -678,63 +631,53 @@ fn step_disk_alongside(
             "no se pudo formatear la EFI",
         )?;
     }
-    let (data, luks) = if plan.encrypt {
-        let pass_path = pass.as_ref().map(SecretFile::path).unwrap_or(Path::new(""));
-        run_ok(
-            plan,
-            report,
-            &Cmd::new("cryptsetup")
-                .arg("luksFormat")
-                .arg("--type")
-                .arg("luks2")
-                .arg("--key-file")
-                .arg_path(pass_path)
-                .arg(&system),
-            "no se pudo cifrar la partición del sistema",
-        )?;
-        run_ok(
-            plan,
-            report,
-            &Cmd::new("cryptsetup")
-                .arg("open")
-                .arg("--key-file")
-                .arg_path(pass_path)
-                .arg(&system)
-                .arg("cryptroot"),
-            "no se pudo abrir el contenedor cifrado",
-        )?;
-        let uuid = runner::capture(
-            &Cmd::new("blkid")
-                .arg("-s")
-                .arg("UUID")
-                .arg("-o")
-                .arg("value")
-                .arg(&system),
-        )
-        .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
-        .unwrap_or_default();
-        enroll_keys(plan, report, &system, Some(pass_path))?;
-        (
-            "/dev/mapper/cryptroot".to_string(),
-            Some(detect::LuksPartition {
-                path: system.clone(),
-                uuid,
-            }),
-        )
-    } else {
-        (system.clone(), None)
-    };
+    let pass_path = pass.path();
+    run_ok(
+        plan,
+        report,
+        &Cmd::new("cryptsetup")
+            .arg("luksFormat")
+            .arg("--type")
+            .arg("luks2")
+            .arg("--key-file")
+            .arg_path(pass_path)
+            .arg(&system),
+        "no se pudo cifrar la partición del sistema",
+    )?;
+    run_ok(
+        plan,
+        report,
+        &Cmd::new("cryptsetup")
+            .arg("open")
+            .arg("--key-file")
+            .arg_path(pass_path)
+            .arg(&system)
+            .arg("cryptroot"),
+        "no se pudo abrir el contenedor cifrado",
+    )?;
+    let uuid = runner::capture(
+        &Cmd::new("blkid")
+            .arg("-s")
+            .arg("UUID")
+            .arg("-o")
+            .arg("value")
+            .arg(&system),
+    )
+    .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+    .unwrap_or_default();
+    enroll_keys(plan, report, &system, Some(pass_path))?;
+    let data = "/dev/mapper/cryptroot";
 
     run_ok(
         plan,
         report,
-        &Cmd::new("mkfs.btrfs").arg("-L").arg("nixos").arg(&data),
+        &Cmd::new("mkfs.btrfs").arg("-L").arg("nixos").arg(data),
         "no se pudo crear el btrfs",
     )?;
-    setup_subvolumes(plan, report, &data)?;
-    mount_alongside(plan, report, &data, &esp)?;
+    setup_subvolumes(plan, report, data)?;
+    mount_alongside(plan, report, data, &esp)?;
 
-    Ok(luks)
+    Ok(detect::LuksPartition { path: system, uuid })
 }
 
 fn shrink_ntfs(plan: &Plan, report: &mut Reporter, spec: &ShrinkSpec) -> Result<()> {
@@ -1277,11 +1220,7 @@ fn step_license(plan: &Plan, report: &mut Reporter) -> Result<()> {
     Ok(())
 }
 
-fn step_hardware(
-    plan: &Plan,
-    report: &mut Reporter,
-    luks: Option<&detect::LuksPartition>,
-) -> Result<()> {
+fn step_hardware(plan: &Plan, report: &mut Reporter, luks: &detect::LuksPartition) -> Result<()> {
     let dir = plan.root.join("persist/keel");
     fs::create_dir_all(&dir)?;
 
@@ -1301,11 +1240,8 @@ fn step_hardware(
     let machine = dir.join("machine.toml");
     let mut fields = serde_json::Map::new();
     fields.insert("hostName".into(), plan.settings.host_name.clone().into());
-    fields.insert("encrypt".into(), plan.encrypt.into());
-    fields.insert(
-        "luksUuid".into(),
-        luks.map(|l| l.uuid.clone()).unwrap_or_default().into(),
-    );
+    fields.insert("encrypt".into(), true.into());
+    fields.insert("luksUuid".into(), luks.uuid.clone().into());
     fields.insert("espUuid".into(), plan.esp_uuid().into());
     fields.insert("secureBoot".into(), plan.secure_boot.into());
     fields.insert("tpmUnlock".into(), plan.luks_tpm.into());

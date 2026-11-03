@@ -36,9 +36,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             format!("{} · {}", d.short_name(), action)
         })
         .unwrap_or_default();
-    let cifrado = if !app.disks.encrypt {
-        "No".to_string()
-    } else if app.enc.tpm && app.enc.tpm_present {
+    let cifrado = if app.enc.tpm && app.enc.tpm_present {
         "Sí · TPM".to_string()
     } else {
         "Sí".to_string()

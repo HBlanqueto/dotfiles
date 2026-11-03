@@ -442,16 +442,8 @@ fn details(app: &App) -> Vec<String> {
             .map(|d| d.size.saturating_sub(diskplan::GIB))
             .unwrap_or(0),
     };
-    let cifrado = if app.disks.encrypt {
-        "cifrado"
-    } else {
-        "sin cifrar"
-    };
     vec![
-        format!(
-            "EFI 1 GB · System HD {} btrfs · {cifrado}",
-            human_size(size)
-        ),
+        format!("EFI 1 GB · System HD {} btrfs · cifrado", human_size(size)),
         "@ @home @nix @log @persist · zram".to_string(),
     ]
 }

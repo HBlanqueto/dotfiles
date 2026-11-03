@@ -340,7 +340,6 @@ pub struct DiskState {
     pub erase_modal: bool,
     pub erase_focus: usize,
     pub bar_focus: bool,
-    pub encrypt: bool,
 }
 
 impl DiskState {
@@ -671,7 +670,6 @@ impl App {
                 erase_modal: false,
                 erase_focus: 0,
                 bar_focus: false,
-                encrypt: true,
             },
             enc: EncState::new(detect::tpm2_present() && secure_boot),
             net: NetState {
@@ -995,13 +993,8 @@ impl App {
             _ => None,
         };
 
-        let encrypt = self.disks.encrypt;
         let luks_passphrase = Zeroizing::new(self.enc.pass.value().to_string());
-        let recovery_key = Zeroizing::new(if encrypt {
-            self.enc.recovery.to_string()
-        } else {
-            String::new()
-        });
+        let recovery_key = Zeroizing::new(self.enc.recovery.to_string());
 
         let disk_mode = match self.disks.effective() {
             DiskDecision::WholeDisk => install::DiskMode::Whole,
@@ -1033,10 +1026,9 @@ impl App {
             source: self.repo_dir.clone(),
             root,
             settings: self.settings.clone(),
-            encrypt,
             luks_passphrase,
             recovery_key,
-            luks_tpm: encrypt && self.enc.tpm && self.enc.tpm_present,
+            luks_tpm: self.enc.tpm && self.enc.tpm_present,
             device: disk.path(),
             disk_mode,
             dry_run: self.dry_run,
@@ -1540,12 +1532,7 @@ impl App {
     }
 
     pub fn go_back(&mut self) {
-        let prev = if self.screen == Screen::Summary && !self.disks.encrypt {
-            Some(Screen::Disk)
-        } else {
-            self.screen.previous(self.show_network)
-        };
-        if let Some(prev) = prev {
+        if let Some(prev) = self.screen.previous(self.show_network) {
             self.screen = prev;
             self.reset_focus();
             self.status = None;
@@ -1560,12 +1547,7 @@ impl App {
         if self.screen == Screen::License {
             self.spawn_source_check();
         }
-        let next = if self.screen == Screen::Disk && !self.disks.encrypt {
-            Some(Screen::Summary)
-        } else {
-            self.screen.next(self.show_network)
-        };
-        match next {
+        match self.screen.next(self.show_network) {
             Some(Screen::Installing) => {
                 self.screen = Screen::Installing;
                 self.reset_install_view();
@@ -2399,12 +2381,7 @@ impl App {
                     DiskDecision::Shrink { .. } => "junto a Windows",
                     _ => "sin decidir",
                 };
-                let cif = if self.disks.encrypt {
-                    "cifrado"
-                } else {
-                    "sin cifrar"
-                };
-                format!("{action} · EFI + System HD (btrfs, {cif})")
+                format!("{action} · EFI + System HD (btrfs, cifrado)")
             }
             Step::Settings => "machine.toml".to_string(),
             Step::System => {

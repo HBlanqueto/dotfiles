@@ -1,4 +1,3 @@
-//! Reads the flake's `system/lib/defaults.nix`.
 use color_eyre::eyre::{eyre, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;

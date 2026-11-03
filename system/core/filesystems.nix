@@ -1,4 +1,3 @@
-# Device-agnostic filesystems addressed by label.
 { config, lib, ... }:
 
 let

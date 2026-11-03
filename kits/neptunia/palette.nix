@@ -1,4 +1,3 @@
-# Console palette: the 16 ANSI colors.
 { theme }:
 let
   inherit (theme) colors;

@@ -1,4 +1,3 @@
-//! In-memory secrets such as the LUKS recovery key.
 use color_eyre::eyre::{eyre, Result};
 use rand::rngs::OsRng;
 use rand::RngCore;

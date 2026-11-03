@@ -1,4 +1,3 @@
-# Single place that reads the external data (`machine.toml`, users, facter report).
 {
   impure ? (builtins ? currentSystem),
 }:
@@ -90,17 +89,9 @@ let
   users = if usersFromDir != { } then usersFromDir else legacyUsers;
   hasUsers = users != { };
 
-  soleUser =
-    if builtins.length (builtins.attrNames users) == 1 then
-      users.${builtins.head (builtins.attrNames users)}
-    else
-      null;
-
   settings = import ./defaults.nix // machine;
 
   facterFile = "${persist}/facter.json";
-
-  username = if soleUser == null then null else soleUser.username;
 in
 {
   inherit
@@ -110,7 +101,6 @@ in
     settings
     users
     hasUsers
-    username
     ;
 
   facterReport = if impure && builtins.pathExists facterFile then facterFile else null;

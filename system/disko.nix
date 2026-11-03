@@ -1,4 +1,3 @@
-# Standalone disko disk layout.
 {
   device ? "/dev/vda",
   luksPasswordFile ? null,

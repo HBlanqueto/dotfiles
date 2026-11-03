@@ -1,4 +1,3 @@
-# Optional peripherals and roles, one switch per feature.
 {
   config,
   lib,

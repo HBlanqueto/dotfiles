@@ -1,4 +1,3 @@
-# Test VM for the first boot.
 {
   nixpkgs,
   inputs,

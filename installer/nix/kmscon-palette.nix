@@ -1,4 +1,3 @@
-# Renders the neptunia palette as kmscon `--palette*` arguments.
 { pkgs, theme }:
 
 let

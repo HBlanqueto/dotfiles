@@ -1,4 +1,3 @@
-//! Time zones from tzdata.
 const ZONE1970_TAB: &str = include_str!(env!("KEEL_ZONE1970_TAB"));
 
 pub fn zones() -> Vec<String> {

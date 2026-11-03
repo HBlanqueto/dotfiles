@@ -1,4 +1,3 @@
-//! Embedded xkb keyboard layouts and variants.
 use std::sync::OnceLock;
 
 const XKB_BASE_LST: &str = include_str!(env!("KEEL_XKB_BASE_LST"));

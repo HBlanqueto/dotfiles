@@ -1,4 +1,3 @@
-# Extra hardware wiring on top of the facter modules.
 {
   config,
   lib,

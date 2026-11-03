@@ -1,4 +1,3 @@
-# Per-machine facts that are not committed to the repo.
 {
   config,
   lib,

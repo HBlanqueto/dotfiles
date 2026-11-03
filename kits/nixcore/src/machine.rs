@@ -1,4 +1,3 @@
-//! Machine data stored outside the repo (`machine.toml`).
 use crate::store;
 use color_eyre::eyre::Result;
 use std::path::{Path, PathBuf};

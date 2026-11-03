@@ -1,4 +1,3 @@
-# Btrfs root rollback on every boot (impermanence).
 { pkgs, ... }:
 
 {

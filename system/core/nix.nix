@@ -36,7 +36,7 @@
       allowUnfree = true;
     };
     overlays = [
-      (import ../overlays { inherit inputs; })
+      (import ../overlays)
       inputs.brave-previews.overlays.default
       (_final: prev: {
         xorg = prev.xorg // {

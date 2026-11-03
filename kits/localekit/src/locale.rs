@@ -1,4 +1,3 @@
-//! Glibc UTF-8 locales with names in their own language.
 use std::collections::HashSet;
 
 const SUPPORTED: &str = include_str!(env!("KEEL_LOCALES"));

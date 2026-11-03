@@ -1,4 +1,3 @@
-# Builds the nixosConfiguration for the generic profile.
 { inputs, theme }:
 {
   system,

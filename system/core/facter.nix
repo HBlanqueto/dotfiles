@@ -1,4 +1,3 @@
-# Hardware detection from a nixos-facter report.
 { lib, data, ... }:
 
 let

@@ -1,4 +1,3 @@
-# Home template "raft": fish, starship, git and theme only.
 { config, pkgs, ... }:
 
 let

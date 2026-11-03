@@ -1,4 +1,3 @@
-# Creates `users.users.<name>` from the external user data.
 { lib, data, ... }:
 
 let

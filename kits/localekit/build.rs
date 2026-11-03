@@ -1,4 +1,3 @@
-//! Generates the locale name table from glibc locale files.
 use std::fmt::Write as _;
 use std::path::PathBuf;
 

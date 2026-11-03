@@ -1,4 +1,3 @@
-//! Reads and rewrites the external TOML data.
 use color_eyre::eyre::{eyre, Context, Result};
 use std::path::Path;
 use toml_edit::{Array, DocumentMut, Item, Table, Value};

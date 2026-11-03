@@ -1,4 +1,3 @@
-# nixdots-rebuild: safe wrapper around nixos-rebuild.
 mode="${1:-sw}"
 update=0
 case "$mode" in

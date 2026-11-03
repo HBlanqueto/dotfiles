@@ -1,4 +1,3 @@
-# Bootloader selection driven by `keel.machine.secureBoot`.
 {
   config,
   lib,

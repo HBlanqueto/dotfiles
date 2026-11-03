@@ -1,4 +1,3 @@
-# Home-manager modules exported as `homeModules`.
 let
   theme = import ../../../kits/neptunia;
 

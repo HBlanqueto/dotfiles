@@ -1,4 +1,3 @@
-# System-wide locale, time zone, keyboard, console and account settings.
 {
   config,
   lib,

@@ -1,4 +1,3 @@
-# TPM2 auto-unlock of the LUKS2 root.
 {
   config,
   lib,

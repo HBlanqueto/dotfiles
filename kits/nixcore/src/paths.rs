@@ -1,4 +1,3 @@
-//! Paths of the external data, derived from `KEEL_ROOT`.
 use std::path::PathBuf;
 
 pub fn root() -> String {

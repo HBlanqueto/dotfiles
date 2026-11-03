@@ -601,21 +601,34 @@ fn step_disk_whole(plan: &Plan, report: &mut Reporter) -> Result<Option<detect::
         luks.path, luks.uuid
     ));
 
-    let pass_path = pass.as_ref().map(SecretFile::path);
+    enroll_keys(
+        plan,
+        report,
+        &luks.path,
+        pass.as_ref().map(SecretFile::path),
+    )?;
+    Ok(Some(luks))
+}
+
+fn enroll_keys(
+    plan: &Plan,
+    report: &mut Reporter,
+    device: &str,
+    pass_path: Option<&Path>,
+) -> Result<()> {
     if let Some(pass_path) = pass_path {
         verify_key(
             report,
-            &luks.path,
+            device,
             pass_path,
             "la frase del disco no coincide con la configurada",
         )?;
     }
-
-    step_recovery_key(plan, report, &luks.path, pass_path)?;
+    step_recovery_key(plan, report, device, pass_path)?;
     if plan.luks_tpm {
-        step_tpm_enroll(plan, report, &luks.path, pass_path)?;
+        step_tpm_enroll(plan, report, device, pass_path)?;
     }
-    Ok(Some(luks))
+    Ok(())
 }
 
 fn step_disk_alongside(
@@ -626,14 +639,15 @@ fn step_disk_alongside(
 ) -> Result<Option<detect::LuksPartition>> {
     if plan.dry_run {
         report.log("(simulación) particiones nuevas creadas en el espacio libre");
-        return Ok(if plan.encrypt {
-            Some(detect::LuksPartition {
-                path: format!("{}4", plan.device),
-                uuid: "00000000-0000-0000-0000-000000000000".to_string(),
-            })
-        } else {
-            None
-        });
+        if !plan.encrypt {
+            return Ok(None);
+        }
+        let luks = detect::LuksPartition {
+            path: format!("{}4", plan.device),
+            uuid: "00000000-0000-0000-0000-000000000000".to_string(),
+        };
+        enroll_keys(plan, report, &luks.path, None)?;
+        return Ok(Some(luks));
     }
 
     clean_target(plan, report);
@@ -700,6 +714,7 @@ fn step_disk_alongside(
         )
         .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
         .unwrap_or_default();
+        enroll_keys(plan, report, &system, Some(pass_path))?;
         (
             "/dev/mapper/cryptroot".to_string(),
             Some(detect::LuksPartition {

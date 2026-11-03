@@ -268,9 +268,9 @@ fn prepare_target_tmp(plan: &Plan, report: &mut Reporter) -> Result<()> {
     let build = target_build_dir(plan);
     if !plan.dry_run {
         fs::create_dir_all(&tmp)?;
-        set_mode_dir(&tmp, 0o755)?;
+        set_mode(&tmp, 0o755)?;
         fs::create_dir_all(&build)?;
-        set_mode_dir(&build, 0o700)?;
+        set_mode(&build, 0o700)?;
     }
     std::env::set_var("TMPDIR", &tmp);
     std::env::set_var("KEEL_ROOT", &plan.root);
@@ -344,13 +344,13 @@ impl TempSwap {
             .arg("8g")
             .arg_path(&path);
         ensure_ok(
-            exec(plan, report, &mkswap, &plan.source)?,
+            exec_in(plan, report, &mkswap, &plan.source)?,
             "no se pudo crear el swap temporal",
         )?;
 
         let swapon = Cmd::new("swapon").arg_path(&path);
         ensure_ok(
-            exec(plan, report, &swapon, &plan.source)?,
+            exec_in(plan, report, &swapon, &plan.source)?,
             "no se pudo activar el swap temporal",
         )?;
 
@@ -433,7 +433,7 @@ fn ensure_disk_ready(plan: &Plan, report: &mut Reporter) -> Result<()> {
         .arg_path(pass.path());
 
     ensure_ok(
-        exec(plan, report, &cmd, &plan.source)?,
+        exec_in(plan, report, &cmd, &plan.source)?,
         "no se pudo volver a montar el disco",
     )
 }
@@ -529,7 +529,7 @@ fn step_disk_whole(plan: &Plan, report: &mut Reporter) -> Result<detect::LuksPar
     ));
 
     ensure_ok(
-        exec(plan, report, &cmd, &plan.source)?,
+        exec_in(plan, report, &cmd, &plan.source)?,
         "no se pudo cifrar y formatear el disco",
     )?;
 
@@ -901,7 +901,7 @@ fn mount_alongside(plan: &Plan, report: &mut Reporter, data: &str, esp: &str) ->
 }
 
 fn run_ok(plan: &Plan, report: &mut Reporter, cmd: &Cmd, what: &str) -> Result<()> {
-    ensure_ok(exec(plan, report, cmd, &plan.source)?, what)
+    ensure_ok(exec_in(plan, report, cmd, &plan.source)?, what)
 }
 
 fn human_gib(bytes: u64) -> String {
@@ -950,7 +950,7 @@ impl SecretFile {
     fn write(name: &str, secret: &str) -> Result<Self> {
         let dir = Path::new("/run/keel");
         fs::create_dir_all(dir)?;
-        set_mode_dir(dir, 0o700)?;
+        set_mode(dir, 0o700)?;
         let path = dir.join(name);
         let mut file = OpenOptions::new()
             .create(true)
@@ -1157,7 +1157,7 @@ fn ensure_repo_ready(plan: &Plan, report: &mut Reporter, repo: &Path) -> Result<
         .arg("u+w")
         .arg_path(repo)
         .with_display(format!("chmod -R u+w {}", repo.display()));
-    let _ = exec(plan, report, &chmod, &plan.source);
+    let _ = exec_in(plan, report, &chmod, &plan.source);
 
     if repo.join(".git").exists() {
         return Ok(());
@@ -1166,9 +1166,12 @@ fn ensure_repo_ready(plan: &Plan, report: &mut Reporter, repo: &Path) -> Result<
     report.log("git: repo sin .git; se crea un commit inicial");
 
     let init = git_cmd(repo, &["init"]);
-    ensure_ok(exec(plan, report, &init, &plan.source)?, "git init falló")?;
+    ensure_ok(
+        exec_in(plan, report, &init, &plan.source)?,
+        "git init falló",
+    )?;
     let add = git_cmd(repo, &["add", "-A"]);
-    ensure_ok(exec(plan, report, &add, &plan.source)?, "git add falló")?;
+    ensure_ok(exec_in(plan, report, &add, &plan.source)?, "git add falló")?;
     let commit = git_cmd(
         repo,
         &[
@@ -1182,7 +1185,7 @@ fn ensure_repo_ready(plan: &Plan, report: &mut Reporter, repo: &Path) -> Result<
         ],
     );
     ensure_ok(
-        exec(plan, report, &commit, &plan.source)?,
+        exec_in(plan, report, &commit, &plan.source)?,
         "git commit falló",
     )
 }
@@ -1213,11 +1216,11 @@ fn step_hardware(plan: &Plan, report: &mut Reporter, luks: &detect::LuksPartitio
         .arg_path(&facter)
         .with_display(format!("nixos-facter -o {}", facter.display()));
     ensure_ok(
-        exec(plan, report, &cmd, &plan.source)?,
+        exec_in(plan, report, &cmd, &plan.source)?,
         "nixos-facter falló",
     )?;
     if !plan.dry_run {
-        set_mode_file(&facter, 0o644)?;
+        set_mode(&facter, 0o644)?;
     }
 
     let machine = dir.join("machine.toml");
@@ -1257,7 +1260,7 @@ fn step_hardware(plan: &Plan, report: &mut Reporter, luks: &detect::LuksPartitio
     report.log(format!("$ escribir {}", machine.display()));
     nixcore::machine::merge_fields_at(&machine, fields)?;
     if !plan.dry_run {
-        set_mode_file(&machine, 0o644)?;
+        set_mode(&machine, 0o644)?;
     }
     Ok(())
 }
@@ -1326,7 +1329,7 @@ fn step_persist(plan: &Plan, report: &mut Reporter) -> Result<()> {
 
     let secrets = persist.join("secrets");
     fs::create_dir_all(&secrets)?;
-    set_mode_dir(&secrets, 0o711)?;
+    set_mode(&secrets, 0o711)?;
 
     persist_wifi(plan, report)?;
     Ok(())
@@ -1363,7 +1366,7 @@ fn create_persist_dir(
             .map(|m| m as u32)
             .unwrap_or(0o755)
     };
-    set_mode_dir(&target, mode)?;
+    set_mode(&target, mode)?;
 
     if let Some(user) = entry.get("user").and_then(|u| u.as_str()) {
         let group = entry.get("group").and_then(|g| g.as_str()).unwrap_or(user);
@@ -1434,14 +1437,14 @@ fn persist_wifi(plan: &Plan, report: &mut Reporter) -> Result<()> {
         .root
         .join("persist/etc/NetworkManager/system-connections");
     fs::create_dir_all(&dst_dir)?;
-    set_mode_dir(&dst_dir, 0o700)?;
+    set_mode(&dst_dir, 0o700)?;
     let dst = dst_dir.join(format!("{}.nmconnection", wifi.ssid));
     report.log(format!("$ cp {} {}", src.display(), dst.display()));
     if plan.dry_run {
         fs::write(&dst, "")?;
     } else {
         match fs::copy(&src, &dst) {
-            Ok(_) => set_mode_file(&dst, 0o600)?,
+            Ok(_) => set_mode(&dst, 0o600)?,
             Err(err) => report.log(format!("aviso: no se pudo copiar la conexión Wi-Fi: {err}")),
         }
     }
@@ -1483,7 +1486,7 @@ fn step_secure_boot(plan: &Plan, report: &mut Reporter) -> Result<()> {
         .arg("--directory")
         .arg_path(&keys)
         .with_display("sbctl create-keys --directory /mnt/persist/var/lib/sbctl");
-    let code = exec(plan, report, &cmd, &plan.source)?;
+    let code = exec_in(plan, report, &cmd, &plan.source)?;
     ensure_ok(code, "sbctl create-keys falló")?;
     Ok(())
 }
@@ -1561,10 +1564,6 @@ fn run_with_progress(plan: &Plan, report: &mut Reporter, cmd: &Cmd) -> i32 {
     let code = runner::run(cmd, &mut sink);
     report.repaint();
     code
-}
-
-fn exec(plan: &Plan, report: &mut Reporter, cmd: &Cmd, cwd: &Path) -> Result<i32> {
-    exec_in(plan, report, cmd, cwd)
 }
 
 fn command_line(plan: &Plan, cmd: &Cmd) -> String {
@@ -1920,15 +1919,11 @@ fn last_error_line(stderr: &str) -> String {
         .unwrap_or_else(|| "la configuración no evalúa".to_string())
 }
 
-fn set_mode_dir(path: &Path, mode: u32) -> Result<()> {
+fn set_mode(path: &Path, mode: u32) -> Result<()> {
     let mut perms = fs::metadata(path)?.permissions();
     perms.set_mode(mode);
     fs::set_permissions(path, perms)?;
     Ok(())
-}
-
-fn set_mode_file(path: &Path, mode: u32) -> Result<()> {
-    set_mode_dir(path, mode)
 }
 
 fn copy_log_to_persist(plan: &Plan, report: &mut Reporter) {

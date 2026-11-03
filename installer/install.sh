@@ -37,7 +37,7 @@ else
 fi
 
 # shellcheck disable=SC2086
-tool_pkgs="$nixpkgs#disko $nixpkgs#mkpasswd $nixpkgs#sbctl $nixpkgs#nixos-facter"
+tool_pkgs="$nixpkgs#disko $nixpkgs#sbctl $nixpkgs#nixos-facter"
 
 mkdir -p "$WORK"
 binary="$WORK/nixdots-installer-$arch"

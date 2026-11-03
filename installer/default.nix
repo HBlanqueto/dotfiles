@@ -11,7 +11,6 @@ let
       util-linux
       cryptsetup
       systemd
-      mkpasswd
       sbctl
       nixos-facter
       less

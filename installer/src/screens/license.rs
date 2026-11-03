@@ -1,4 +1,3 @@
-//! License screen with the GPL text and accept/decline buttons.
 use crate::app::{Action, App};
 use crate::widgets::{self, Btn, ButtonRow};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};

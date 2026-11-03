@@ -1,4 +1,3 @@
-//! Disk picker screen.
 use crate::app::{Action, App};
 use crate::detect::{human_size, Disk};
 use crate::disk::{self as diskplan, DiskDecision};

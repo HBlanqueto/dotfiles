@@ -1,4 +1,3 @@
-//! Runs the installation steps and streams their output to the UI.
 use crate::detect;
 use crate::runner::{self, Cmd, Stream};
 use crate::settings::Settings;

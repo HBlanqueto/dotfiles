@@ -1,4 +1,3 @@
-//! Disk helpers: choosing how to install on a disk.
 use crate::detect::{self, Disk};
 
 pub const GIB: u64 = 1024 * 1024 * 1024;

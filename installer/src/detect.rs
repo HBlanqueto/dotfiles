@@ -1,4 +1,3 @@
-//! Detects the machine model, disks and network backends.
 use serde::Deserialize;
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::Path;

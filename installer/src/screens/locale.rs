@@ -1,4 +1,3 @@
-//! Language selection screen.
 use crate::app::{Action, App, PickItem};
 use crate::widgets::Btn;
 use ratatui::crossterm::event::KeyEvent;

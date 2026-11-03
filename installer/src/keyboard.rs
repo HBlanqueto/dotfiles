@@ -1,4 +1,3 @@
-//! Detects the active keyboard layout and applies one to the console.
 use std::process::{Command, Stdio};
 
 pub use localekit::keyboard::{all, by_id, display, suggest, Layout};

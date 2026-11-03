@@ -1,4 +1,3 @@
-//! Installer application state and the terminal layout shared by every screen.
 use crate::detect::{self, Disk};
 use crate::disk::{self, DiskDecision};
 use crate::install::{self, Msg as InstallMsg, Plan, Step};

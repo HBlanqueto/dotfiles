@@ -1,4 +1,3 @@
-//! Installer screens; each exposes `draw`, `key`, `height`, `commands` and `buttons`.
 pub mod disk;
 pub mod done;
 pub mod encryption;

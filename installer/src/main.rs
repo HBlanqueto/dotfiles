@@ -1,4 +1,3 @@
-//! Text-mode installer entry point (dry-run by default, `--install` for real).
 use color_eyre::eyre::{bail, Result};
 use nixdots_installer::app::App;
 use nixdots_installer::detect;

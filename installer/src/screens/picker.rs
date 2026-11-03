@@ -1,4 +1,3 @@
-//! Shared drawing and key handling for searchable list pickers.
 use crate::app::Picker;
 use crate::theme::Palette;
 use crate::widgets;

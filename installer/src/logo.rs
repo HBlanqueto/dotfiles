@@ -1,4 +1,3 @@
-//! NixOS logo converted to ratatui text.
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 

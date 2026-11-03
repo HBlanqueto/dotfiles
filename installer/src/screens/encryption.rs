@@ -1,4 +1,3 @@
-//! Encryption screen: LUKS passphrase, recovery key and TPM unlock.
 use crate::app::{Action, App, ENC_CONFIRM, ENC_NOTED, ENC_PASS, ENC_TPM};
 use crate::runner::{self, Cmd};
 use crate::widgets::{self, Btn};

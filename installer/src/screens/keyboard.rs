@@ -1,4 +1,3 @@
-//! Keyboard layout screen.
 use crate::app::{Action, App};
 use crate::widgets::{self, Btn};
 use ratatui::crossterm::event::{Event, KeyCode, KeyEvent};

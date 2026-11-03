@@ -1,4 +1,3 @@
-//! Network probing, Wi-Fi association and the backend abstraction.
 use color_eyre::eyre::{eyre, Result};
 use std::process::{Command, Stdio};
 use std::sync::Arc;

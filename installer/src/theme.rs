@@ -1,4 +1,3 @@
-//! Installer color palette.
 use ratatui::style::Color;
 
 pub mod hex {

@@ -1,4 +1,3 @@
-//! Small shared widgets: buttons, fields, list rows and dialog dimmer.
 use crate::theme::Palette;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};

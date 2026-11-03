@@ -61,6 +61,7 @@ in
       wants = [ "sound.target" ];
       after = [ "sound.target" ];
       wantedBy = [ "multi-user.target" ];
+      restartIfChanged = false;
 
       serviceConfig = {
         Type = "oneshot";

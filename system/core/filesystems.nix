@@ -65,8 +65,8 @@ in
 
   assertions = [
     {
-      assertion = !m.encrypt || config.boot.initrd.luks.devices ? "cryptroot";
-      message = "keel.machine.encrypt está activo pero no hay boot.initrd.luks.devices.cryptroot";
+      assertion = !m.encrypt || m.luksUuid != "";
+      message = "keel.machine.encrypt está activo pero keel.machine.luksUuid está vacío";
     }
   ];
 }

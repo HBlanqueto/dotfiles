@@ -1,9 +1,6 @@
 use ratatui::style::Color;
 
 pub mod hex {
-    #![allow(dead_code)]
-
-    pub const DBG: &str = "0d1219";
     pub const LBG: &str = "212b38";
 
     pub const FG: &str = "adbac7";
@@ -242,7 +239,6 @@ mod tests {
         let n = neptunia();
 
         let checks: &[(&str, &str)] = &[
-            ("dbg", hex::DBG),
             ("lbg", hex::LBG),
             ("fg", hex::FG),
             ("bg", hex::BG),

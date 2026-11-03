@@ -700,7 +700,7 @@ fn shrink_ntfs(plan: &Plan, report: &mut Reporter, spec: &ShrinkSpec) -> Result<
 
     let index = partition_index(&spec.ntfs)
         .ok_or_else(|| eyre!("no se pudo leer el número de partición de {}", spec.ntfs))?;
-    let start = partition_start(plan, report, &plan.device, index)?;
+    let start = partition_start(&plan.device, index)?;
     let end = format!("+{}", target / 512);
     let cmd = Cmd::new("sgdisk")
         .arg(format!("--delete={index}"))
@@ -794,7 +794,7 @@ fn partition_index(device: &str) -> Option<u32> {
     digits.parse().ok()
 }
 
-fn partition_start(plan: &Plan, report: &mut Reporter, device: &str, index: u32) -> Result<String> {
+fn partition_start(device: &str, index: u32) -> Result<String> {
     let out = runner::capture(&Cmd::new("sgdisk").arg(format!("-i={index}")).arg(device))?;
     let text = String::from_utf8_lossy(&out.stdout);
     for line in text.lines() {
@@ -805,7 +805,6 @@ fn partition_start(plan: &Plan, report: &mut Reporter, device: &str, index: u32)
             }
         }
     }
-    let _ = (plan, report);
     Err(eyre!(
         "no se pudo leer el primer sector de la partición {index}"
     ))
@@ -1313,7 +1312,7 @@ fn step_persist(plan: &Plan, report: &mut Reporter) -> Result<()> {
             if entry_path(entry).as_deref() == Some("/var/log") {
                 log_dup = true;
             }
-            create_persist_dir(plan, report, &persist, entry)?;
+            create_persist_dir(report, &persist, entry)?;
         }
         if log_dup {
             report.log("aviso: /var/log definido dos veces: subvolumen @log e impermanence");
@@ -1321,7 +1320,7 @@ fn step_persist(plan: &Plan, report: &mut Reporter) -> Result<()> {
     }
     if let Some(files) = entries.get("files").and_then(|f| f.as_array()) {
         for entry in files {
-            create_persist_file(plan, report, &persist, entry)?;
+            create_persist_file(report, &persist, entry)?;
         }
     }
 
@@ -1346,7 +1345,6 @@ fn entry_path(entry: &serde_json::Value) -> Option<String> {
 }
 
 fn create_persist_dir(
-    _plan: &Plan,
     report: &mut Reporter,
     persist: &Path,
     entry: &serde_json::Value,
@@ -1382,7 +1380,6 @@ fn create_persist_dir(
 }
 
 fn create_persist_file(
-    _plan: &Plan,
     report: &mut Reporter,
     persist: &Path,
     entry: &serde_json::Value,

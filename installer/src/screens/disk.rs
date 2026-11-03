@@ -81,17 +81,8 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     y += 1;
 
     if shrink_case {
-        if let DiskDecision::Shrink {
-            volume, max_free, ..
-        } = app.disks.decision
-        {
-            draw_shrink(
-                f,
-                app,
-                Rect::new(area.x, y, area.width, 1),
-                volume,
-                max_free,
-            );
+        if let DiskDecision::Shrink { volume, .. } = app.disks.decision {
+            draw_shrink(f, app, Rect::new(area.x, y, area.width, 1), volume);
             y += 1;
         }
     }
@@ -385,13 +376,11 @@ pub fn has_usable_disk(app: &App) -> bool {
         .any(|d| d.unusable_reason().is_none())
 }
 
-fn draw_shrink(f: &mut Frame, app: &App, area: Rect, volume: u64, max_free: u64) {
+fn draw_shrink(f: &mut Frame, app: &App, area: Rect, volume: u64) {
     let freed = app.disks.shrink_bytes;
     let windows = volume.saturating_sub(freed);
     let bar_w = area.width.saturating_sub(20).clamp(10, 60) as usize;
-    let total = windows + freed;
     let widths = diskplan::block_widths(&[windows, freed], bar_w);
-    let _ = total;
     let mut spans = vec![
         Span::styled("Windows ", Style::default().fg(app.palette.secondary)),
         Span::styled(
@@ -405,7 +394,6 @@ fn draw_shrink(f: &mut Frame, app: &App, area: Rect, volume: u64, max_free: u64)
         ),
         Span::styled(" Keel ", Style::default().fg(app.palette.primary)),
     ];
-    let _ = max_free;
     f.render_widget(
         Paragraph::new(Line::from(std::mem::take(&mut spans))).alignment(Alignment::Center),
         area,

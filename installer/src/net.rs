@@ -33,8 +33,7 @@ pub trait WifiBackend: Send + Sync {
     fn scan(&self) -> Vec<Wifi>;
     fn connect(&self, ssid: &str, pass: &str) -> Result<()>;
     fn status(&self) -> bool;
-    fn is_saved(&self, ssid: &str) -> bool {
-        let _ = ssid;
+    fn is_saved(&self, _ssid: &str) -> bool {
         false
     }
 }

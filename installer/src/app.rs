@@ -1007,7 +1007,10 @@ impl App {
                 shrink: None,
             },
             DiskDecision::Shrink {
-                ntfs, reuse_efi, ..
+                ntfs,
+                volume,
+                reuse_efi,
+                ..
             } => install::DiskMode::Alongside {
                 reuse_efi: if reuse_efi {
                     disk.efi().map(|e| e.path())
@@ -1016,7 +1019,7 @@ impl App {
                 },
                 shrink: Some(install::ShrinkSpec {
                     ntfs,
-                    free_bytes: self.disks.shrink_bytes,
+                    target_mib: volume.saturating_sub(self.disks.shrink_bytes) >> 20,
                 }),
             },
             _ => install::DiskMode::Whole,

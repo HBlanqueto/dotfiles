@@ -50,7 +50,7 @@ pub enum DiskMode {
 #[derive(Debug, Clone)]
 pub struct ShrinkSpec {
     pub ntfs: String,
-    pub free_bytes: u64,
+    pub target_mib: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -496,7 +496,11 @@ fn step_disk(plan: &Plan, report: &mut Reporter) -> Result<detect::LuksPartition
 
 fn step_disk_whole(plan: &Plan, report: &mut Reporter) -> Result<detect::LuksPartition> {
     if !plan.dry_run {
-        clean_target(plan, report);
+        clean_target(report);
+        if let Some(luks) = detect::luks_partition(&plan.device) {
+            let mut sink = |_: Stream| {};
+            let _ = runner::run(&Cmd::new("wipefs").arg("-a").arg(&luks.path), &mut sink);
+        }
     }
 
     report.log("creando las particiones y formateando el disco");
@@ -593,7 +597,8 @@ fn step_disk_alongside(
         return Ok(luks);
     }
 
-    clean_target(plan, report);
+    clean_target(report);
+    remove_created_partitions(plan, report)?;
 
     if let Some(spec) = shrink {
         shrink_ntfs(plan, report, spec)?;
@@ -669,15 +674,22 @@ fn step_disk_alongside(
 
 fn shrink_ntfs(plan: &Plan, report: &mut Reporter, spec: &ShrinkSpec) -> Result<()> {
     let current = current_ntfs_size(&spec.ntfs);
-    let target = current.saturating_sub(spec.free_bytes);
-    report.log(format!(
-        "Windows: se liberarán {} reduciendo {}",
-        detect::gb(spec.free_bytes),
-        spec.ntfs
-    ));
+    let target = spec.target_mib << 20;
     if current == 0 || target == 0 {
         return Err(eyre!("no se pudo calcular el tamaño final de Windows"));
     }
+    if current <= target {
+        report.log(format!(
+            "Windows ya mide {}; no se vuelve a reducir",
+            detect::gb(current)
+        ));
+        return Ok(());
+    }
+    report.log(format!(
+        "Windows: se reducirá {} a {}",
+        spec.ntfs,
+        detect::gb(target)
+    ));
 
     let check = Cmd::new("ntfsresize")
         .arg("--no-action")
@@ -691,30 +703,30 @@ fn shrink_ntfs(plan: &Plan, report: &mut Reporter, spec: &ShrinkSpec) -> Result<
         &check,
         "ntfsresize rechazó el tamaño propuesto",
     )?;
+    // Matar ntfsresize mientras mueve datos corrompe el NTFS.
     let real = Cmd::new("ntfsresize")
         .arg("--force")
         .arg("--size")
         .arg(target.to_string())
-        .arg(&spec.ntfs);
+        .arg(&spec.ntfs)
+        .without_idle_timeout();
     run_ok(plan, report, &real, "no se pudo reducir Windows")?;
 
     let index = partition_index(&spec.ntfs)
         .ok_or_else(|| eyre!("no se pudo leer el número de partición de {}", spec.ntfs))?;
-    let start = partition_start(&plan.device, index)?;
-    let end = format!("+{}", target / 512);
+    let entry = gpt_entry(&plan.device, index)?;
+    // Una sola llamada atómica (sgdisk solo escribe si todo sale bien) y mismo GUID: el BCD lo usa.
     let cmd = Cmd::new("sgdisk")
+        .arg("--set-alignment=1")
         .arg(format!("--delete={index}"))
-        .arg(&plan.device);
-    run_ok(
-        plan,
-        report,
-        &cmd,
-        "no se pudo reescribir la partición de Windows",
-    )?;
-    let cmd = Cmd::new("sgdisk")
-        .arg(format!("--new={index}:{start}:{end}"))
-        .arg(format!("--typecode={index}:0700"))
-        .arg(format!("--change-name={index}:Basic data partition"))
+        .arg(format!(
+            "--new={index}:{}:+{}M",
+            entry.first_sector, spec.target_mib
+        ))
+        .arg(format!("--typecode={index}:{}", entry.type_guid))
+        .arg(format!("--partition-guid={index}:{}", entry.unique_guid))
+        .arg(format!("--attributes={index}:=:{}", entry.attributes))
+        .arg(format!("--change-name={index}:{}", entry.name))
         .arg(&plan.device);
     run_ok(
         plan,
@@ -750,6 +762,11 @@ fn create_partition(
     } else {
         format!("+{size}")
     };
+    if let Some(existing) = find_partition(&plan.device, label) {
+        return Err(eyre!(
+            "{existing} ya se llama «{label}»; bórrala o elige otro disco antes de instalar"
+        ));
+    }
     let cmd = Cmd::new("sgdisk")
         .arg(format!("--new=0:0:{end}"))
         .arg(format!("--typecode=0:{type_code}"))
@@ -757,8 +774,10 @@ fn create_partition(
         .arg(&plan.device);
     run_ok(plan, report, &cmd, "no se pudo crear la partición")?;
     rescan(plan, report);
-    find_partition(&plan.device, label)
-        .ok_or_else(|| eyre!("no se encontró la partición nueva {label}"))
+    let path = find_partition(&plan.device, label)
+        .ok_or_else(|| eyre!("no se encontró la partición nueva {label}"))?;
+    created_partitions().push(path.clone());
+    Ok(path)
 }
 
 fn find_partition(device: &str, label: &str) -> Option<String> {
@@ -794,20 +813,44 @@ fn partition_index(device: &str) -> Option<u32> {
     digits.parse().ok()
 }
 
-fn partition_start(device: &str, index: u32) -> Result<String> {
-    let out = runner::capture(&Cmd::new("sgdisk").arg(format!("-i={index}")).arg(device))?;
-    let text = String::from_utf8_lossy(&out.stdout);
-    for line in text.lines() {
-        if let Some(rest) = line.strip_prefix("First sector:") {
-            let value = rest.split_whitespace().next().unwrap_or("");
-            if !value.is_empty() {
-                return Ok(value.to_string());
-            }
-        }
-    }
-    Err(eyre!(
-        "no se pudo leer el primer sector de la partición {index}"
-    ))
+struct GptEntry {
+    first_sector: String,
+    type_guid: String,
+    unique_guid: String,
+    attributes: String,
+    name: String,
+}
+
+fn gpt_entry(device: &str, index: u32) -> Result<GptEntry> {
+    let out = runner::capture(
+        &Cmd::new("sgdisk")
+            .arg(format!("--info={index}"))
+            .arg(device),
+    )?;
+    parse_gpt_entry(&String::from_utf8_lossy(&out.stdout))
+        .ok_or_else(|| eyre!("no se pudo leer la partición {index} de {device}"))
+}
+
+fn parse_gpt_entry(info: &str) -> Option<GptEntry> {
+    let field = |key: &str| {
+        info.lines()
+            .find_map(|line| line.strip_prefix(key))
+            .and_then(|rest| rest.split_whitespace().next())
+            .map(str::to_string)
+    };
+    let name = info
+        .lines()
+        .find_map(|line| line.strip_prefix("Partition name: "))?
+        .trim()
+        .trim_matches('\'')
+        .to_string();
+    Some(GptEntry {
+        first_sector: field("First sector:")?,
+        type_guid: field("Partition GUID code:")?,
+        unique_guid: field("Partition unique GUID:")?,
+        attributes: field("Attribute flags:")?,
+        name,
+    })
 }
 
 fn rescan(plan: &Plan, report: &mut Reporter) {
@@ -904,20 +947,48 @@ fn run_ok(plan: &Plan, report: &mut Reporter, cmd: &Cmd, what: &str) -> Result<(
     ensure_ok(exec_in(plan, report, cmd, &plan.source)?, what)
 }
 
-fn clean_target(plan: &Plan, report: &mut Reporter) {
-    report.log(
-        "$ umount -R /mnt; cryptsetup close cryptroot; wipefs -a <partición>   (limpieza previa)",
-    );
+fn clean_target(report: &mut Reporter) {
+    report.log("$ umount -R /mnt; cryptsetup close cryptroot   (limpieza previa)");
     let mut sink = |_: Stream| {};
     let _ = runner::run(&Cmd::new("umount").arg("-R").arg("/mnt"), &mut sink);
     let _ = runner::run(
         &Cmd::new("cryptsetup").arg("close").arg("cryptroot"),
         &mut sink,
     );
-    if let Some(luks) = detect::luks_partition(&plan.device) {
-        let _ = runner::run(&Cmd::new("wipefs").arg("-a").arg(&luks.path), &mut sink);
-    }
     let _ = fs::remove_dir_all("/run/keel");
+}
+
+fn remove_created_partitions(plan: &Plan, report: &mut Reporter) -> Result<()> {
+    let created = std::mem::take(&mut *created_partitions());
+    for path in created.iter().rev() {
+        let index = partition_index(path)
+            .ok_or_else(|| eyre!("no se pudo leer el número de partición de {path}"))?;
+        report.log(format!(
+            "$ wipefs -a {path}; sgdisk --delete={index}   (intento anterior)"
+        ));
+        let mut sink = |_: Stream| {};
+        let _ = runner::run(&Cmd::new("wipefs").arg("-a").arg(path), &mut sink);
+        run_ok(
+            plan,
+            report,
+            &Cmd::new("sgdisk")
+                .arg(format!("--delete={index}"))
+                .arg(&plan.device),
+            "no se pudo borrar la partición del intento anterior",
+        )?;
+    }
+    if !created.is_empty() {
+        rescan(plan, report);
+    }
+    Ok(())
+}
+
+// Solo se borra lo que creó este proceso: junto a Windows, el resto del disco no es nuestro.
+fn created_partitions() -> std::sync::MutexGuard<'static, Vec<String>> {
+    static CREATED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+    CREATED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 fn verify_key(report: &mut Reporter, device: &str, key_file: &Path, what: &str) -> Result<()> {
@@ -1555,7 +1626,7 @@ fn exec_in(plan: &Plan, report: &mut Reporter, cmd: &Cmd, cwd: &Path) -> Result<
         return Ok(0);
     }
 
-    let wrapped = Cmd::new("sh")
+    let mut wrapped = Cmd::new("sh")
         .arg("-c")
         .arg(format!(
             "cd {} && exec {}",
@@ -1563,6 +1634,7 @@ fn exec_in(plan: &Plan, report: &mut Reporter, cmd: &Cmd, cwd: &Path) -> Result<
             shell_command(cmd)
         ))
         .with_display(cmd.display.clone());
+    wrapped.idle_timeout = cmd.idle_timeout;
     let code = run_logged(report, &wrapped, |_| {});
     Ok(code)
 }

@@ -20,13 +20,14 @@ fn run() -> Result<()> {
     let username = username()?;
     let home = std::env::var("HOME").wrap_err("falta HOME")?;
     let config = Path::new(&home).join(".config/home-manager");
-    let prefs = Prefs::read(&username).unwrap_or(None);
 
     if config.join("flake.nix").is_file() {
         status("Tu escritorio ya está preparado.");
         delete_seed(&username);
         return Ok(());
     }
+
+    let prefs = Prefs::read(&username)?;
 
     phase(0);
     status("Preparando el flake del home");

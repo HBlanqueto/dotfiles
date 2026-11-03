@@ -124,4 +124,7 @@ in
   firstBoot = impure && !hasUsers;
 
   exists = path: impure && builtins.pathExists (root + path);
+
+  prefsSeed =
+    name: builtins.substring (builtins.stringLength root) (-1) "${usersDir}/${name}.prefs.toml";
 }

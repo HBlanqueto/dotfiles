@@ -1,4 +1,3 @@
-# Dev shell for the installer, the wizard and repo tools.
 {
   pkgs,
   tablesEnv,
@@ -18,32 +17,12 @@
         gcc
         clang
         lld
-        pkg-config
-        slint-viewer
-        slint-lsp
-        fontconfig
-        freetype
-        libxkbcommon
-        libglvnd
-        wayland
-        libx11
         setup
         nixfmt
         statix
         deadnix
         nil
       ];
-      LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (
-        with pkgs;
-        [
-          wayland
-          libxkbcommon
-          libglvnd
-          fontconfig
-          freetype
-          libx11
-        ]
-      );
     }
   );
 }

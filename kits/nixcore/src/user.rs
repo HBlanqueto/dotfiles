@@ -1,4 +1,3 @@
-//! User name validation.
 pub const RESERVED_USERS: &[&str] = &[
     "root",
     "nixos",
@@ -41,6 +40,19 @@ pub fn username_error(name: &str) -> Option<&'static str> {
     }
     if RESERVED_USERS.contains(&name) {
         return Some("nombre reservado");
+    }
+    None
+}
+
+pub fn full_name_error(name: &str) -> Option<&'static str> {
+    if name.trim().is_empty() {
+        return Some("no puede estar vacío");
+    }
+    if name.chars().count() > 128 {
+        return Some("máximo 128 caracteres");
+    }
+    if name.chars().any(|c| c.is_control() || c == ':') {
+        return Some("sin caracteres de control ni ':'");
     }
     None
 }

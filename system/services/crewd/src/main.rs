@@ -1,14 +1,10 @@
-//! `crewd`: system D-Bus service that manages user accounts.
 use std::collections::HashMap;
-use std::io::Write;
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use color_eyre::eyre::{bail, Context, Result};
-use nixcore::paths;
-use nixcore::rebuild::{self, Mode, Outcome};
+use nixcore::rebuild;
 use nixcore::user;
 use nixcore::user_data::{self, UserData};
 use tokio::sync::Mutex;
@@ -21,7 +17,6 @@ use zeroize::Zeroizing;
 const BUS_NAME: &str = "io.github.HBlanqueto.Keel.Crew1";
 const OBJECT_PATH: &str = "/io/github/HBlanqueto/Keel/Crew1";
 const ACTION: &str = "io.github.HBlanqueto.Keel.crew.manage";
-const MAX_FULL_NAME: usize = 128;
 
 #[proxy(
     default_service = "org.freedesktop.PolicyKit1",
@@ -287,14 +282,14 @@ async fn create(
     };
     progress(emitter, job, "create", 2, 30, "Escribiendo la cuenta").await;
     user.write()?;
-    if let Err(err) = write_hash(username, &hash) {
+    if let Err(err) = user_data::write_hash(username, &hash) {
         let _ = std::fs::remove_file(user_data::path_for(username));
         return Err(err);
     }
     progress(emitter, job, "create", 3, 50, "Reconstruyendo el sistema").await;
     if let Err(err) = rebuild_system(emitter, job, "create", Vec::new()).await {
         let _ = std::fs::remove_file(user_data::path_for(username));
-        let _ = std::fs::remove_file(hash_path(username));
+        let _ = std::fs::remove_file(user_data::hash_path(username));
         return Err(err);
     }
     progress(emitter, job, "create", 4, 100, "Cuenta creada").await;
@@ -319,10 +314,10 @@ async fn delete(
     progress(emitter, job, "delete", 1, 10, "Eliminando la cuenta").await;
 
     let user_bak = std::fs::read_to_string(user_data::path_for(username)).ok();
-    let hash_bak = std::fs::read(hash_path(username)).ok();
+    let hash_bak = std::fs::read(user_data::hash_path(username)).ok();
     let prefs_bak = std::fs::read_to_string(user_data::prefs_path_for(username)).ok();
     let _ = std::fs::remove_file(user_data::path_for(username));
-    let _ = std::fs::remove_file(hash_path(username));
+    let _ = std::fs::remove_file(user_data::hash_path(username));
     let _ = std::fs::remove_file(user_data::prefs_path_for(username));
 
     progress(emitter, job, "delete", 2, 50, "Reconstruyendo el sistema").await;
@@ -387,11 +382,11 @@ async fn set_password(
     )
     .await;
     let hash = nixcore::crypto::hash_password(password)?;
-    let old = std::fs::read(hash_path(username)).ok();
-    write_hash(username, &hash)?;
+    let old = std::fs::read(user_data::hash_path(username)).ok();
+    user_data::write_hash(username, &hash)?;
     if let Err(err) = rebuild_system(emitter, job, "set-password", Vec::new()).await {
         if let Some(old) = old {
-            let _ = write_hash(username, &String::from_utf8_lossy(&old));
+            let _ = user_data::write_hash(username, &String::from_utf8_lossy(&old));
         }
         return Err(err);
     }
@@ -445,21 +440,26 @@ async fn rebuild_system(
     allow_missing: Vec<String>,
 ) -> Result<()> {
     let (flake_ref, _rev) = rebuild::system_ref()?;
-    let outcome =
-        tokio::task::spawn_blocking(move || rebuild::run(&flake_ref, Mode::Switch, &allow_missing))
+    let failed_units =
+        tokio::task::spawn_blocking(move || rebuild::switch(&flake_ref, &allow_missing))
             .await
             .wrap_err("la reconstrucción se interrumpió")??;
-    warn_failed(emitter, job, action, &outcome).await;
+    warn_failed(emitter, job, action, &failed_units).await;
     Ok(())
 }
 
-async fn warn_failed(emitter: &SignalEmitter<'static>, job: u32, action: &str, outcome: &Outcome) {
-    if outcome.failed_units.is_empty() {
+async fn warn_failed(
+    emitter: &SignalEmitter<'static>,
+    job: u32,
+    action: &str,
+    failed_units: &[String],
+) {
+    if failed_units.is_empty() {
         return;
     }
     let message = format!(
         "el sistema se activó, pero quedaron unidades en fallo: {}",
-        outcome.failed_units.join(", ")
+        failed_units.join(", ")
     );
     let _ = Users::warning(emitter, job, action, &message).await;
 }
@@ -472,18 +472,8 @@ fn validate_username(username: &str) -> fdo::Result<()> {
 }
 
 fn validate_full_name(full_name: &str) -> fdo::Result<()> {
-    if full_name.trim().is_empty() {
-        return Err(fdo::Error::Failed("el nombre no puede estar vacío".into()));
-    }
-    if full_name.chars().count() > MAX_FULL_NAME {
-        return Err(fdo::Error::Failed(format!(
-            "el nombre supera {MAX_FULL_NAME} caracteres"
-        )));
-    }
-    if full_name.chars().any(|c| c.is_control() || c == ':') {
-        return Err(fdo::Error::Failed(
-            "el nombre no puede llevar caracteres de control ni ':'".into(),
-        ));
+    if let Some(err) = user::full_name_error(full_name) {
+        return Err(fdo::Error::Failed(format!("nombre inválido: {err}")));
     }
     Ok(())
 }
@@ -536,37 +526,12 @@ fn user_has_processes(username: &str) -> Result<bool> {
     Ok(false)
 }
 
-fn hash_path(username: &str) -> PathBuf {
-    paths::secrets().join(format!("{username}.hash"))
-}
-
-fn write_hash(username: &str, hash: &str) -> Result<()> {
-    let dir = paths::secrets();
-    std::fs::create_dir_all(&dir)?;
-    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o711))?;
-    let path = hash_path(username);
-    let tmp = dir.join(format!(".{username}.hash.tmp"));
-    {
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&tmp)?;
-        file.write_all(hash.as_bytes())?;
-        file.sync_all()?;
-    }
-    std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600))?;
-    std::fs::rename(&tmp, &path)?;
-    Ok(())
-}
-
 fn restore(username: &str, user: Option<&str>, hash: Option<&[u8]>, prefs: Option<&str>) {
     if let Some(text) = user {
         let _ = std::fs::write(user_data::path_for(username), text);
     }
     if let Some(bytes) = hash {
-        let _ = write_hash(username, &String::from_utf8_lossy(bytes));
+        let _ = user_data::write_hash(username, &String::from_utf8_lossy(bytes));
     }
     if let Some(text) = prefs {
         let _ = std::fs::write(user_data::prefs_path_for(username), text);

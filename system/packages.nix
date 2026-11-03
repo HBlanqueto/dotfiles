@@ -13,6 +13,7 @@
     description = "First-login home setup for Keel";
     runtimeInputs = [
       pkgs.home-manager
+      pkgs.libnotify
       pkgs.systemd
       pkgs.git
       pkgs.coreutils
@@ -20,6 +21,4 @@
   };
 
   nixdots-rebuild = pkgs.callPackage ./packages/nixdots-rebuild.nix { };
-
-  xnu-console-font = pkgs.callPackage ./packages/xnu-console-font.nix { };
 }

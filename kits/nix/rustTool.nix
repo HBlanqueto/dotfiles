@@ -1,4 +1,3 @@
-# Common builder for the repo's Rust binaries.
 {
   pkgs,
   root,
@@ -22,7 +21,6 @@ let
         (root + "/Cargo.toml")
         (root + "/Cargo.lock")
         (root + "/welcome/cli")
-        (root + "/welcome/gui")
         (root + "/installer/Cargo.toml")
         (root + "/installer/src")
         (root + "/installer/assets")
@@ -32,7 +30,6 @@ let
         (root + "/.cargo")
         (root + "/LICENSE")
         (root + "/kits/neptunia/neptunia.nix")
-        (root + "/kits/neptunia/generated/neptunia.slint")
         (root + "/system/templates/home")
       ];
     };

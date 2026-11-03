@@ -1,33 +1,9 @@
-//! Safe rebuild of the installed system, used by `crewd` and `steward`.
 use color_eyre::eyre::{bail, eyre, Context, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use toml_edit::DocumentMut;
 
 use crate::runner;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Mode {
-    Switch,
-    Boot,
-    Build,
-}
-
-impl Mode {
-    fn arg(self) -> &'static str {
-        match self {
-            Mode::Switch => "switch",
-            Mode::Boot => "boot",
-            Mode::Build => "build",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct Outcome {
-    pub activated: bool,
-    pub failed_units: Vec<String>,
-}
 
 pub fn system_ref() -> Result<(PathBuf, String)> {
     let raw = std::fs::read_to_string("/etc/keel/source")
@@ -62,7 +38,7 @@ pub fn release_commit() -> Result<String> {
     Ok(commit)
 }
 
-pub fn run(flake_ref: &Path, mode: Mode, allow_missing: &[String]) -> Result<Outcome> {
+pub fn switch(flake_ref: &Path, allow_missing: &[String]) -> Result<Vec<String>> {
     let ref_arg = format!("path:{}#keel", flake_ref.display());
 
     let build = Command::new("nixos-rebuild")
@@ -82,27 +58,16 @@ pub fn run(flake_ref: &Path, mode: Mode, allow_missing: &[String]) -> Result<Out
         );
     }
 
-    if mode == Mode::Build {
-        return Ok(Outcome::default());
-    }
-
     let activate = Command::new("nixos-rebuild")
-        .args([mode.arg(), "--impure", "--flake", &ref_arg])
+        .args(["switch", "--impure", "--flake", &ref_arg])
         .env("NIX_CONFIG", runner::nix_config())
         .output()
         .wrap_err("no se pudo ejecutar nixos-rebuild")?;
     match activate.status.code() {
-        Some(0) => Ok(Outcome {
-            activated: true,
-            failed_units: Vec::new(),
-        }),
-        Some(4) => Ok(Outcome {
-            activated: true,
-            failed_units: failed_units(),
-        }),
+        Some(0) => Ok(Vec::new()),
+        Some(4) => Ok(failed_units()),
         code => bail!(
-            "nixos-rebuild {} falló (código {}): {}",
-            mode.arg(),
+            "nixos-rebuild switch falló (código {}): {}",
             code.map(|c| c.to_string())
                 .unwrap_or_else(|| "señal".into()),
             tail(&activate.stderr)

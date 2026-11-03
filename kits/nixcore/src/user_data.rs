@@ -1,7 +1,8 @@
-//! Per-user account data stored outside the repo.
 use crate::store;
 use color_eyre::eyre::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::io::Write;
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use toml_edit::{value, Item, Table};
 
@@ -20,48 +21,28 @@ pub struct A11y {
     pub screen_keyboard: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Git {
     pub name: String,
     pub email: String,
 }
 
-fn default_true() -> bool {
-    true
-}
-
-fn default_version() -> u32 {
-    1
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserData {
-    #[serde(default = "default_version")]
     pub version: u32,
     pub username: String,
     pub full_name: String,
-    #[serde(default = "default_true")]
     pub admin: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Prefs {
-    #[serde(default = "default_version")]
     pub version: u32,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color_scheme: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accent_color: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub avatar_color: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub avatar_path: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub a11y: Option<A11y>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub git: Option<Git>,
 }
 
@@ -357,4 +338,29 @@ pub fn migrate_to_toml() -> Result<usize> {
         }
     }
     Ok(written)
+}
+
+pub fn hash_path(username: &str) -> PathBuf {
+    crate::paths::secrets().join(format!("{username}.hash"))
+}
+
+pub fn write_hash(username: &str, hash: &str) -> Result<()> {
+    let dir = crate::paths::secrets();
+    std::fs::create_dir_all(&dir)?;
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o711))?;
+    let path = hash_path(username);
+    let tmp = dir.join(format!(".{username}.hash.tmp"));
+    {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&tmp)?;
+        file.write_all(hash.as_bytes())?;
+        file.sync_all()?;
+    }
+    std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600))?;
+    std::fs::rename(&tmp, &path)?;
+    Ok(())
 }

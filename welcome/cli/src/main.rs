@@ -1,25 +1,21 @@
-//! `nixdots-setup`: CLI that applies the first-boot wizard data.
 use color_eyre::eyre::{bail, eyre, Context, Result};
 use nixcore::machine;
 use nixcore::runner::{self, Cmd, Stream};
+use nixcore::store;
+use nixcore::user;
 use nixcore::user_data::{self, Git, LegacyUser, Prefs, UserData};
-use serde::Deserialize;
-use std::io::Read;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use zeroize::Zeroizing;
 
-const HELP: &str = "nixdots-setup apply <datos.json> [--repo <ruta>] [--dry-run]
+const HELP: &str = "nixdots-setup [--repo <ruta>] [--dry-run]
 
-  datos.json  fullName, username, locale, region, keyboardLayout,
-              keyboardVariant, timeZone, timeZoneAuto, a11y, colorScheme,
-              accentColor, avatarColor, autoLogin y, opcionalmente, gitName,
-              gitEmail, avatarPath y admin.
+  Asistente de texto del primer arranque. Pide nombre, usuario, contraseña,
+  inicio automático e identidad de git; escribe /persist/keel/users/<usuario>.toml,
+  el hash y la semilla de prefs, fusiona prettyHostName y autoLoginUser en
+  machine.toml y ejecuta nixos-rebuild boot.
   --repo      repositorio a reconstruir (defecto /persist/keel/repo)
   --dry-run   solo imprime lo que haría, sin escribir nada
-
-Los datos personales van a /persist/keel/users/<usuario>.json; los de sistema (locale, zona,
-teclado, prettyHostName, autoLoginUser) se fusionan en machine.toml. La
-contraseña se lee de stdin.
 
 nixdots-setup migrate [--dry-run]
 
@@ -31,39 +27,12 @@ nixdots-setup migrate-toml
   migrate-toml  convierte machine.json y /persist/keel/users/*.json a .toml conservando los
                 originales como respaldo (los seguirá leyendo si falta el .toml).";
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Data {
+struct Answers {
     full_name: String,
     username: String,
-    locale: String,
-    #[serde(default)]
-    region: Option<String>,
-    #[serde(default)]
-    keyboard_layout: String,
-    #[serde(default)]
-    keyboard_variant: String,
-    time_zone: String,
-    #[serde(default)]
-    time_zone_auto: Option<bool>,
-    #[serde(default)]
-    color_scheme: Option<String>,
-    #[serde(default)]
-    accent_color: Option<String>,
-    #[serde(default)]
-    avatar_color: Option<String>,
-    #[serde(default)]
-    avatar_path: Option<String>,
-    #[serde(default)]
-    auto_login: Option<bool>,
-    #[serde(default)]
-    a11y: Option<nixcore::user_data::A11y>,
-    #[serde(default)]
-    git_name: Option<String>,
-    #[serde(default)]
-    git_email: Option<String>,
-    #[serde(default)]
-    admin: Option<bool>,
+    password: Zeroizing<String>,
+    auto_login: bool,
+    git: Option<Git>,
 }
 
 fn main() {
@@ -77,19 +46,17 @@ fn main() {
 fn run() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
-        Some("apply") => apply(&args[1..]),
         Some("migrate") => migrate(&args[1..]),
         Some("migrate-toml") => migrate_toml(&args[1..]),
-        Some("-h") | Some("--help") | None => {
+        Some("-h") | Some("--help") => {
             println!("{HELP}");
             Ok(())
         }
-        Some(other) => bail!("orden desconocida: {other}\n\n{HELP}"),
+        _ => setup(&args),
     }
 }
 
-fn apply(args: &[String]) -> Result<()> {
-    let mut data_path = None;
+fn setup(args: &[String]) -> Result<()> {
     let mut repo = PathBuf::from("/persist/keel/repo");
     let mut dry_run = false;
     let mut it = args.iter();
@@ -99,133 +66,215 @@ fn apply(args: &[String]) -> Result<()> {
                 repo = PathBuf::from(it.next().ok_or_else(|| eyre!("--repo necesita un valor"))?)
             }
             "--dry-run" => dry_run = true,
-            "-h" | "--help" => {
-                println!("{HELP}");
-                return Ok(());
-            }
-            other if other.starts_with("--") => bail!("opción desconocida: {other}"),
-            other => data_path = Some(PathBuf::from(other)),
+            other => bail!("opción desconocida: {other}\n\n{HELP}"),
         }
     }
-    let data_path = data_path.ok_or_else(|| eyre!("falta el archivo de datos"))?;
-    let data = load_data(&data_path)?;
-    validate(&data)?;
-    let password = read_password()?;
-    let sim_fail = std::env::var_os("KEEL_SIM_FAIL").is_some();
+    println!("\nBienvenido a Keel. Vamos a crear tu cuenta.\n");
+    let answers = ask()?;
+    apply(&answers, &repo, dry_run)
+}
 
-    phase(0, dry_run);
-    let hash = nixcore::crypto::hash_password(&password)?;
-    let secrets = Path::new("/persist/secrets");
-    let hash_path = secrets.join(format!("{}.hash", data.username));
-    println!("$ escribir {} (0600)", hash_path.display());
-    if !dry_run {
-        std::fs::create_dir_all(secrets)?;
-        set_mode(secrets, 0o711)?;
+fn ask() -> Result<Answers> {
+    let full_name = ask_valid("Nombre completo", None, user::full_name_error)?;
+    let suggested = user::generate_username(&full_name);
+    let username = ask_valid("Nombre de usuario", Some(&suggested), user::username_error)?;
+    let password = ask_password()?;
+    let auto_login = ask_yes_no("¿Iniciar sesión automáticamente?")?;
+    let git_name = prompt("Nombre para git (Intro para omitir)", None)?;
+    let git = if git_name.is_empty() {
+        None
+    } else {
+        let email = ask_valid("Correo para git", None, email_error)?;
+        Some(Git {
+            name: git_name,
+            email,
+        })
+    };
+    Ok(Answers {
+        full_name,
+        username,
+        password,
+        auto_login,
+        git,
+    })
+}
+
+fn prompt(label: &str, default: Option<&str>) -> Result<String> {
+    match default {
+        Some(d) if !d.is_empty() => print!("{label} [{d}]: "),
+        _ => print!("{label}: "),
+    }
+    std::io::stdout().flush()?;
+    let mut line = String::new();
+    if std::io::stdin().read_line(&mut line)? == 0 {
+        bail!("se cerró la entrada");
+    }
+    let line = line.trim().to_string();
+    Ok(match default {
+        Some(d) if line.is_empty() => d.to_string(),
+        _ => line,
+    })
+}
+
+fn ask_valid(
+    label: &str,
+    default: Option<&str>,
+    error: fn(&str) -> Option<&'static str>,
+) -> Result<String> {
+    loop {
+        let answer = prompt(label, default)?;
+        match error(&answer) {
+            Some(err) => println!("  {err}"),
+            None => return Ok(answer),
+        }
+    }
+}
+
+fn ask_yes_no(label: &str) -> Result<bool> {
+    loop {
+        match prompt(&format!("{label} [s/N]"), None)?
+            .to_lowercase()
+            .as_str()
         {
-            use std::io::Write;
-            use std::os::unix::fs::OpenOptionsExt;
-            let mut file = std::fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .mode(0o600)
-                .open(&hash_path)?;
-            file.write_all(hash.as_bytes())?;
-            file.sync_all()?;
+            "" | "n" | "no" => return Ok(false),
+            "s" | "si" | "sí" => return Ok(true),
+            _ => println!("  responde s o n"),
         }
-        set_mode(&hash_path, 0o600)?;
     }
+}
 
-    phase(1, dry_run);
-    if sim_fail {
-        bail!("Fallo simulado al aplicar la configuración");
+fn ask_password() -> Result<Zeroizing<String>> {
+    loop {
+        let password = read_hidden("Contraseña")?;
+        if password.is_empty() {
+            println!("  no puede estar vacía");
+            continue;
+        }
+        if *read_hidden("Repite la contraseña")? != *password {
+            println!("  no coinciden");
+            continue;
+        }
+        return Ok(password);
     }
+}
+
+fn read_hidden(label: &str) -> Result<Zeroizing<String>> {
+    print!("{label}: ");
+    std::io::stdout().flush()?;
+    let _echo = EchoOff::new();
+    let mut line = Zeroizing::new(String::new());
+    if std::io::stdin().read_line(&mut line)? == 0 {
+        bail!("se cerró la entrada");
+    }
+    println!();
+    Ok(Zeroizing::new(
+        line.trim_end_matches(['\n', '\r']).to_string(),
+    ))
+}
+
+struct EchoOff;
+
+impl EchoOff {
+    fn new() -> Self {
+        stty("-echo");
+        EchoOff
+    }
+}
+
+impl Drop for EchoOff {
+    fn drop(&mut self) {
+        stty("echo");
+    }
+}
+
+fn stty(setting: &str) {
+    let _ = std::process::Command::new("stty")
+        .arg(setting)
+        .stderr(std::process::Stdio::null())
+        .status();
+}
+
+fn email_error(email: &str) -> Option<&'static str> {
+    if email.contains('@') && email.contains('.') {
+        None
+    } else {
+        Some("no parece un correo")
+    }
+}
+
+fn apply(answers: &Answers, repo: &Path, dry_run: bool) -> Result<()> {
+    let username = &answers.username;
+
+    println!("\n== Guardando la cuenta ==");
+    let hash = nixcore::crypto::hash_password(&answers.password)?;
+    println!(
+        "$ escribir {} (0600)",
+        user_data::hash_path(username).display()
+    );
     let user = UserData {
         version: 1,
-        username: data.username.clone(),
-        full_name: data.full_name.clone(),
-        admin: data.admin.unwrap_or(true),
+        username: username.clone(),
+        full_name: answers.full_name.clone(),
+        admin: true,
     };
     let prefs = Prefs {
-        version: 1,
-        color_scheme: data.color_scheme.clone().and_then(non_empty),
-        accent_color: data.accent_color.clone().and_then(non_empty),
-        avatar_color: data.avatar_color.clone().and_then(non_empty),
-        avatar_path: data.avatar_path.clone().and_then(non_empty),
-        a11y: data.a11y.clone(),
-        git: match (data.git_name.clone(), data.git_email.clone()) {
-            (Some(name), Some(email)) if !name.trim().is_empty() && !email.trim().is_empty() => {
-                Some(Git { name, email })
-            }
-            _ => None,
-        },
+        git: answers.git.clone(),
+        ..Prefs::default()
     };
+    println!("$ escribir {}", user_data::path_for(username).display());
     println!(
-        "$ escribir {} (0644)",
-        user_data::path_for(&data.username).display()
+        "$ escribir {} (0600)",
+        user_data::prefs_path_for(username).display()
     );
-    if !dry_run {
-        user.write()?;
-        println!(
-            "$ escribir {} (0644)",
-            user_data::prefs_path_for(&data.username).display()
-        );
-        prefs.write(&data.username)?;
-    }
-
     let mut fields = serde_json::Map::new();
     fields.insert(
         "prettyHostName".into(),
-        localized_pretty_host_name(&current_pretty_hostname(), &data.full_name, &data.locale)
-            .into(),
+        localized_pretty_host_name(
+            &current_pretty_hostname(),
+            &answers.full_name,
+            &machine_locale(),
+        )
+        .into(),
     );
-    fields.insert("defaultLocale".into(), data.locale.clone().into());
-    if let Some(region) = data.region.clone().and_then(non_empty) {
-        fields.insert("region".into(), region.into());
-    }
-    fields.insert("timeZone".into(), data.time_zone.clone().into());
-    fields.insert(
-        "timeZoneAuto".into(),
-        data.time_zone_auto.unwrap_or(false).into(),
-    );
-    if let Some(layout) = non_empty(data.keyboard_layout.clone()) {
-        fields.insert("keyboardLayout".into(), layout.into());
-    }
-    if let Some(variant) = non_empty(data.keyboard_variant.clone()) {
-        fields.insert("keyboardVariant".into(), variant.into());
-    }
     fields.insert(
         "autoLoginUser".into(),
-        if data.auto_login.unwrap_or(false) {
-            data.username.clone().into()
+        if answers.auto_login {
+            username.clone().into()
         } else {
             serde_json::Value::Null
         },
     );
-    println!("$ fusionar {} (0644)", machine::path().display());
+    println!("$ fusionar {}", machine::path().display());
     if !dry_run {
+        user_data::write_hash(username, &hash)?;
+        user.write()?;
+        prefs.write(username)?;
         machine::merge_fields(fields)?;
     }
 
-    phase(2, dry_run);
-    let host = hostname()?;
+    println!("\n== Construyendo el sistema ==");
     let rebuild = Cmd::new("nixos-rebuild")
         .args(["boot", "--impure", "--flake"])
-        .arg(format!("{}#{host}", repo.display()));
+        .arg(format!("{}#{}", repo.display(), hostname()?));
     run_step(&rebuild, dry_run, "nixos-rebuild")?;
 
-    phase(3, dry_run);
-    let home_link = format!("/home/{}/dotfiles", data.username);
     println!(
-        "$ ln -sfn {} {home_link} && chown -R 1000:users {}",
+        "$ ln -sfn {} /home/{username}/dotfiles && chown -R 1000:users {}",
         repo.display(),
         repo.display()
     );
     if !dry_run {
-        link_home(&data.username, &repo)?;
+        link_home(username, repo)?;
     }
-    phase(4, dry_run);
+    println!("\nListo. El equipo se reiniciará.");
     Ok(())
+}
+
+fn machine_locale() -> String {
+    store::load_document(&machine::path())
+        .ok()
+        .and_then(|doc| doc.get("defaultLocale")?.as_str().map(str::to_string))
+        .unwrap_or_default()
 }
 
 fn migrate(args: &[String]) -> Result<()> {
@@ -348,77 +397,12 @@ fn migrate_toml(args: &[String]) -> Result<()> {
     Ok(())
 }
 
-fn phase(n: u8, dry_run: bool) {
-    if dry_run && n > 0 {
-        std::thread::sleep(std::time::Duration::from_millis(1600));
-    }
-    println!("PHASE {n}");
-}
-
-fn load_data(path: &Path) -> Result<Data> {
-    let text = std::fs::read_to_string(path)
-        .wrap_err_with(|| format!("no se pudo leer {}", path.display()))?;
-    serde_json::from_str(&text).wrap_err("los datos no tienen el formato esperado")
-}
-
-fn validate(data: &Data) -> Result<()> {
-    if data.full_name.trim().is_empty() {
-        bail!("fullName está vacío");
-    }
-    if let Some(err) = nixcore::user::username_error(&data.username) {
-        bail!("username inválido: {err}");
-    }
-    if data.locale.trim().is_empty() {
-        bail!("locale está vacío");
-    }
-    if !locale_known(&data.locale) {
-        bail!("locale desconocido: {}", data.locale);
-    }
-    if let Some(region) = data.region.as_deref() {
-        if !region.trim().is_empty() && !locale_known(region) {
-            bail!("region desconocida: {region}");
-        }
-    }
-    if data.time_zone.trim().is_empty() {
-        bail!("timeZone está vacío");
-    }
-    if !timezone_known(&data.time_zone) {
-        bail!("zona horaria desconocida: {}", data.time_zone);
-    }
-    if let Some(email) = &data.git_email {
-        if !email.trim().is_empty() && !(email.contains('@') && email.contains('.')) {
-            bail!("gitEmail no parece un correo");
-        }
-    }
-    Ok(())
-}
-
-fn locale_known(code: &str) -> bool {
-    localekit::locale::all().iter().any(|l| l.code == code)
-}
-
-fn timezone_known(zone: &str) -> bool {
-    localekit::timezone::zones().iter().any(|z| z == zone)
-}
-
 fn non_empty(value: String) -> Option<String> {
     if value.trim().is_empty() {
         None
     } else {
         Some(value)
     }
-}
-
-fn read_password() -> Result<Zeroizing<String>> {
-    let mut buf = Zeroizing::new(String::new());
-    std::io::stdin()
-        .read_to_string(&mut buf)
-        .wrap_err("no se pudo leer la contraseña de stdin")?;
-    let password = buf.trim_end_matches(['\n', '\r']).to_string();
-    if password.is_empty() {
-        bail!("la contraseña está vacía");
-    }
-    Ok(Zeroizing::new(password))
 }
 
 fn hostname() -> Result<String> {
@@ -494,12 +478,6 @@ fn run_step(cmd: &Cmd, dry_run: bool, what: &str) -> Result<()> {
     if code != 0 {
         bail!("{what} falló (código {code})");
     }
-    Ok(())
-}
-
-fn set_mode(path: &Path, mode: u32) -> Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))?;
     Ok(())
 }
 

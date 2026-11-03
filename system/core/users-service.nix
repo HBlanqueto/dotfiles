@@ -1,4 +1,3 @@
-# Account management service (`crewd`) and first-login home setup.
 { pkgs, inputs, ... }:
 
 let
@@ -6,14 +5,6 @@ let
 
   userd = inputs.self.packages.${system}.crewd;
   homeInit = inputs.self.packages.${system}.home-init;
-  setupGui = inputs.self.packages.${system}.assist-setup;
-
-  homeInitSession = pkgs.writeShellScript "steward-home-session" ''
-    if [ -f "$HOME/.config/home-manager/flake.nix" ]; then
-        exec ${homeInit}/bin/nixdots-home-init
-    fi
-    exec ${setupGui}/bin/nixdots-setup-gui --home-init
-  '';
 
   polkitPolicy = pkgs.writeTextFile {
     name = "io.github.HBlanqueto.Keel.crew.manage.policy";
@@ -105,17 +96,9 @@ in
     after = [ "graphical-session.target" ];
     wants = [ "graphical-session.target" ];
 
-    path = [
-      homeInit
-      pkgs.home-manager
-      pkgs.systemd
-      pkgs.git
-      pkgs.coreutils
-    ];
-
     serviceConfig = {
       Type = "simple";
-      ExecStart = "${homeInitSession}";
+      ExecStart = "${homeInit}/bin/nixdots-home-init";
     };
   };
 }

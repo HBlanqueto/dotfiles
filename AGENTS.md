@@ -54,7 +54,7 @@ Se cumplen al pie de la letra. Ganan el diff más corto y la respuesta más cort
 10. **Investiga antes de suponer.** Si la causa o la API no está clara,
    consulta en internet, en este orden:
    1. el código y la documentación oficial de la dependencia **en la versión
-      fijada**: el código de nixpkgs en el rev de `flake.lock`, el manual de NixOS, la documentación de disko, lanzaboote, nixos-facter y home-manager, y docs.rs para ratatui y Slint;
+      fijada**: el código de nixpkgs en el rev de `flake.lock`, el manual de NixOS, la documentación de disko, lanzaboote, nixos-facter y home-manager, y docs.rs para ratatui;
    2. los issues, PR, changelogs y discusiones del proyecto upstream;
    3. foros como Discourse, Stack Overflow o Reddit, solo como pista y
       contrastados con 1 o 2.
@@ -101,9 +101,10 @@ users = builtins.fromTOML (builtins.readFile "/persist/keel/users/${u}.toml");
   arranque: `firstboot-vm` y `firstboot-vm-aarch64` (`dev.sh vm`).
 - **Datos fuera del repo**, en `/persist/nixdots/`:
   - `machine.toml` — el archivo del sistema. Lo escriben el instalador
-    (hostName, encrypt, luksUuid, espUuid, secureBoot, tpmUnlock, extras) y el
-    asistente (prettyHostName, defaultLocale, region, timeZone, timeZoneAuto,
-    keyboardLayout/Variant, autoLoginUser); gana el último en escribir. La
+    (hostName, encrypt, luksUuid, espUuid, secureBoot, tpmUnlock, extras,
+    defaultLocale, timeZone, keyboardLayout/Variant, prettyHostName) y el
+    asistente (prettyHostName con el nombre del usuario, autoLoginUser); gana el
+    último en escribir. La
     escritura fusiona sobre el TOML existente. `espUuid` es el UUID de la ESP de
     Windows reutilizada (vacío si se crea nueva); `/boot` se monta por ese UUID
     en ese caso, y por label `BOOT` en el resto.
@@ -113,8 +114,8 @@ users = builtins.fromTOML (builtins.readFile "/persist/keel/users/${u}.toml");
     `username`.
   - `/persist/keel/users/<usuario>.prefs.toml` — semilla de un solo uso para el home:
     apariencia y accesibilidad (colorScheme, accentColor, avatar*, a11y) y git.
-    La escribe el asistente (y `nixdots-userd`) con modo 0600 y dueño del
-    usuario; `nixdots-home-init` copia git a `home.nix` y el resto a
+    La escribe el asistente (solo git) con modo 0600; una regla tmpfiles `z`
+    le da dueño al crear la cuenta. `nixdots-home-init` copia git a `home.nix` y el resto a
     `~/.config/home-manager/prefs.toml`, y borra la semilla.
   - `user.json` — **respaldo transitorio**: si no hay usuarios en `/persist/keel/users/*`, `data.nix` lo
     lee como un único usuario `admin = true`.
@@ -154,7 +155,7 @@ dotfiles/
 ├── .github/        README corto, docs/ (instalador y sistema) y workflows/
 ├── system/         configuración NixOS, usuarios, servicios, plantillas y disko
 ├── installer/      instalador TUI, install.sh, launcher de kmscon y logo
-├── welcome/        asistente del primer arranque (CLI, GUI Slint) y su VM
+├── welcome/        asistente de texto del primer arranque y su VM
 ├── kits/           lo compartido: nixcore, localekit, neptunia y helpers Nix
 ├── flake.nix  flake.lock  Cargo.toml  Cargo.lock  .cargo/
 └── AGENTS.md  dev.sh  install.sh  LICENSE  .gitignore  .git-blame-ignore-revs
@@ -166,8 +167,7 @@ dotfiles/
   que solo exista en la ISO o en el asistente.
 - `installer/`: solo lo que corre desde la ISO (TUI, `install.sh`, launcher de
   kmscon y logo).
-- `welcome/`: solo el asistente del primer arranque (CLI, GUI Slint, diseño y
-  VM de prueba).
+- `welcome/`: solo el asistente de texto del primer arranque y su VM de prueba.
 - `kits/`: lo compartido entre al menos dos de los anteriores (nixcore,
   localekit, neptunia y helpers Nix).
 
@@ -227,10 +227,11 @@ nunca reescribas código solo para silenciarlos.
     Equipo · Disco · Cifrado · Resumen · Instalando · Listo. No pide usuario,
     contraseña ni Git, ni escribe `/persist/keel/users/*.toml` ni el hash (eso lo hace el
     asistente). La frase de LUKS es siempre propia. Sin soporte de ratón.
-  - `welcome/cli` — CLI del primer arranque (`nixdots-setup apply`) y de
-    migración (`nixdots-setup migrate`).
-  - `welcome/gui` — asistente gráfico «Hola» en **Slint** (no GTK/libadwaita);
-    su modo `--home-init` muestra «Preparando tu escritorio» al primer inicio.
+  - `welcome/cli` — asistente de texto del primer arranque (`nixdots-setup`,
+    lo lanza greetd en tty1 como root): pide nombre, usuario, contraseña,
+    inicio automático y git, y ejecuta `nixos-rebuild boot`. También migra
+    datos viejos (`nixdots-setup migrate`, `migrate-toml`). No hay interfaz
+    gráfica del primer arranque.
   - `system/services/crewd` — servicio de sistema por D-Bus
     (`org.nixdots.Users1`, política propia en el bus): `ListUsers`,
     `CreateUser`, `DeleteUser(keepHome)`, `SetAdmin`, `SetFullName`,
@@ -247,8 +248,9 @@ nunca reescribas código solo para silenciarlos.
     `~/.config/home-manager`, lo crea fijando `nixdots` a
     `github:HBlanqueto/nixdots` en la rev de `/etc/nixdots/rev` (o `path:` si la
     rev no es un commit), rellena `SYSTEM` con la arquitectura real, copia la
-    semilla de prefs y ejecuta `home-manager switch`. Si el home ya existe,
-    ignora la semilla y pide a userd que la borre.
+    semilla de prefs y ejecuta `home-manager switch`, avisando con
+    `notify-send` al empezar y al terminar. Si el home ya existe, ignora la
+    semilla y pide a userd que la borre.
 - El sistema publica en `/etc/nixdots/flake-ref` el source exacto del flake
   instalado y en `/etc/nixdots/rev` su commit (`dirty` si se construyó con
   cambios); ambos se retienen en el closure para que userd pueda reconstruir.
@@ -259,19 +261,14 @@ nunca reescribas código solo para silenciarlos.
 
 ## Tema
 
-- Una sola carpeta, `kits/neptunia/`, con dos fuentes; nada de colores
-  hardcodeados en Nix, Lua, Rust ni Slint:
-  - `kits/neptunia/neptunia.nix` (vía `kits/neptunia/default.nix`) — paleta
-    de **terminal** (kmscon, wezterm, instalador y yazi), con `filecolors.nix`,
-    `vscode.nix` y `palette.nix`.
-  - `kits/neptunia/{tokens,components}.json` → `generated/` — **interfaz
-    gráfica** (Slint, CSS). El asistente importa `Theme` y `Metrics` de
-    `generated/neptunia.slint`.
-- Copias generadas y versionadas (check `neptunia-generated` que falla si se
-  desincronizan):
-  - `kits/neptunia/generated/*` ←
-    `nix eval --raw -f kits/neptunia {slint,css}`
-  - `kits/neptunia/generated/kmscon-palette` ← `nix build .#kmscon-palette`
+- Una sola fuente, `kits/neptunia/neptunia.nix` (vía `default.nix`): paleta de
+  terminal para kmscon, wezterm, el instalador, yazi, eza y VS Code, con
+  `filecolors.nix`, `vscode.nix` y `palette.nix`. Nada de colores
+  hardcodeados en Nix, Lua ni Rust; `installer/src/theme.rs` copia la paleta y
+  un test la compara con `neptunia.nix`.
+- `kits/neptunia/generated/kmscon-palette` ← `nix build .#kmscon-palette`,
+  versionada para `install.sh`; el check `neptunia-generated` falla si se
+  desincroniza.
 
 ## Estilo
 
@@ -285,7 +282,7 @@ nunca reescribas código solo para silenciarlos.
   Nix) y `dist` (hereda el anterior y añade `opt-level = "z"`, `lto = true`,
   `codegen-units = 1` y `strip = true`; es el de las releases de GitHub,
   `cargo build --profile dist`).
-- devShell: uno solo (`nix develop`), con Rust, Slint, formateadores y el CLI
+- devShell: uno solo (`nix develop`), con Rust, formateadores y el CLI
   `nixdots-setup` para las simulaciones.
-- Atajos: `./dev.sh sim installer|setup [--here]`, `./dev.sh vm [arch]` y
+- Atajos: `./dev.sh sim installer [--here]`, `./dev.sh sim setup`, `./dev.sh vm [arch]` y
   `./dev.sh test [--no-build]`.

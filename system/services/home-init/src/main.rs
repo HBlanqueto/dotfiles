@@ -1,5 +1,4 @@
-//! `steward home prepare`: sets up `~/.config/home-manager` on first login.
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use color_eyre::eyre::{bail, eyre, Context, Result};
@@ -10,7 +9,7 @@ const FLAKE_TEMPLATE: &str = include_str!("../../../templates/home/flake.nix");
 fn main() {
     color_eyre::install().ok();
     if let Err(err) = run() {
-        status(&format!("No se pudo preparar el escritorio: {err}"));
+        notify(&format!("No se pudo preparar el escritorio: {err}"));
         eprintln!("ERROR: {err}");
         std::process::exit(1);
     }
@@ -22,15 +21,15 @@ fn run() -> Result<()> {
     let config = Path::new(&home).join(".config/home-manager");
 
     if config.join("flake.nix").is_file() {
-        status("Tu escritorio ya está preparado.");
+        println!("Tu escritorio ya está preparado.");
         delete_seed(&username);
         return Ok(());
     }
 
     let prefs = Prefs::read(&username)?;
 
-    phase(0);
-    status("Preparando el flake del home");
+    notify("Preparando tu escritorio; tardará unos minutos.");
+    println!("Preparando el flake del home");
     let (flake_ref, rev) = nixcore::rebuild::system_ref()
         .map(|(path, rev)| (path.display().to_string(), rev))
         .unwrap_or_default();
@@ -46,8 +45,7 @@ fn run() -> Result<()> {
     std::fs::create_dir_all(&config)
         .wrap_err_with(|| format!("no se pudo crear {}", config.display()))?;
 
-    phase(1);
-    status("Escribiendo la configuración");
+    println!("Escribiendo la configuración");
     write_flake(&config, &url, system)?;
     std::fs::write(
         config.join("home.nix"),
@@ -66,11 +64,10 @@ fn run() -> Result<()> {
             .status();
     }
 
-    phase(2);
-    status("Aplicando tu escritorio");
+    println!("Aplicando tu escritorio");
     let mut ok = home_switch(&config);
     if !ok && !used_fallback {
-        status("Sin acceso a la revisión; uso la copia instalada");
+        println!("Sin acceso a la revisión; uso la copia instalada");
         let fallback = format!("path:{flake_ref}");
         write_flake(&config, &fallback, system)?;
         ok = home_switch(&config);
@@ -80,8 +77,8 @@ fn run() -> Result<()> {
     }
 
     delete_seed(&username);
-    phase(4);
-    status("Escritorio listo.");
+    println!("Escritorio listo.");
+    notify("Tu escritorio está listo.");
     Ok(())
 }
 
@@ -181,24 +178,10 @@ fn nix_str(s: &str) -> String {
     format!("\"{escaped}\"")
 }
 
-fn phase(n: u32) {
-    println!("PHASE {n}");
-    let _ = write_status(&format!("phase={n}\n"));
-}
-
-fn status(message: &str) {
-    println!("STATUS {message}");
-    let _ = write_status(&format!("message={message}\n"));
-}
-
-fn write_status(text: &str) -> Result<()> {
-    let dir = match std::env::var("XDG_RUNTIME_DIR") {
-        Ok(dir) if !dir.is_empty() => PathBuf::from(dir).join("keel"),
-        _ => PathBuf::from("/tmp").join(format!("keel-{}", std::process::id())),
-    };
-    std::fs::create_dir_all(&dir)?;
-    std::fs::write(dir.join("home-init.status"), text)?;
-    Ok(())
+fn notify(message: &str) {
+    let _ = Command::new("notify-send")
+        .args(["--app-name=Keel", "Escritorio", message])
+        .status();
 }
 
 fn delete_seed(username: &str) {

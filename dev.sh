@@ -5,7 +5,13 @@ REPO=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 cd "$REPO"
 
 usage() {
-    sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'
+    cat <<'EOF'
+uso: ./dev.sh <orden>
+  sim installer [--here]  simula el instalador (sin tocar discos)
+  sim setup               simula el asistente de texto del primer arranque
+  vm [x86_64|aarch64]     construye y arranca la VM del primer arranque
+  test [--no-build]       clippy, tests, flake check y recorrido del instalador
+EOF
 }
 
 die() {
@@ -57,13 +63,7 @@ sim_installer() {
 }
 
 sim_setup() {
-    if [ "${1:-}" = "--here" ] || [ "${1:-}" = "-t" ]; then
-        here cargo run --manifest-path welcome/gui/Cargo.toml -- --sim
-    fi
-    run_window keel-setup-sim \
-        "-w welcome/gui/ui -w welcome/gui/src -w welcome/gui/Cargo.toml -w welcome/gui/build.rs -w Cargo.toml" \
-        slint,rs,toml \
-        cargo run --manifest-path welcome/gui/Cargo.toml -- --sim
+    here cargo run -q --manifest-path welcome/cli/Cargo.toml -- --dry-run
 }
 
 vm() {
@@ -81,10 +81,9 @@ vm() {
 
     cat <<EOF
 
-VM construida. Dentro, el asistente corre solo (cage) con datos de prueba en
-/etc/keel/assist-setup.json: escribe /persist/keel/user.json, hace
-'nixos-rebuild boot' y reinicia. Tras el reinicio arranca GDM con el usuario
-"prueba" (contraseña de prueba: test1234).
+VM construida. Dentro, el asistente de texto pide la cuenta en tty1, escribe
+/persist/keel/users/<usuario>.toml y su hash, hace 'nixos-rebuild boot' y
+reinicia. Tras el reinicio arranca GDM con esa cuenta.
 
 Si cambias la config del host, borra ./$host.qcow2 para partir de cero (las
 generaciones del rebuild viven ahí).
@@ -293,12 +292,12 @@ case "$cmd" in
     sim)
         shift
         what=${1:-}
-        [ -n "$what" ] || die 2 "uso: $0 sim {installer|setup} [--here]"
+        [ -n "$what" ] || die 2 "uso: $0 sim {installer [--here]|setup}"
         shift
         case "$what" in
             installer) sim_installer "$@" ;;
             setup) sim_setup "$@" ;;
-            *) die 2 "uso: $0 sim {installer|setup} [--here]" ;;
+            *) die 2 "uso: $0 sim {installer [--here]|setup}" ;;
         esac
         ;;
     vm) shift; vm "$@" ;;

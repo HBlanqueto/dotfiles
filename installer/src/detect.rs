@@ -157,7 +157,17 @@ pub fn network_online() -> bool {
 }
 
 pub fn is_live_environment() -> bool {
-    Path::new("/etc/NIXOS").exists() || Path::new("/iso").exists()
+    is_mounted("/nix/.ro-store")
+}
+
+pub fn is_mounted(path: &str) -> bool {
+    std::fs::read_to_string("/proc/mounts")
+        .map(|mounts| {
+            mounts
+                .lines()
+                .any(|line| line.split_whitespace().nth(1) == Some(path))
+        })
+        .unwrap_or(false)
 }
 
 pub fn euid() -> u32 {

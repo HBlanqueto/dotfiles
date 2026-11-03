@@ -284,16 +284,6 @@ fn run_steps(plan: &Plan, report: &mut Reporter) -> Result<()> {
     Ok(())
 }
 
-fn is_mounted(path: &str) -> bool {
-    fs::read_to_string("/proc/mounts")
-        .map(|mounts| {
-            mounts
-                .lines()
-                .any(|line| line.split_whitespace().nth(1) == Some(path))
-        })
-        .unwrap_or(false)
-}
-
 fn prepare_target_tmp(plan: &Plan, report: &mut Reporter) -> Result<()> {
     let tmp = plan.root.join("tmp");
     let build = target_build_dir(plan);
@@ -435,7 +425,7 @@ fn ensure_disk_ready(plan: &Plan, report: &mut Reporter) -> Result<()> {
         return ensure_alongside_ready(plan, report, reuse_efi.as_deref());
     }
     let encrypted_open = !plan.encrypt || Path::new("/dev/mapper/cryptroot").exists();
-    if is_mounted("/mnt") && encrypted_open {
+    if detect::is_mounted("/mnt") && encrypted_open {
         report.log("disco ya montado; se continúa sin reformatear");
         return Ok(());
     }
@@ -489,7 +479,7 @@ fn ensure_alongside_ready(
     reuse_efi: Option<&str>,
 ) -> Result<()> {
     let encrypted_open = !plan.encrypt || Path::new("/dev/mapper/cryptroot").exists();
-    if is_mounted("/mnt") && encrypted_open {
+    if detect::is_mounted("/mnt") && encrypted_open {
         report.log("disco ya montado; se continúa sin reformatear");
         return Ok(());
     }

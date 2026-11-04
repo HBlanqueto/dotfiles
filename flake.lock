@@ -2,7 +2,10 @@
   "nodes": {
     "barrierkit": {
       "inputs": {
-        "crane": "crane_2",
+        "crane": [
+          "malaysia",
+          "crane"
+        ],
         "nixpkgs": [
           "malaysia",
           "nixpkgs"
@@ -76,21 +79,6 @@
       }
     },
     "crane_2": {
-      "locked": {
-        "lastModified": 1792350552,
-        "narHash": "sha256-292lvpvxTGKryKxh3/3tcIVi85CwYGdl4oOi113Sob8=",
-        "owner": "ipetkov",
-        "repo": "crane",
-        "rev": "e675a36b7377bebe41d548388a2501cbb16d380d",
-        "type": "github"
-      },
-      "original": {
-        "owner": "ipetkov",
-        "repo": "crane",
-        "type": "github"
-      }
-    },
-    "crane_3": {
       "locked": {
         "lastModified": 1792350552,
         "narHash": "sha256-292lvpvxTGKryKxh3/3tcIVi85CwYGdl4oOi113Sob8=",
@@ -208,17 +196,17 @@
     "malaysia": {
       "inputs": {
         "barrierkit": "barrierkit",
-        "crane": "crane_3",
+        "crane": "crane_2",
         "nixpkgs": [
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1793745537,
-        "narHash": "sha256-0nEzEucvgI4n7uVrey5Dh9ykZXGUz8Eep0V4mT91M18=",
+        "lastModified": 1793752951,
+        "narHash": "sha256-F7tOW0BgpQEClncQl+xx0boBui/F86XlHyj2atlzOlI=",
         "owner": "HBlanqueto",
         "repo": "malaysia",
-        "rev": "cfcf7c019af3425959674d6f8bcd43249101cfb3",
+        "rev": "7f3f013b1f6bfa950c81590baf65352021e9e54f",
         "type": "github"
       },
       "original": {

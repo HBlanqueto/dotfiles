@@ -3,6 +3,6 @@
 
   timeZone = "America/Merida";
   defaultLocale = "es_MX.UTF-8";
-  keyboardLayout = "es";
+  keyboardLayout = "latam";
   keyboardVariant = "";
 }

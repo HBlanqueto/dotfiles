@@ -7,6 +7,7 @@ in
   imports = [ inputs.malaysia.nixosModules.default ];
 
   programs.malaysia.enable = true;
+  programs.malaysia.globalMenu.electron.enable = true;
 
   environment.sessionVariables.LD_LIBRARY_PATH = [
     "${inputs.malaysia.packages.${system}.libadwaita-global-menu}/lib"

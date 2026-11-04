@@ -1,13 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["installer", "kits/nixcore", "system/services/crewd", "system/services/home-init", "welcome/cli", "kits/localekit", "welcome/gui"]
+members = ["kits/nixcore", "system/services/crewd", "system/services/home-init", "welcome/cli", "kits/localekit", "welcome/gui"]
 
 [profile.release]
 panic = "abort"
-
-[profile.dist]
-inherits = "release"
-opt-level = "z"
-lto = true
-codegen-units = 1
-strip = true

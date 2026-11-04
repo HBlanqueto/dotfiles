@@ -218,7 +218,10 @@ nunca reescribas código solo para silenciarlos.
   lanzador del instalador sí abre kmscon con JetBrainsMono Nerd Font Mono 14 y la
   paleta neptunia. Plymouth usa el tema integrado `spinner` con la fuente
   Consoleet Darwin (OTF, `pkgs.consoleet-darwin`).
-- Workspace Rust (`Cargo.toml` raíz); los crates viven en `installer/`, `welcome/`, `system/services/` y `kits/`:
+- Workspace Rust (`Cargo.toml` raíz); los crates viven en `welcome/`, `system/services/` y `kits/`.
+  `installer/` es un workspace aparte, con su propio `Cargo.lock` y su derivación
+  en `installer/default.nix`: el sistema instalado no lo compila ni lo lleva en el
+  `src` de sus herramientas.
   - `kits/nixcore` — settings, /persist/keel/users/<usuario>.toml, machine.toml, hash,
     ejecución de comandos.
   - `kits/localekit` — locales, zonas y teclados embebidos al compilar.
@@ -281,10 +284,11 @@ nunca reescribas código solo para silenciarlos.
 - Rust: rustfmt y `cargo clippy -D warnings` limpios. Errores con
   `color_eyre`/`Result`, nunca `unwrap()` en rutas que dependan del sistema.
   Secretos con `Zeroizing` y por stdin o archivo temporal, nunca por argv.
-  `Cargo.toml` tiene dos perfiles: `release` (solo `panic = "abort"`, el que usa
-  Nix) y `dist` (hereda el anterior y añade `opt-level = "z"`, `lto = true`,
-  `codegen-units = 1` y `strip = true`; es el de las releases de GitHub,
-  `cargo build --profile dist`).
+  Los dos `Cargo.toml` tienen el perfil `release` (solo `panic = "abort"`, el
+  que usa Nix); `installer/Cargo.toml` añade `dist` (hereda el anterior y añade
+  `opt-level = "z"`, `lto = true`, `codegen-units = 1` y `strip = true`; es el de
+  las releases de GitHub, `cargo build --manifest-path installer/Cargo.toml
+  --profile dist`).
 - devShell: uno solo (`nix develop`), con Rust, Slint, formateadores y el CLI
   `nixdots-setup` para las simulaciones.
 - Atajos: `./dev.sh sim installer|setup [--here]`, `./dev.sh vm [arch]` y

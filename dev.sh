@@ -114,10 +114,12 @@ run_test() {
 
     say "cargo clippy -D warnings"
     nix develop -c cargo clippy --workspace --all-targets -- -D warnings
+    nix develop -c cargo clippy --manifest-path installer/Cargo.toml --all-targets -- -D warnings
     ok "clippy"
 
     say "cargo test"
     nix develop -c cargo test --workspace
+    nix develop -c cargo test --manifest-path installer/Cargo.toml
     ok "tests"
 
     say "nix flake check --impure --no-build"

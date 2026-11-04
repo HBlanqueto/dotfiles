@@ -10,8 +10,6 @@ on:
       - "installer/**"
       - "kits/nixcore/**"
       - "kits/localekit/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
       - ".cargo/**"
       - "system/disko.nix"
       - "system/**"
@@ -55,11 +53,11 @@ jobs:
           KEEL_LOCALE_DIR: /usr/share/i18n/locales
           KEEL_XKB_BASE_LST: /usr/share/X11/xkb/rules/base.lst
           KEEL_ZONE1970_TAB: /usr/share/zoneinfo/zone1970.tab
-        run: cargo build --profile dist --locked --target ${{ matrix.target }} -p nixdots-installer
+        run: cargo build --manifest-path installer/Cargo.toml --profile dist --locked --target ${{ matrix.target }}
 
       - name: Rename the binary
         run: |
-          cp target/${{ matrix.target }}/dist/nixdots-installer \
+          cp installer/target/${{ matrix.target }}/dist/nixdots-installer \
             nixdots-installer-${{ matrix.arch }}
 
       - uses: actions/upload-artifact@v4

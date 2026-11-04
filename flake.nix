@@ -97,7 +97,6 @@
         { system, pkgs }:
         import ./installer {
           inherit pkgs theme tablesEnv;
-          mkRustTool = mkRustTool system;
         }
       );
 

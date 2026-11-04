@@ -12,17 +12,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1793825885,
-        "narHash": "sha256-p4Msp7NHvnK9CoIgSxFhx+GScR0O2Y+2+y4GvzGbhqI=",
+        "lastModified": 1793828222,
+        "narHash": "sha256-4HuZsTERr59HyUqYxXTvfR8V+CbyhvTqOZlLZ3DsyCg=",
         "owner": "HBlanqueto",
         "repo": "barrierkit",
-        "rev": "a0de6777488b899437e174714f58fed814f25177",
+        "rev": "aa8aca4905fa92945a3c22e36bbd36dff0b9e7b6",
         "type": "github"
       },
       "original": {
         "owner": "HBlanqueto",
         "repo": "barrierkit",
-        "rev": "a0de6777488b899437e174714f58fed814f25177",
+        "rev": "aa8aca4905fa92945a3c22e36bbd36dff0b9e7b6",
         "type": "github"
       }
     },
@@ -202,11 +202,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793826623,
-        "narHash": "sha256-qzJCycFY3cZPHSMwGzEdrVwpWixD+u0GO740ifaUPos=",
+        "lastModified": 1793829255,
+        "narHash": "sha256-T6vDFB6Oob325gX/UbtYFaP+ZYCJTyy1UuFUttS5RBs=",
         "owner": "HBlanqueto",
         "repo": "malaysia",
-        "rev": "4e370a4f817b9e32d7010d4d06798ba7c36e1d56",
+        "rev": "6754a727cd52badaca6ba277fe79095041813997",
         "type": "github"
       },
       "original": {

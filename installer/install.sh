@@ -79,53 +79,6 @@ if [ "$verified" -ne 1 ]; then
 fi
 chmod +x "$binary"
 
-if [ "${TERM:-}" = linux ] && [ -z "${KEEL_NO_KMSCON:-}" ]; then
-    case "$(tty 2>/dev/null || true)" in
-        /dev/tty*)
-            palette_file="$here/kits/neptunia/generated/kmscon-palette"
-            if [ -r "$palette_file" ]; then
-                palette=$(cat "$palette_file")
-
-                fontdir=$(nix build --no-link --print-out-paths \
-                    "$nixpkgs#nerd-fonts.jetbrains-mono" 2>/dev/null || true)
-                if [ -n "$fontdir" ]; then
-                    FONTCONFIG_FILE="$WORK/fonts.conf"
-                    export FONTCONFIG_FILE
-                    cat >"$FONTCONFIG_FILE" <<EOF
-<?xml version="1.0"?>
-<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
-<fontconfig>
-  <dir>$fontdir/share/fonts</dir>
-  <cachedir>$WORK/fontcache</cachedir>
-</fontconfig>
-EOF
-                fi
-
-                hwaccel=
-                if [ -e /dev/dri/renderD128 ]; then hwaccel=--hwaccel; fi
-
-                rm -f "$WORK/started" "$WORK/exit-code"
-
-                # shellcheck disable=SC2086
-                nix --extra-experimental-features 'nix-command flakes' \
-                    shell "$nixpkgs#kmscon" "$nixpkgs#nerd-fonts.jetbrains-mono" $tool_pkgs -c \
-                    kmscon --vt auto --switchvt $hwaccel \
-                    --font-name "JetBrainsMono Nerd Font Mono" --font-size 14 \
-                    $palette --login -- "$binary" --install "$@" || true
-
-                if [ -e "$WORK/started" ]; then
-                    code=$(cat "$WORK/exit-code" 2>/dev/null || true)
-                    case "$code" in
-                        '' | *[!0-9]*) code=1 ;;
-                    esac
-                    exit "$code"
-                fi
-                echo "kmscon no pudo iniciar; se usa el modo ASCII." >&2
-            fi
-            ;;
-    esac
-fi
-
 # shellcheck disable=SC2086
 exec nix --extra-experimental-features 'nix-command flakes' \
     shell $tool_pkgs -c "$binary" --install "$@"

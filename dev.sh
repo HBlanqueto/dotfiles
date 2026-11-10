@@ -66,33 +66,6 @@ sim_setup() {
         cargo run --manifest-path welcome/gui/Cargo.toml -- --sim
 }
 
-vm() {
-    arch=${1:-x86_64}
-    case "$arch" in
-        x86_64) host="firstboot-vm" ;;
-        aarch64 | arm64) host="firstboot-vm-aarch64" ;;
-        *) die 2 "uso: $0 vm [x86_64|aarch64]" ;;
-    esac
-
-    KEEL_ROOT=$(mktemp -d)
-    export KEEL_ROOT
-
-    nix build "$REPO#nixosConfigurations.$host.config.system.build.vm"
-
-    cat <<EOF
-
-VM construida. Dentro, el asistente corre solo (cage) con datos de prueba en
-/etc/keel/assist-setup.json: escribe /persist/keel/user.json, hace
-'nixos-rebuild boot' y reinicia. Tras el reinicio arranca GDM con el usuario
-"prueba" (contraseña de prueba: test1234).
-
-Si cambias la config del host, borra ./$host.qcow2 para partir de cero (las
-generaciones del rebuild viven ahí).
-EOF
-
-    exec "./result/bin/run-$host-vm"
-}
-
 run_test() {
     build=1
     for arg in "$@"; do
@@ -301,7 +274,6 @@ case "$cmd" in
             *) die 2 "uso: $0 sim {installer|setup} [--here]" ;;
         esac
         ;;
-    vm) shift; vm "$@" ;;
     test) shift; run_test "$@" ;;
     -h | --help | "") usage ;;
     *) usage >&2; exit 2 ;;

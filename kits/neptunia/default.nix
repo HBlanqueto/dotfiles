@@ -292,7 +292,6 @@ rec {
     ;
 
   filecolors = import ./filecolors.nix;
-  vscode = import ./vscode.nix { inherit colors; };
 
   files =
     pkgs:

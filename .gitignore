@@ -3,8 +3,3 @@
 
 # Rust build artifacts (Cargo workspace at the repo root).
 /target
-
-# Discos y NVRAM de las VMs de prueba (`dev.sh vm`).
-*.qcow2
-*.fd
-/firstboot-vm*

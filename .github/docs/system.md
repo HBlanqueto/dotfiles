@@ -61,7 +61,6 @@ Las prestaciones opcionales se declaran en `system/core/extras.nix` bajo
 - `epson`: impresora/escáner Epson L3250.
 - `trezor`: cartera Trezor (`trezord`).
 - `chime`: sonido de arranque.
-- `libvirt`: libvirt + virt-manager (y el grupo `libvirtd` para los admins).
 - `brightnessctl`: brillo y reglas udev para las teclas del panel.
 - `remoteAccess`: clientes Remmina y RustDesk.
 - `iphoneTethering`: tethering USB del iPhone.
@@ -78,8 +77,7 @@ red local.
 
 Lado NixOS: `system/core/extras.nix` (`nixdots.extras.remoteAccess`) sólo
 instala los paquetes `remmina` y `rustdesk-flutter`. Se activa por máquina en
-`machine.toml` (`"extras": { "remoteAccess": true }`), así que en el ThinkPad
-está activo y en la VM queda desactivado.
+`machine.toml` (`"extras": { "remoteAccess": true }`).
 
 > No guardes en el repo contraseñas de VNC ni el ID de RustDesk. Todo eso se
 > queda en cada máquina.

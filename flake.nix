@@ -54,15 +54,6 @@
             };
         };
 
-      mkFirstBootVm = import ./welcome/vm.nix {
-        inherit
-          nixpkgs
-          inputs
-          theme
-          data
-          ;
-      };
-
       supportedSystems = [
         "x86_64-linux"
         "aarch64-linux"
@@ -96,7 +87,7 @@
       installerPackages = forAllSystems (
         { system, pkgs }:
         import ./installer {
-          inherit pkgs theme tablesEnv;
+          inherit pkgs tablesEnv;
           mkRustTool = mkRustTool system;
         }
       );
@@ -137,15 +128,6 @@
           requireImpure = false;
           data = emptyData;
         };
-
-        firstboot-vm = mkFirstBootVm {
-          system = "x86_64-linux";
-          hostName = "firstboot-vm";
-        };
-        firstboot-vm-aarch64 = mkFirstBootVm {
-          system = "aarch64-linux";
-          hostName = "firstboot-vm-aarch64";
-        };
       }
       // nixpkgs.lib.optionalAttrs (data.machine ? hostName) {
         ${data.machine.hostName} = keel;
@@ -164,52 +146,50 @@
 
       checks = forAllSystems (
         { pkgs, ... }:
-        let
-          palette = pkgs.callPackage ./installer/nix/kmscon-palette.nix { inherit theme; };
-        in
         {
           neptunia-generated = pkgs.runCommand "check-neptunia-generated" { } ''
             ok=1
             ${pkgs.diffutils}/bin/diff -u ${./kits/neptunia/generated/neptunia.slint} ${pkgs.writeText "g.slint" theme.slint} || ok=0
             ${pkgs.diffutils}/bin/diff -u ${./kits/neptunia/generated/neptunia.css} ${pkgs.writeText "g.css" theme.css} || ok=0
             ${pkgs.diffutils}/bin/diff -u ${./kits/neptunia/generated/Neptunia.qml} ${pkgs.writeText "g.qml" theme.qml} || ok=0
-            ${pkgs.diffutils}/bin/diff -u ${./kits/neptunia/generated/kmscon-palette} ${palette} || ok=0
             if [ "$ok" = 0 ]; then
                 echo "" >&2
                 echo "kits/neptunia/generated está desactualizado. Regéneralo con:" >&2
                 echo "  nix eval --raw -f kits/neptunia slint > kits/neptunia/generated/neptunia.slint" >&2
                 echo "  nix eval --raw -f kits/neptunia css   > kits/neptunia/generated/neptunia.css" >&2
                 echo "  nix eval --raw -f kits/neptunia qml   > kits/neptunia/generated/Neptunia.qml" >&2
-                echo "  cp \$(nix build .#kmscon-palette --print-out-paths) kits/neptunia/generated/kmscon-palette" >&2
                 exit 1
             fi
             ${pkgs.coreutils}/bin/touch $out
           '';
 
-          slint-demo = pkgs.runCommand "check-slint-demo" {
-            nativeBuildInputs = with pkgs; [ slint-viewer xvfb-run ];
-          } ''
-            export HOME=$TMPDIR
-            cd ${./kits/neptunia}
-            xvfb-run -a slint-viewer demo.slint --component NpButton \
-              --screenshot $TMPDIR/demo.png --backend software
-            test -s $TMPDIR/demo.png
-            ${pkgs.coreutils}/bin/touch $out
-          '';
+          slint-demo =
+            pkgs.runCommand "check-slint-demo"
+              {
+                nativeBuildInputs = with pkgs; [
+                  slint-viewer
+                  xvfb-run
+                ];
+              }
+              ''
+                export HOME=$TMPDIR
+                cd ${./kits/neptunia}
+                xvfb-run -a slint-viewer demo.slint --component NpButton \
+                  --screenshot $TMPDIR/demo.png --backend software
+                test -s $TMPDIR/demo.png
+                ${pkgs.coreutils}/bin/touch $out
+              '';
         }
       );
 
       packages = forAllSystems (
-        { system, pkgs }: {
+        { system, ... }: {
           installer = installerPackages.${system}.installer;
           setup = welcomePackages.${system}.setup;
           assist-setup = welcomePackages.${system}.assist-setup;
           crewd = systemPackages.${system}.crewd;
           home-init = systemPackages.${system}.home-init;
-          launcher = installerPackages.${system}.launcher;
-          default = installerPackages.${system}.launcher;
-
-          kmscon-palette = installerPackages.${system}.kmscon-palette;
+          default = installerPackages.${system}.installer;
 
           nixdots-rebuild = systemPackages.${system}.nixdots-rebuild;
         }
@@ -219,11 +199,11 @@
         { system, ... }: {
           installer = {
             type = "app";
-            program = "${installerPackages.${system}.launcher}/bin/nixdots-installer";
+            program = "${installerPackages.${system}.installer}/bin/nixdots-installer";
           };
           default = {
             type = "app";
-            program = "${installerPackages.${system}.launcher}/bin/nixdots-installer";
+            program = "${installerPackages.${system}.installer}/bin/nixdots-installer";
           };
         }
       );

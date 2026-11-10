@@ -10,57 +10,9 @@
 let
   yaziConfig = import ./config/yazi { inherit theme; };
 
-  palette = import ../../../../../kits/neptunia/palette.nix { inherit theme; };
-  rgba = hex: alpha: "rgba(${palette.rgb hex},${alpha})";
-
   starshipPlain = pkgs.runCommand "starship-plain-text-symbols.toml" { } ''
     ${pkgs.starship}/bin/starship preset plain-text-symbols -o $out
   '';
-
-  vscodeSettings = {
-    "editor.fontFamily" = "'Liga SFMono Nerd Font', 'Twitter Color Emoji', monospace";
-    "editor.fontLigatures" = true;
-    "editor.fontSize" = 12;
-    "editor.lineHeight" = 18;
-    "editor.wordWrap" = "on";
-    "workbench.editor.tabSizing" = "shrink";
-    "workbench.editor.showTabs" = "multiple";
-    "editor.centeredLayout" = false;
-    "editor.stickyScroll.enabled" = false;
-
-    "terminal.integrated.fontFamily" = "'Liga SFMono Nerd Font'";
-    "terminal.integrated.fontSize" = 12;
-    "workbench.colorTheme" = "Neptunia";
-    "workbench.settings.applyToAllProfiles" = [ ];
-
-    "explorer.confirmDelete" = false;
-    "explorer.confirmDragAndDrop" = false;
-
-    "files.exclude" = {
-      "**/.git" = false;
-      "**/.svn" = false;
-      "**/.hg" = false;
-      "**/.DS_Store" = false;
-      "**/node_modules" = true;
-      "**/dist" = true;
-    };
-
-    "git.autofetch" = true;
-    "git.confirmSync" = false;
-
-    "indentRainbow.indicatorStyle" = "light";
-    "indentRainbow.lightIndicatorStyleLineWidth" = 2;
-    "indentRainbow.colors" = with theme.colors; [
-      (rgba c11 "0.3")
-      (rgba c10 "0.3")
-      (rgba c13 "0.3")
-      (rgba c14 "0.3")
-    ];
-
-    "continue.showInlineTip" = false;
-    "claudeCode.preferredLocation" = "panel";
-    "workbench.iconTheme" = "file-icons";
-  };
 in
 
 {
@@ -100,51 +52,10 @@ in
 
   home = {
     file = {
-      ".config/Code/User/settings.json".text = builtins.toJSON vscodeSettings;
-
-      ".vscode/extensions/neptunia-theme/package.json".text = theme.vscode.packageJson;
-      ".vscode/extensions/neptunia-theme/themes/neptunia-color-theme.json".text = theme.vscode.themeJson;
-
       ".config/fastfetch/logo.txt".source = ./config/fastfetch/logo.txt;
       ".config/fastfetch/config.jsonc".source = ./config/fastfetch/config.jsonc;
 
       "Pictures/Screenshots/.gitkeep".text = "";
-    };
-
-    activation = {
-      registerNeptuniaExtension = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        ${pkgs.python3}/bin/python3 - <<'PYEOF'
-        import json
-        import os
-
-        dir = os.path.expanduser("~/.vscode/extensions/neptunia-theme")
-        path = os.path.expanduser("~/.vscode/extensions/extensions.json")
-
-        if not os.path.exists(os.path.join(dir, "package.json")):
-            raise SystemExit
-
-        try:
-            with open(path) as f:
-                data = json.load(f)
-        except (OSError, ValueError):
-            data = []
-
-        entry = {
-            "identifier": {"id": "nix.neptunia-theme"},
-            "version": "1.0.0",
-            "location": {"$mid": 1, "path": os.path.abspath(dir), "scheme": "file"},
-            "relativeLocation": "neptunia-theme",
-            "metadata": {"source": "gallery", "installedTimestamp": 1786954366021},
-        }
-
-        if not any(e.get("identifier", {}).get("id") == "nix.neptunia-theme" for e in data):
-            data.append(entry)
-            with open(path + ".nixbak", "w") as f:
-                json.dump(data, f, indent=2)
-                f.write("\n")
-            os.replace(path + ".nixbak", path)
-        PYEOF
-      '';
     };
 
     packages =

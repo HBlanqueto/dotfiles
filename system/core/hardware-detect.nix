@@ -33,7 +33,5 @@ in
 
       systemPackages = lib.optional hasAmdGpu pkgs.radeontop;
     };
-
-    keel.console.hwRender = lib.mkIf isQemu false;
   };
 }

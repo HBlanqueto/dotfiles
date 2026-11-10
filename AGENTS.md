@@ -192,8 +192,7 @@ lo hagas.
   **nixos-facter**. Por eso la evaluación real exige `--impure`; `nixdots-rebuild`
   lo añade. La salida también se expone con el hostname de la máquina.
 - Variantes puras solo para CI: `nixdots-x86_64-linux` y
-  `nixdots-aarch64-linux` (no leen /persist). VMs de prueba del primer
-  arranque: `firstboot-vm` y `firstboot-vm-aarch64` (`dev.sh vm`).
+  `nixdots-aarch64-linux` (no leen /persist).
 - **Datos fuera del repo**, en `/persist/nixdots/`:
   - `machine.toml` — el archivo del sistema. Lo escriben el instalador
     (hostName, encrypt, luksUuid, espUuid, secureBoot, tpmUnlock, extras) y el
@@ -248,8 +247,8 @@ lo hagas.
 dotfiles/
 ├── .github/        README corto, docs/ (instalador y sistema) y workflows/
 ├── system/         configuración NixOS, usuarios, servicios, plantillas y disko
-├── installer/      instalador TUI, install.sh, launcher de kmscon y logo
-├── welcome/        asistente del primer arranque (CLI, GUI Slint) y su VM
+├── installer/      instalador TUI, install.sh y logo
+├── welcome/        asistente del primer arranque (CLI y GUI Slint)
 ├── kits/           lo compartido: nixcore, localekit, neptunia y helpers Nix
 ├── flake.nix  flake.lock  Cargo.toml  Cargo.lock  .cargo/
 └── AGENTS.md  dev.sh  install.sh  LICENSE  .gitignore  .git-blame-ignore-revs
@@ -259,10 +258,8 @@ dotfiles/
 - `system/`: todo lo que acaba en el sistema instalado (NixOS, cuentas,
   plantillas de home, servicios, paquetes, overlays y disko). No va aquí nada
   que solo exista en la ISO o en el asistente.
-- `installer/`: solo lo que corre desde la ISO (TUI, `install.sh`, launcher de
-  kmscon y logo).
-- `welcome/`: solo el asistente del primer arranque (CLI, GUI Slint, diseño y
-  VM de prueba).
+- `installer/`: solo lo que corre desde la ISO (TUI, `install.sh` y logo).
+- `welcome/`: solo el asistente del primer arranque (CLI, GUI Slint y diseño).
 - `kits/`: lo compartido entre al menos dos de los anteriores (nixcore,
   localekit, neptunia y helpers Nix).
 
@@ -305,14 +302,10 @@ nunca reescribas código solo para silenciarlos.
 - Otto (fork `github:HBlanqueto/otto`, con `layers` y `smithay-otto`) salió del
   sistema y solo se conserva como referencia externa, fuera de este repo: no lo
   reintroduzcas sin que se pida.
-- Consola: la TTY instalada usa **solo** la fuente XNU (kmscon con el motor
-  `psf`, `font-name` = `xnu-console.psf`, tamaño 32 —al doble—, y `console.font`
-  = `xnu-console.psf` en el kernel: initrd y consola de emergencia). Solo tiene
-  256 glifos Latin-1, así que en la TTY el prompt de fish (starship) y `eza` van
-  sin iconos Nerd Font, y los caracteres fuera de Latin-1 salen como «?». El
-  lanzador del instalador sí abre kmscon con JetBrainsMono Nerd Font Mono 14 y la
-  paleta neptunia. Plymouth usa el tema integrado `spinner` con la fuente
-  Consoleet Darwin (OTF, `pkgs.consoleet-darwin`).
+- Consola: la TTY usa `Lat2-Terminus16` (la fuente incluida en `kbd`) con la
+  paleta neptunia; `console.font` usa la misma en el kernel (initrd y consola de
+  emergencia). Plymouth usa el tema integrado `spinner` con la fuente Consoleet
+  Darwin (OTF, `pkgs.consoleet-darwin`).
 - Workspace Rust (`Cargo.toml` raíz); los crates viven en `installer/`, `welcome/`, `system/services/` y `kits/`:
   - `kits/nixcore` — settings, /persist/keel/users/<usuario>.toml, machine.toml, hash,
     ejecución de comandos.
@@ -357,8 +350,7 @@ nunca reescribas código solo para silenciarlos.
 - Una sola carpeta, `kits/neptunia/`, con dos fuentes; nada de colores
   hardcodeados en Nix, Lua, Rust ni Slint:
   - `kits/neptunia/neptunia.nix` (vía `kits/neptunia/default.nix`) — paleta
-    de **terminal** (kmscon, wezterm, instalador y yazi), con `filecolors.nix`,
-    `vscode.nix` y `palette.nix`.
+    de **terminal** (wezterm, instalador y yazi), con `filecolors.nix`.
   - `kits/neptunia/{tokens,components}.json` → `generated/` — **interfaz
     gráfica** (Slint, CSS). El asistente importa `Theme` y `Metrics` de
     `generated/neptunia.slint`.
@@ -366,7 +358,6 @@ nunca reescribas código solo para silenciarlos.
   desincronizan):
   - `kits/neptunia/generated/*` ←
     `nix eval --raw -f kits/neptunia {slint,css}`
-  - `kits/neptunia/generated/kmscon-palette` ← `nix build .#kmscon-palette`
 
 ## Estilo
 
@@ -382,5 +373,5 @@ nunca reescribas código solo para silenciarlos.
   `cargo build --profile dist`).
 - devShell: uno solo (`nix develop`), con Rust, Slint, formateadores y el CLI
   `nixdots-setup` para las simulaciones.
-- Atajos: `./dev.sh sim installer|setup [--here]`, `./dev.sh vm [arch]` y
+- Atajos: `./dev.sh sim installer|setup [--here]` y
   `./dev.sh test [--no-build]`.

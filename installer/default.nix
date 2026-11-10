@@ -1,4 +1,8 @@
-{ pkgs, mkRustTool, theme, tablesEnv }:
+{
+  pkgs,
+  mkRustTool,
+  tablesEnv,
+}:
 
 let
   installer = mkRustTool {
@@ -24,10 +28,4 @@ let
 in
 {
   inherit installer;
-
-  launcher = pkgs.callPackage ./nix/launcher.nix {
-    inherit installer theme;
-  };
-
-  kmscon-palette = pkgs.callPackage ./nix/kmscon-palette.nix { inherit theme; };
 }

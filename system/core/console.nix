@@ -1,44 +1,27 @@
+{ theme, ... }:
+
 {
-  config,
-  lib,
-  pkgs,
-  theme,
-  ...
-}:
-
-let
-  palette = import ../../kits/neptunia/palette.nix { inherit theme; };
-
-  xnuFont = "${pkgs.xnu-console-font}/share/consolefonts/xnu-console.psf";
-in
-{
-  options.keel.console.hwRender = lib.mkOption {
-    type = lib.types.bool;
-    default = true;
-    description = "Aceleración 3D (DRM) en kmscon. Falso en UTM/virtio, donde no aporta.";
-  };
-
   config.console = {
     earlySetup = true;
-    colors = palette.consoleColors;
-    font = xnuFont;
+    colors = with theme.colors; [
+      bg
+      c1
+      c2
+      c3
+      c4
+      c5
+      c6
+      c7
+      lbg
+      c9
+      c10
+      c11
+      c12
+      c13
+      c14
+      c15
+    ];
+    font = "Lat2-Terminus16";
     useXkbConfig = true;
-  };
-
-  config.services.kmscon = {
-    enable = true;
-    useXkbConfig = true;
-    config = {
-      hwaccel = config.keel.console.hwRender;
-      font-engine = "psf";
-      font-name = xnuFont;
-      font-size = 16;
-    }
-    // builtins.listToAttrs (
-      map (e: {
-        name = palette.name e.suffix;
-        inherit (e) value;
-      }) palette.entries
-    );
   };
 }

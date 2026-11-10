@@ -22,8 +22,7 @@ en instalar, para poder ver la pantalla completa.
 
 La vía normal no compila nada: descarga el binario precompilado de la última
 release y lo ejecuta, añadiendo con `nix shell` las herramientas que la ISO no
-trae (en una VT real abre antes `kmscon` con la fuente **JetBrainsMono Nerd Font
-Mono 14** y la paleta de neptunia).
+trae.
 
 ```sh
 nix-shell -p git --run "git clone --depth 1 https://github.com/HBlanqueto/nixdots"

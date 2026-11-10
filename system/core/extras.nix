@@ -16,7 +16,6 @@ in
     epson = lib.mkEnableOption "the Epson L3250 printer/scanner";
     trezor = lib.mkEnableOption "the Trezor hardware wallet (trezord)";
     chime = lib.mkEnableOption "the boot chime";
-    libvirt = lib.mkEnableOption "libvirt + virt-manager";
     brightnessctl = lib.mkEnableOption "brightnessctl and its backlight hotkey rules";
     remoteAccess = lib.mkEnableOption "the Remmina and RustDesk remote access clients";
     iphoneTethering = lib.mkEnableOption "USB tethering from an iPhone" // {
@@ -35,7 +34,6 @@ in
       epson = lib.mkDefault (extraData.epson or false);
       trezor = lib.mkDefault (extraData.trezor or false);
       chime = lib.mkDefault (extraData.chime or false);
-      libvirt = lib.mkDefault (extraData.libvirt or false);
       brightnessctl = lib.mkDefault (extraData.brightnessctl or false);
       remoteAccess = lib.mkDefault (extraData.remoteAccess or false);
       iphoneTethering = lib.mkDefault (extraData.iphoneTethering or true);
@@ -75,16 +73,6 @@ in
       };
     };
 
-    virtualisation.libvirtd.enable = cfg.libvirt;
-    programs.virt-manager.enable = cfg.libvirt;
-    networking.firewall.trustedInterfaces = lib.mkIf cfg.libvirt [ "virbr0" ];
-    users.users = lib.mapAttrs (
-      _: u:
-      lib.mkIf (cfg.libvirt && (u.admin or false)) {
-        extraGroups = [ "libvirtd" ];
-      }
-    ) data.users;
-
     environment.systemPackages =
       lib.optionals cfg.brightnessctl [ pkgs.brightnessctl ]
       ++ lib.optionals cfg.remoteAccess [
@@ -92,7 +80,6 @@ in
         pkgs.rustdesk-flutter
       ];
 
-    environment.persistence."/persist".directories =
-      lib.optionals cfg.epson [ "/var/lib/cups" ] ++ lib.optionals cfg.libvirt [ "/var/lib/libvirt" ];
+    environment.persistence."/persist".directories = lib.optionals cfg.epson [ "/var/lib/cups" ];
   };
 }

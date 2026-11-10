@@ -13,13 +13,10 @@ kits/neptunia/
 ├── default.nix        traduce los JSON y compone el tema; solo builtins, sin nixpkgs
 ├── neptunia.nix       paleta de terminal (colors)
 ├── filecolors.nix     colores por tipo de archivo (eza/yazi)
-├── vscode.nix         tema de VS Code
-├── palette.nix        utilidades ANSI/kmscon sobre `colors`
 ├── generated/         salidas ya generadas, para quien no use Nix (SlintPad, otro repo)
 │   ├── neptunia.slint   globals Theme y Metrics para Slint
 │   ├── neptunia.css     variables CSS (GTK4, web)
-│   ├── Neptunia.qml     singleton QtQuick
-│   └── kmscon-palette   argumentos `--palette*` de kmscon
+│   └── Neptunia.qml     singleton QtQuick
 └── demo.slint         galería para ajustar a ojo con slint-viewer o SlintPad
 ```
 
@@ -33,7 +30,6 @@ cd kits/neptunia
 nix eval --raw -f . slint > generated/neptunia.slint
 nix eval --raw -f . css   > generated/neptunia.css
 nix eval --raw -f . qml   > generated/Neptunia.qml
-cp "$(nix build .#kmscon-palette --print-out-paths)" generated/kmscon-palette
 ```
 
 ## Modos de color del escritorio

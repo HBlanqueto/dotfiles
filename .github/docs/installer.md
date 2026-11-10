@@ -13,9 +13,9 @@ There are two ways to run it:
   sudo ./nixdots/install.sh
   ```
 
-  `install.sh` picks `x86_64`/`aarch64` from `uname -m`, downloads the binary from the [latest release](https://github.com/HBlanqueto/nixdots/releases/latest), verifies it against `SHA256SUMS` and runs it with `--install`, providing (via `nix shell`, pinned to `flake.lock`) the tools the live ISO lacks. On a real VT it opens `kmscon` (Nerd Font + the neptunia palette) first. The binaries are built and published by `.github/workflows/installer-release.yml` on every `v*` tag.
+  `install.sh` picks `x86_64`/`aarch64` from `uname -m`, downloads the binary from the [latest release](https://github.com/HBlanqueto/nixdots/releases/latest), verifies it against `SHA256SUMS` and runs it with `--install`, providing (via `nix shell`, pinned to `flake.lock`) the tools the live ISO lacks. The binaries are built and published by `.github/workflows/installer-release.yml` on every `v*` tag.
 
-The installed system's TTY uses **only** the XNU (macOS text-console) font, read by kmscon's `psf` engine at double size, which has 256 Latin-1 glyphs; on the VT the fish prompt (starship) and `eza` therefore run without Nerd Font icons, and characters outside Latin-1 come out as «?». The installer's own VT keeps JetBrainsMono Nerd Font Mono 14.
+The installed system's TTY uses Terminus (`Lat2-Terminus16`, shipped with `kbd`) and the neptunia palette. Plymouth uses the built-in `spinner` theme with the Consoleet Darwin font.
 
 * **Development (compiles from source):**
 

@@ -20,6 +20,4 @@
   };
 
   nixdots-rebuild = pkgs.callPackage ./packages/nixdots-rebuild.nix { };
-
-  xnu-console-font = pkgs.callPackage ./packages/xnu-console-font.nix { };
 }

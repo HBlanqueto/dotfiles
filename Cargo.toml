@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["installer", "kits/nixcore", "system/services/crewd", "system/services/home-init", "welcome/cli", "kits/localekit", "welcome/gui"]
+members = ["installer", "kits/nixcore", "system/services/crewd", "system/services/home-init", "welcome/cli", "kits/localekit"]
 
 [profile.release]
 panic = "abort"

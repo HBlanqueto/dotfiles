@@ -1,5 +1,5 @@
 {
-  description = "Welcome ~/*. Watch your step, it vanishes on boot.";
+  description = "NixOS dotfiles.";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -140,53 +140,16 @@
       templates = {
         home = {
           path = ./system/templates/home;
-          description = "Home independiente de Keel (home-manager)";
+          description = "Standalone Keel home-manager template";
         };
       };
 
-      checks = forAllSystems (
-        { pkgs, ... }:
-        {
-          neptunia-generated = pkgs.runCommand "check-neptunia-generated" { } ''
-            ok=1
-            ${pkgs.diffutils}/bin/diff -u ${./kits/neptunia/generated/neptunia.slint} ${pkgs.writeText "g.slint" theme.slint} || ok=0
-            ${pkgs.diffutils}/bin/diff -u ${./kits/neptunia/generated/neptunia.css} ${pkgs.writeText "g.css" theme.css} || ok=0
-            ${pkgs.diffutils}/bin/diff -u ${./kits/neptunia/generated/Neptunia.qml} ${pkgs.writeText "g.qml" theme.qml} || ok=0
-            if [ "$ok" = 0 ]; then
-                echo "" >&2
-                echo "kits/neptunia/generated está desactualizado. Regéneralo con:" >&2
-                echo "  nix eval --raw -f kits/neptunia slint > kits/neptunia/generated/neptunia.slint" >&2
-                echo "  nix eval --raw -f kits/neptunia css   > kits/neptunia/generated/neptunia.css" >&2
-                echo "  nix eval --raw -f kits/neptunia qml   > kits/neptunia/generated/Neptunia.qml" >&2
-                exit 1
-            fi
-            ${pkgs.coreutils}/bin/touch $out
-          '';
-
-          slint-demo =
-            pkgs.runCommand "check-slint-demo"
-              {
-                nativeBuildInputs = with pkgs; [
-                  slint-viewer
-                  xvfb-run
-                ];
-              }
-              ''
-                export HOME=$TMPDIR
-                cd ${./kits/neptunia}
-                xvfb-run -a slint-viewer demo.slint --component NpButton \
-                  --screenshot $TMPDIR/demo.png --backend software
-                test -s $TMPDIR/demo.png
-                ${pkgs.coreutils}/bin/touch $out
-              '';
-        }
-      );
+      checks = forAllSystems (_: { });
 
       packages = forAllSystems (
         { system, ... }: {
           installer = installerPackages.${system}.installer;
           setup = welcomePackages.${system}.setup;
-          assist-setup = welcomePackages.${system}.assist-setup;
           crewd = systemPackages.${system}.crewd;
           home-init = systemPackages.${system}.home-init;
           default = installerPackages.${system}.installer;

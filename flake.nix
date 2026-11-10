@@ -160,7 +160,7 @@
       formatter = forAllSystems ({ pkgs, ... }: pkgs.nixfmt);
 
       devShells = forAllSystems (
-        { system, pkgs, ... }:
+        { pkgs, ... }:
         import ./kits/nix/devShells.nix {
           inherit pkgs tablesEnv;
         }

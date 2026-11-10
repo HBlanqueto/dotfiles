@@ -2,7 +2,7 @@
 { config, lib, ... }:
 
 let
-  btrfsOptions = import ../lib/btrfs-mount-options.nix ++ [ "space_cache=v2" ];
+  btrfsOptions = import ../lib/btrfs-mount-options.nix;
 
   btrfs = {
     device = "/dev/disk/by-label/nixos";

@@ -32,8 +32,6 @@ Fuentes de partida por área. Las de cada dependencia fijada están en la regla
 - Aplica los cambios directamente. No escribas tests nuevos ni pidas
   verificaciones salvo que se pida. Si eliminas o renombras una función, elimina
   o adapta sus tests existentes para que el workspace siga compilando.
-- Commits pequeños y lógicos con conventional commits
-  (`feat(installer): …`, `fix(console): …`, `refactor(common): …`).
 - No cambies `stateVersion` (system/lib/defaults.nix, "26.05").
 - No añadas dependencias pesadas (inputs, crates, servicios) sin justificarlo en
   el commit.
@@ -41,6 +39,59 @@ Fuentes de partida por área. Las de cada dependencia fijada están en la regla
 - Al terminar, resume en 1–3 líneas qué cambiaste y qué queda pendiente.
 - Idioma: mensajes de la interfaz, documentación y los pocos comentarios que
   se permiten, en español.
+
+## Ramas y push (permanente)
+
+- Todo cambio va **directo a `master`** y se sube con `git push origin master`.
+  No crees ramas, ni locales ni remotas (tampoco `claude/...` de sesiones en la
+  nube), ni abras pull requests salvo que se pida. Vale para cualquier agente
+  (opencode, Claude Code en local o en la nube, DeepSeek, Kimi, etc.).
+- Hay varias sesiones trabajando a la vez: `git pull --ff-only` antes de
+  empezar y antes de cada push. Nunca `push --force`, `reset --hard` sobre
+  commits subidos ni rebase de historia publicada.
+- Las máquinas fijan el repo por rev (`/etc/nixdots/rev` y el `flake.lock` del
+  home). Ese rev debe estar en `master`; un commit que solo vive en una rama
+  puede desaparecer de GitHub y romper `nixdots-home-init` y `crewd`.
+- `Cargo.lock` y `flake.lock` solo cambian si cambias dependencias o inputs; si
+  aparecen modificados sin eso, `git checkout` del archivo.
+
+## Commits
+
+Pequeños y lógicos. Tipo y ámbito entre paréntesis: `feat(installer): …`,
+`fix(console): …`, `refactor(nixcore): …`, `docs(system): …`. Tipos: `feat`,
+`fix`, `docs`, `refactor`, `test`, `perf`, `chore`, `build`. Nunca un ámbito
+sin tipo.
+
+## Regla de entorno
+
+No modifiques nada fuera del repo.
+
+- **Sistema:** nunca `nixos-rebuild switch`, `nixdots-rebuild`,
+  `home-manager switch` ni `nixdots-setup apply` sobre el host. Se prueba con
+  `./dev.sh sim …`, `./dev.sh vm` o `nix build`/`nix flake check`.
+- **Datos:** no leas ni escribas `/persist`, `/etc/nixdots` ni
+  `~/.config/home-manager` reales; las simulaciones usan `NIXDOTS_ROOT`.
+- **Servicios y discos:** no reinicies servicios, no toques la sesión ni
+  ejecutes disko, `cryptsetup`, `sbctl` o `systemd-cryptenroll` fuera de una
+  VM. Si algo del host falla, detente y repórtalo.
+
+## Documentación (solo español)
+
+Aplica a `.github/README.md`, `.github/docs/`, `system/templates/home/README.md`
+y este archivo.
+
+1. **Solo en español.** Cada documento existe una vez; no hay copias en otro
+   idioma. Los comentarios permitidos y el rustdoc también van en español.
+2. **Un proceso por documento:** objetivo y alcance (dónde empieza y acaba),
+   lector, entradas y salidas, y pasos numerados en orden de ejecución.
+3. **Fuente real.** Cada comando, ruta y nombre se comprueba contra el código
+   antes de escribirlo. El documento se actualiza en el commit que cambia lo
+   que describe; si deja de valer, se borra.
+4. **Estilo:** frases cortas, voz activa y presente; una idea por párrafo.
+   Nada se repite: se enlaza a su única fuente (este archivo,
+   `.github/docs/system.md` o `.github/docs/installer.md`). Ejemplos mínimos y
+   ejecutables, mejor en pareja ✗/✓.
+5. **Comentarios en el código:** reglas 5 y 6 de «Código mínimo».
 
 ## Código mínimo (reglas duras, estilo ponytail)
 
@@ -112,6 +163,27 @@ users = builtins.fromTOML (builtins.readFile "/persist/keel/users/${u}.toml");
   regenera; nunca se edita a mano.
 - Las diferencias de hardware van en `hardware-detect.nix` vía facter, nunca
   por nombre de host.
+
+### Limpieza (tarea recurrente)
+
+Cuando se pida «limpiar» un área, o al tocar un archivo que no cumple estas
+reglas, sigue este orden, un commit por paso y por área (`refactor(…)`,
+`docs(…)`):
+
+1. **Comentarios:** borra los que prohíbe la regla 6 (qué hace, historia,
+   cabeceras, `TODO` sin issue, código comentado). En Nix vale igual para `#`.
+2. **Código muerto:** `deadnix` y `statix` limpios; borra funciones, opciones,
+   `let` y argumentos sin uso, y sus tests.
+3. **Duplicados:** un valor o una regla repetidos pasan a su única fuente
+   (`system/lib/`, `kits/nixcore`, `kits/neptunia`); colores literales, a
+   `kits/neptunia`.
+4. **Documentación:** corrige o borra lo que ya no coincide con el código
+   («Documentación», regla 3), empezando por este archivo.
+5. **Comprueba:** `cargo clippy -D warnings`, `nix flake check` (o el check
+   afectado) y, si tocaste el instalador o el asistente, su `./dev.sh sim`.
+
+Sin cambios de comportamiento: si limpiar exige uno, anótalo en el resumen y no
+lo hagas.
 
 ## Arquitectura (no volver atrás)
 

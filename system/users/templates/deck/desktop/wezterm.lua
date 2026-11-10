@@ -202,18 +202,4 @@ local config = {
     },
 }
 
-local last_bg = nil
-
-wezterm.on('update-status', function(window, pane)
-    local proc = pane:get_foreground_process_name() or ''
-    local nvim = proc:find('nvim', 1, true) ~= nil
-    local bg = nvim and theme.bg or nil
-    if bg ~= last_bg then
-        last_bg = bg
-        local overrides = window:get_config_overrides() or {}
-        overrides.colors = bg and make_colors(bg) or nil
-        window:set_config_overrides(overrides)
-    end
-end)
-
 return config

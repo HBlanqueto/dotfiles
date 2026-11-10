@@ -8,8 +8,6 @@
 }:
 
 let
-  yaziConfig = import ./config/yazi { inherit theme; };
-
   starshipPlain = pkgs.runCommand "starship-plain-text-symbols.toml" { } ''
     ${pkgs.starship}/bin/starship preset plain-text-symbols -o $out
   '';
@@ -120,21 +118,6 @@ in
           ControlPersist = "no";
         };
       };
-    };
-
-    yazi = {
-      enable = true;
-      enableFishIntegration = true;
-      plugins = {
-        yatline = pkgs.yaziPlugins.yatline.overrideAttrs (o: {
-          patches = (o.patches or [ ]) ++ [ ./config/yazi/yatline-icon.patch ];
-        });
-
-        full-border = pkgs.yaziPlugins.full-border;
-      };
-      initLua = builtins.readFile ./config/yazi/init.lua;
-
-      inherit (yaziConfig) settings theme;
     };
 
     mpv = {

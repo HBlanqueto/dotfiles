@@ -12,7 +12,7 @@ kits/neptunia/
 │                      segmentado rectangular, pestañas de barra de herramientas…)
 ├── default.nix        traduce los JSON y compone el tema; solo builtins, sin nixpkgs
 ├── neptunia.nix       paleta de terminal (colors)
-├── filecolors.nix     colores por tipo de archivo (eza/yazi)
+├── filecolors.nix     colores por tipo de archivo (eza)
 ├── generated/         salidas ya generadas, para quien no use Nix (SlintPad, otro repo)
 │   ├── neptunia.slint   globals Theme y Metrics para Slint
 │   ├── neptunia.css     variables CSS (GTK4, web)

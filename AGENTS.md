@@ -350,7 +350,7 @@ nunca reescribas código solo para silenciarlos.
 - Una sola carpeta, `kits/neptunia/`, con dos fuentes; nada de colores
   hardcodeados en Nix, Lua, Rust ni Slint:
   - `kits/neptunia/neptunia.nix` (vía `kits/neptunia/default.nix`) — paleta
-    de **terminal** (wezterm, instalador y yazi), con `filecolors.nix`.
+    de **terminal** (wezterm e instalador), con `filecolors.nix`.
   - `kits/neptunia/{tokens,components}.json` → `generated/` — **interfaz
     gráfica** (Slint, CSS). El asistente importa `Theme` y `Metrics` de
     `generated/neptunia.slint`.

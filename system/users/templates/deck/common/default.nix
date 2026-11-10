@@ -15,7 +15,7 @@
         else
           "${pkgs.firefox}/bin/firefox";
       TERMINAL = "wezterm";
-      EDITOR = "nvim";
+      EDITOR = "code --wait";
       NO_AT_BRIDGE = "1";
       NIXOS_OZONE_WL = "1";
     };

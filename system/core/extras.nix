@@ -17,7 +17,6 @@ in
     trezor = lib.mkEnableOption "the Trezor hardware wallet (trezord)";
     chime = lib.mkEnableOption "the boot chime";
     brightnessctl = lib.mkEnableOption "brightnessctl and its backlight hotkey rules";
-    remoteAccess = lib.mkEnableOption "the Remmina and RustDesk remote access clients";
     iphoneTethering = lib.mkEnableOption "USB tethering from an iPhone" // {
       default = true;
     };
@@ -35,7 +34,6 @@ in
       trezor = lib.mkDefault (extraData.trezor or false);
       chime = lib.mkDefault (extraData.chime or false);
       brightnessctl = lib.mkDefault (extraData.brightnessctl or false);
-      remoteAccess = lib.mkDefault (extraData.remoteAccess or false);
       iphoneTethering = lib.mkDefault (extraData.iphoneTethering or true);
     };
 
@@ -73,12 +71,7 @@ in
       };
     };
 
-    environment.systemPackages =
-      lib.optionals cfg.brightnessctl [ pkgs.brightnessctl ]
-      ++ lib.optionals cfg.remoteAccess [
-        pkgs.remmina
-        pkgs.rustdesk-flutter
-      ];
+    environment.systemPackages = lib.optionals cfg.brightnessctl [ pkgs.brightnessctl ];
 
     environment.persistence."/persist".directories = lib.optionals cfg.epson [ "/var/lib/cups" ];
   };

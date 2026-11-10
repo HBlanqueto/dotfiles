@@ -399,7 +399,7 @@ fn run_connect(mut cmd: Command) -> Result<()> {
 pub fn sample_networks() -> Vec<Wifi> {
     vec![
         Wifi {
-            ssid: "keel-lab".into(),
+            ssid: "system-lab".into(),
             signal: 90,
             secured: true,
         },

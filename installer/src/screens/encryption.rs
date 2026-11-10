@@ -397,9 +397,9 @@ fn save_recovery(app: &mut App) {
     let Some(medium) = app.enc.usb.get(app.enc.usb_index).cloned() else {
         return;
     };
-    let name = format!("keel-recovery-{}.txt", app.settings.host_name);
+    let name = format!("system-recovery-{}.txt", app.settings.host_name);
     let content = format!(
-        "Keel · clave de recuperación LUKS2\n\
+        "Sistema · clave de recuperación LUKS2\n\
          hostname: {}\n\
          disco: {}\n\n\
          {}\n\n\
@@ -415,7 +415,7 @@ fn save_recovery(app: &mut App) {
         return;
     }
 
-    let dir = "/tmp/keel-usb";
+    let dir = "/tmp/system-usb";
     let _ = std::fs::create_dir_all(dir);
     let mount = Cmd::new("mount")
         .arg("-o")

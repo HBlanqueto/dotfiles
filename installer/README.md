@@ -1,4 +1,4 @@
-# nixdots-installer
+# install-nixos
 
 Install from a NixOS live ISO:
 
@@ -10,13 +10,13 @@ sudo ./nixdots/install.sh
 Run simulation:
 
 ```sh
-nix run .#installer
+nix run .#install-nixos
 ```
 
 Install from the flake:
 
 ```sh
-sudo nix run .#installer -- --install
+sudo nix run .#install-nixos -- --install
 ```
 
 Options:

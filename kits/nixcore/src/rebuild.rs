@@ -63,7 +63,7 @@ pub fn release_commit() -> Result<String> {
 }
 
 pub fn run(flake_ref: &Path, mode: Mode, allow_missing: &[String]) -> Result<Outcome> {
-    let ref_arg = format!("path:{}#keel", flake_ref.display());
+    let ref_arg = format!("path:{}#system", flake_ref.display());
 
     let build = Command::new("nixos-rebuild")
         .args(["build", "--impure", "--no-link", "--flake", &ref_arg])
@@ -112,7 +112,7 @@ pub fn run(flake_ref: &Path, mode: Mode, allow_missing: &[String]) -> Result<Out
 
 fn disappearing_users(flake_ref: &Path, allow_missing: &[String]) -> Result<Vec<String>> {
     let ref_arg = format!(
-        "path:{}#nixosConfigurations.keel.config.users.users",
+        "path:{}#nixosConfigurations.system.config.users.users",
         flake_ref.display()
     );
     let apply = "u: builtins.filter (n: u.${n}.isNormalUser or false) (builtins.attrNames u)";

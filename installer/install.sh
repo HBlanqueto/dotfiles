@@ -3,7 +3,7 @@ set -eu
 
 REPO="github:HBlanqueto/dotfiles"
 RELEASES="https://github.com/HBlanqueto/dotfiles/releases/download/latest"
-WORK="/tmp/keel-installer"
+WORK="/tmp/system-installer"
 
 NIX_CONFIG="experimental-features = nix-command flakes"
 export NIX_CONFIG
@@ -40,7 +40,7 @@ fi
 tool_pkgs="$nixpkgs#disko $nixpkgs#mkpasswd $nixpkgs#sbctl $nixpkgs#nixos-facter"
 
 mkdir -p "$WORK"
-binary="$WORK/nixdots-installer-$arch"
+binary="$WORK/install-nixos-$arch"
 
 fetch() {
     if command -v curl >/dev/null 2>&1; then
@@ -54,9 +54,9 @@ fetch() {
 }
 
 verified=0
-if fetch "$RELEASES/nixdots-installer-$arch" "$binary" &&
+if fetch "$RELEASES/install-nixos-$arch" "$binary" &&
     fetch "$RELEASES/SHA256SUMS" "$WORK/SHA256SUMS"; then
-    grep " nixdots-installer-$arch\$" "$WORK/SHA256SUMS" >"$WORK/SHA256SUMS.$arch" || true
+    grep " install-nixos-$arch\$" "$WORK/SHA256SUMS" >"$WORK/SHA256SUMS.$arch" || true
     if [ -s "$WORK/SHA256SUMS.$arch" ] &&
         (cd "$WORK" && sha256sum -c "SHA256SUMS.$arch"); then
         verified=1
@@ -70,9 +70,9 @@ if [ "$verified" -ne 1 ]; then
     printf '¿Compilarlo ahora con Nix y ejecutarlo? [s/N] ' >&2
     read -r reply || reply=n
     case "$reply" in
-        s | S | y | Y) exec nix run "$REPO#installer" -- --install "$@" ;;
+        s | S | y | Y) exec nix run "$REPO#install-nixos" -- --install "$@" ;;
         *)
-            echo "Alternativa: sudo nix run $REPO#installer -- --install" >&2
+            echo "Alternativa: sudo nix run $REPO#install-nixos -- --install" >&2
             exit 1
             ;;
     esac

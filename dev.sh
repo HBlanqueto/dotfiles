@@ -54,7 +54,7 @@ sim_installer() {
     if [ "${1:-}" = "--here" ] || [ "${1:-}" = "-t" ]; then
         here cargo run --manifest-path installer/Cargo.toml -- --repo "$REPO"
     fi
-    run_window keel-installer-dev \
+    run_window installer-dev \
         "-w installer/src -w kits/nixcore/src -w installer/Cargo.toml -w kits/nixcore/Cargo.toml -w Cargo.toml" \
         rs,toml \
         cargo run --manifest-path installer/Cargo.toml -- --repo "$REPO"
@@ -96,7 +96,7 @@ run_test() {
         nix build .#installer
     fi
 
-    installer="$REPO/result/bin/nixdots-installer"
+    installer="$REPO/result/bin/install-nixos"
     [ -x "$installer" ] || fail "$installer not found (missing --no-build?)"
 
     driver() {

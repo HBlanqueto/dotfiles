@@ -46,7 +46,7 @@ fn copy_log(app: &App) {
     if let Some(path) = &app.install.log_path {
         let dir = Path::new("/mnt/persist");
         if dir.is_dir() {
-            let _ = std::fs::copy(path, dir.join("keel-install.log"));
+            let _ = std::fs::copy(path, dir.join("system-install.log"));
         }
     }
 }

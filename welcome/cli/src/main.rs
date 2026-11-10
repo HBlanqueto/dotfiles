@@ -1,4 +1,4 @@
-//! `nixdots-setup`: CLI that applies the first-boot wizard data.
+//! `setup-nixos`: CLI that applies the first-boot wizard data.
 use color_eyre::eyre::{bail, eyre, Context, Result};
 use nixcore::machine;
 use nixcore::runner::{self, Cmd, Stream};
@@ -8,7 +8,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use zeroize::Zeroizing;
 
-const HELP: &str = "nixdots-setup apply <datos.json> [--repo <ruta>] [--dry-run]
+const HELP: &str = "setup-nixos apply <datos.json> [--repo <ruta>] [--dry-run]
 
   datos.json  fullName, username, locale, region, keyboardLayout,
               keyboardVariant, timeZone, timeZoneAuto, a11y, colorScheme,
@@ -21,12 +21,12 @@ Los datos personales van a /persist/keel/users/<usuario>.json; los de sistema (l
 teclado, prettyHostName, autoLoginUser) se fusionan en machine.toml. La
 contraseña se lee de stdin.
 
-nixdots-setup migrate [--dry-run]
+setup-nixos migrate [--dry-run]
 
   migrate     convierte el user.json antiguo en /persist/keel/users/<usuario>.toml y mueve
               sus campos de sistema a machine.toml, dejando user.json.bak.
 
-nixdots-setup migrate-toml
+setup-nixos migrate-toml
 
   migrate-toml  convierte machine.json y /persist/keel/users/*.json a .toml conservando los
                 originales como respaldo (los seguirá leyendo si falta el .toml).";

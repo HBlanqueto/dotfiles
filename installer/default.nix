@@ -5,8 +5,8 @@
 }:
 
 let
-  installer = mkRustTool {
-    pname = "nixdots-installer";
+  install-nixos = mkRustTool {
+    pname = "install-nixos";
     subdir = "installer";
     runtimeInputs = with pkgs; [
       disko
@@ -22,10 +22,10 @@ let
       git
       nix
     ];
-    description = "Text-mode installer for the Keel NixOS configuration";
+    description = "Text-mode NixOS installer";
     extra = tablesEnv pkgs;
   };
 in
 {
-  inherit installer;
+  inherit install-nixos;
 }

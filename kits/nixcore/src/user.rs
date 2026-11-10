@@ -78,7 +78,7 @@ pub fn host_name_from_pretty(pretty: &str) -> String {
     name.truncate(63);
     let name = name.trim_end_matches('-');
     if name.is_empty() {
-        "keel".to_string()
+        "system".to_string()
     } else {
         name.to_string()
     }

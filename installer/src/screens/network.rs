@@ -379,7 +379,7 @@ mod tests {
         let mut app = App::new(
             true,
             "test".into(),
-            PathBuf::from("/tmp/keel-does-not-exist"),
+            PathBuf::from("/tmp/system-does-not-exist"),
         );
         app.screen = Screen::Network;
         app.net.phase = RedFase::Lista;

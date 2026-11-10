@@ -41,7 +41,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
 
     f.render_widget(
         Paragraph::new(Span::styled(
-            "¿Dónde quieres instalar Keel?",
+            "¿Dónde quieres instalar el sistema?",
             Style::default()
                 .fg(app.palette.white)
                 .add_modifier(Modifier::BOLD),
@@ -404,7 +404,7 @@ fn draw_shrink(f: &mut Frame, app: &App, area: Rect, volume: u64, max_free: u64)
             "█".repeat(widths[1]),
             Style::default().fg(app.palette.primary),
         ),
-        Span::styled(" Keel ", Style::default().fg(app.palette.primary)),
+        Span::styled(" Sistema ", Style::default().fg(app.palette.primary)),
     ];
     let _ = max_free;
     f.render_widget(

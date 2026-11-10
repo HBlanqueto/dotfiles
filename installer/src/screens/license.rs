@@ -52,7 +52,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(
-                "Keel es la configuración personal de NixOS de ",
+                "Este es el sistema NixOS personal de ",
                 Style::default().fg(app.palette.muted),
             ),
             Span::styled("HBlanqueto", Style::default().fg(app.palette.highlight)),

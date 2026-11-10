@@ -94,7 +94,7 @@ impl Plan {
     }
 
     pub fn log_path(&self) -> PathBuf {
-        PathBuf::from("/tmp/keel-install.log")
+        PathBuf::from("/tmp/system-install.log")
     }
 
     fn esp_uuid(&self) -> String {
@@ -112,7 +112,7 @@ impl Plan {
             self.settings
                 .git_name
                 .clone()
-                .unwrap_or_else(|| "nixdots-installer".to_string()),
+                .unwrap_or_else(|| "install-nixos".to_string()),
             self.settings
                 .git_email
                 .clone()
@@ -193,7 +193,7 @@ fn run(plan: Plan, tx: Sender<Msg>) {
         file,
     };
 
-    report.raw("== Keel installer ==");
+    report.raw("== System installer ==");
     report.raw(&format!(
         "modo: {}",
         if plan.dry_run { "simulación" } else { "real" }
@@ -234,7 +234,7 @@ fn run(plan: Plan, tx: Sender<Msg>) {
     if !plan.dry_run {
         let _ = fs::remove_dir_all(plan.root.join("tmp"));
         let _ = fs::remove_dir_all(target_build_dir(&plan));
-        let _ = fs::remove_dir_all("/run/keel");
+        let _ = fs::remove_dir_all("/run/system");
     }
 
     if let Some(file) = report.file.as_mut() {
@@ -304,7 +304,7 @@ fn prepare_target_tmp(plan: &Plan, report: &mut Reporter) -> Result<()> {
         set_mode_dir(&build, 0o700)?;
     }
     std::env::set_var("TMPDIR", &tmp);
-    std::env::set_var("KEEL_ROOT", &plan.root);
+    std::env::set_var("SYSTEM_ROOT", &plan.root);
     report.log(format!("$ TMPDIR={}", tmp.display()));
     Ok(())
 }
@@ -363,7 +363,7 @@ struct TempSwap {
 
 impl TempSwap {
     fn create(plan: &Plan, report: &mut Reporter) -> Result<Self> {
-        let path = plan.root.join("persist/.keel-install.swap");
+        let path = plan.root.join("persist/.system-install.swap");
         let mut sink = |_: Stream| {};
         let _ = runner::run(&Cmd::new("swapoff").arg_path(&path), &mut sink);
         let _ = fs::remove_file(&path);
@@ -988,7 +988,7 @@ fn clean_target(plan: &Plan, report: &mut Reporter) {
     if let Some(luks) = detect::luks_partition(&plan.device) {
         let _ = runner::run(&Cmd::new("wipefs").arg("-a").arg(&luks.path), &mut sink);
     }
-    let _ = fs::remove_dir_all("/run/keel");
+    let _ = fs::remove_dir_all("/run/system");
 }
 
 fn verify_key(report: &mut Reporter, device: &str, key_file: &Path, what: &str) -> Result<()> {
@@ -1015,7 +1015,7 @@ struct SecretFile {
 
 impl SecretFile {
     fn write(name: &str, secret: &str) -> Result<Self> {
-        let dir = Path::new("/run/keel");
+        let dir = Path::new("/run/system");
         fs::create_dir_all(dir)?;
         set_mode_dir(dir, 0o700)?;
         let path = dir.join(name);
@@ -1248,7 +1248,7 @@ fn ensure_repo_ready(plan: &Plan, report: &mut Reporter, repo: &Path) -> Result<
             email_arg.as_str(),
             "commit",
             "-m",
-            "keel: initial import",
+            "system: initial import",
         ],
     );
     ensure_ok(
@@ -1569,7 +1569,7 @@ fn step_secure_boot(plan: &Plan, report: &mut Reporter) -> Result<()> {
 
 fn step_system(plan: &Plan, report: &mut Reporter) -> Result<()> {
     let repo = plan.installed_repo();
-    let flake = format!("{}#keel", repo.display());
+    let flake = format!("{}#system", repo.display());
     let build = target_build_dir(plan);
 
     let mut cmd = Cmd::new("nixos-install")
@@ -1913,7 +1913,7 @@ fn shell_command(cmd: &Cmd) -> String {
 }
 
 pub fn check_source(repo: &Path) -> Result<(), String> {
-    let tmp = std::env::temp_dir().join("keel-eval");
+    let tmp = std::env::temp_dir().join("system-eval");
     let _ = fs::remove_dir_all(&tmp);
     copy_tree(repo, &tmp).map_err(|err| format!("no se pudo copiar el repo: {err}"))?;
     let _ = std::process::Command::new("chmod")
@@ -1924,7 +1924,7 @@ pub fn check_source(repo: &Path) -> Result<(), String> {
     ensure_git_tree(&tmp);
 
     let expr = format!(
-        "{}#nixosConfigurations.keel.config.system.build.toplevel.drvPath",
+        "{}#nixosConfigurations.system.config.system.build.toplevel.drvPath",
         tmp.display()
     );
     let output = std::process::Command::new("nix")
@@ -1936,7 +1936,7 @@ pub fn check_source(repo: &Path) -> Result<(), String> {
             "nix-command flakes",
         ])
         .arg(&expr)
-        .env("KEEL_ROOT", &tmp)
+        .env("SYSTEM_ROOT", &tmp)
         .env("NIX_CONFIG", runner::nix_config())
         .stdin(std::process::Stdio::null())
         .output()
@@ -1978,13 +1978,13 @@ fn ensure_git_tree(repo: &Path) {
     run(&["add", "-A"]);
     run(&[
         "-c",
-        "user.name=keel-installer",
+        "user.name=system-installer",
         "-c",
         "user.email=installer@localhost",
         "commit",
         "-q",
         "-m",
-        "keel: check snapshot",
+        "system: check snapshot",
     ]);
 }
 
@@ -2015,7 +2015,7 @@ fn copy_log_to_persist(plan: &Plan, report: &mut Reporter) {
     if !dest_dir.is_dir() {
         return;
     }
-    let dest = dest_dir.join("keel-install.log");
+    let dest = dest_dir.join("system-install.log");
     match fs::copy(plan.log_path(), &dest) {
         Ok(_) => report.log(format!("log copiado a {}", dest.display())),
         Err(err) => report.log(format!("no se pudo copiar el log: {err}")),

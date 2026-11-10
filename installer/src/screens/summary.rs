@@ -124,7 +124,7 @@ pub fn commands(app: &App) -> Vec<String> {
         format!(
             "disko --mode destroy,format,mount --yes-wipe-all-disks system/disko.nix --argstr device {device}"
         ),
-        "nixos-install --flake /mnt/persist/keel/repo#keel --root /mnt --no-root-passwd --impure"
+        "nixos-install --flake /mnt/persist/keel/repo#system --root /mnt --no-root-passwd --impure"
             .into(),
     ];
     if app.secure_boot {

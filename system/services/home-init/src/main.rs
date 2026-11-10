@@ -33,11 +33,11 @@ fn run() -> Result<()> {
     let (flake_ref, rev) = nixcore::rebuild::system_ref()
         .map(|(path, rev)| (path.display().to_string(), rev))
         .unwrap_or_default();
-    let (url, used_fallback) = keel_url(&flake_ref, &rev)?;
+    let (url, used_fallback) = system_url(&flake_ref, &rev)?;
     if used_fallback {
         eprintln!(
             "steward home prepare: sin revisión válida; usando path:{flake_ref} \
-             (nix flake update keel no actualizará este input)"
+             (nix flake update system no actualizará este input)"
         );
     }
     let system = system_arch()?;
@@ -87,7 +87,7 @@ fn run() -> Result<()> {
 fn write_flake(config: &Path, url: &str, system: &str) -> Result<()> {
     let flake = FLAKE_TEMPLATE
         .replace("github:HBlanqueto/dotfiles", url)
-        .replace("system = \"SYSTEM\";", &format!("system = \"{system}\";"));
+        .replace("arch = \"SYSTEM\";", &format!("arch = \"{system}\";"));
     std::fs::write(config.join("flake.nix"), flake)?;
     Ok(())
 }
@@ -106,7 +106,7 @@ fn home_switch(config: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn keel_url(flake_ref: &str, rev: &str) -> Result<(String, bool)> {
+fn system_url(flake_ref: &str, rev: &str) -> Result<(String, bool)> {
     if is_rev(rev) {
         return Ok((format!("github:HBlanqueto/dotfiles/{rev}"), false));
     }
@@ -156,14 +156,14 @@ fn home_nix(username: &str, home: &str, prefs: Option<&Prefs>) -> String {
         .map(|g| (g.name.as_str(), g.email.as_str()))
         .unwrap_or(("", ""));
     format!(
-        "# Mi home; el resto sale de keel.homeModules.\n\
+        "# Mi home; el resto sale de system.homeModules.\n\
          {{ ... }}:\n\
          {{\n\
          \x20 home.username = {u};\n\
          \x20 home.homeDirectory = {h};\n\
          \x20 home.stateVersion = \"26.05\";\n\n\
-         \x20 keel.git.name = {n};\n\
-         \x20 keel.git.email = {e};\n\
+         \x20 system.git.name = {n};\n\
+         \x20 system.git.email = {e};\n\
          }}\n",
         u = nix_str(username),
         h = nix_str(home),
@@ -192,8 +192,8 @@ fn status(message: &str) {
 
 fn write_status(text: &str) -> Result<()> {
     let dir = match std::env::var("XDG_RUNTIME_DIR") {
-        Ok(dir) if !dir.is_empty() => PathBuf::from(dir).join("keel"),
-        _ => PathBuf::from("/tmp").join(format!("keel-{}", std::process::id())),
+        Ok(dir) if !dir.is_empty() => PathBuf::from(dir).join("system"),
+        _ => PathBuf::from("/tmp").join(format!("system-{}", std::process::id())),
     };
     std::fs::create_dir_all(&dir)?;
     std::fs::write(dir.join("home-init.status"), text)?;
@@ -204,9 +204,9 @@ fn delete_seed(username: &str) {
     let _ = Command::new("busctl")
         .args([
             "call",
-            "io.github.HBlanqueto.Keel.Crew1",
-            "/io/github/HBlanqueto/Keel/Crew1",
-            "io.github.HBlanqueto.Keel.Crew1",
+            "io.github.HBlanqueto.System.Users1",
+            "/io/github/HBlanqueto/System/Users1",
+            "io.github.HBlanqueto.System.Users1",
             "DeletePrefsSeed",
             "s",
             username,

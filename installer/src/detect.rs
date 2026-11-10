@@ -506,7 +506,7 @@ pub fn efi_free(efi: &Partition) -> Option<u64> {
     if let Some(mp) = efi.mountpoints.iter().find(|m| !m.is_empty()) {
         return df_free(mp);
     }
-    let dir = std::env::temp_dir().join("keel-efi");
+    let dir = std::env::temp_dir().join("system-efi");
     let _ = std::fs::create_dir_all(&dir);
     let mounted = Command::new("mount")
         .args(["-o", "ro"])

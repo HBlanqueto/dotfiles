@@ -1,8 +1,8 @@
 //! Text-mode installer entry point (dry-run by default, `--install` for real).
 use color_eyre::eyre::{bail, Result};
-use nixdots_installer::app::App;
-use nixdots_installer::detect;
-use nixdots_installer::theme;
+use install_nixos::app::App;
+use install_nixos::detect;
+use install_nixos::theme;
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm::execute;
 use ratatui::crossterm::terminal::{
@@ -45,10 +45,10 @@ fn parse_args() -> Result<Args> {
 }
 
 fn help_text() -> String {
-    "nixdots-installer [--install] [--repo <ruta|url>]\n\n  (sin argumentos)  simulación\n  --install         instalación real (requiere root, desde la ISO)\n  --repo            repositorio a instalar (defecto github:HBlanqueto/dotfiles)".to_string()
+    "install-nixos [--install] [--repo <ruta|url>]\n\n  (sin argumentos)  simulación\n  --install         instalación real (requiere root, desde la ISO)\n  --repo            repositorio a instalar (defecto github:HBlanqueto/dotfiles)".to_string()
 }
 
-const STATE_DIR: &str = "/tmp/keel-installer";
+const STATE_DIR: &str = "/tmp/system-installer";
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -87,7 +87,7 @@ fn run(args: Args) -> Result<()> {
 
     let _console = theme::console::Guard::activate();
 
-    let repo_dir = std::env::temp_dir().join("keel-installer-repo");
+    let repo_dir = std::env::temp_dir().join("system-installer-repo");
     let cloned = prepare_repo(&args.repo, &repo_dir).is_ok();
     if !cloned && !args.dry_run {
         prepare_repo(&args.repo, &repo_dir)?;

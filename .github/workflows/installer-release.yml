@@ -55,17 +55,17 @@ jobs:
           KEEL_LOCALE_DIR: /usr/share/i18n/locales
           KEEL_XKB_BASE_LST: /usr/share/X11/xkb/rules/base.lst
           KEEL_ZONE1970_TAB: /usr/share/zoneinfo/zone1970.tab
-        run: cargo build --profile dist --locked --target ${{ matrix.target }} -p nixdots-installer
+        run: cargo build --profile dist --locked --target ${{ matrix.target }} -p install-nixos
 
       - name: Rename the binary
         run: |
-          cp target/${{ matrix.target }}/dist/nixdots-installer \
-            nixdots-installer-${{ matrix.arch }}
+          cp target/${{ matrix.target }}/dist/install-nixos \
+            install-nixos-${{ matrix.arch }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: nixdots-installer-${{ matrix.arch }}
-          path: nixdots-installer-${{ matrix.arch }}
+          name: install-nixos-${{ matrix.arch }}
+          path: install-nixos-${{ matrix.arch }}
 
   release:
     name: publish
@@ -83,7 +83,7 @@ jobs:
 
       - name: Generate SHA256SUMS
         working-directory: dist
-        run: sha256sum nixdots-installer-* > SHA256SUMS
+        run: sha256sum install-nixos-* > SHA256SUMS
 
       - name: Point the `latest` tag at this commit
         if: github.ref_type == 'branch'

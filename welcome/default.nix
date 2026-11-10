@@ -5,8 +5,8 @@
 }:
 
 let
-  setup = mkRustTool {
-    pname = "nixdots-setup";
+  setup-nixos = mkRustTool {
+    pname = "setup-nixos";
     subdir = "welcome/cli";
     runtimeInputs = with pkgs; [
       git
@@ -15,10 +15,10 @@ let
       mkpasswd
       coreutils
     ];
-    description = "First-boot assistant CLI for the Keel configuration";
+    description = "First-boot assistant CLI";
     extra = tablesEnv pkgs;
   };
 in
 {
-  inherit setup;
+  inherit setup-nixos;
 }

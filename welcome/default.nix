@@ -1,4 +1,8 @@
-{ pkgs, mkRustTool, tablesEnv }:
+{
+  pkgs,
+  mkRustTool,
+  tablesEnv,
+}:
 
 let
   setup = mkRustTool {
@@ -17,25 +21,4 @@ let
 in
 {
   inherit setup;
-
-  assist-setup = mkRustTool {
-    pname = "nixdots-setup-gui";
-    subdir = "welcome/gui";
-    description = "Graphical first-boot assistant for the Keel configuration (Slint)";
-    runtimeInputs = [ setup ];
-    extra = (tablesEnv pkgs) // {
-      nativeBuildInputs = [
-        pkgs.pkg-config
-        pkgs.makeWrapper
-      ];
-      buildInputs = with pkgs; [
-        fontconfig
-        freetype
-        libxkbcommon
-        libglvnd
-        wayland
-        libx11
-      ];
-    };
-  };
 }

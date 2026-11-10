@@ -1,6 +1,6 @@
 //! Per-user account data stored outside the repo.
 use crate::store;
-use color_eyre::eyre::{Context, Result};
+use color_eyre::eyre::Result;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use toml_edit::{value, Item, Table};
@@ -280,81 +280,3 @@ fn owner(username: &str) -> Option<(u32, u32)> {
     })
 }
 
-pub fn legacy_path() -> PathBuf {
-    crate::paths::persist().join("user.json")
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct LegacyUser {
-    #[serde(default)]
-    pub username: Option<String>,
-    #[serde(default)]
-    pub userdescription: Option<String>,
-    #[serde(default)]
-    pub pretty_host_name: Option<String>,
-    #[serde(default)]
-    pub git_name: Option<String>,
-    #[serde(default)]
-    pub git_email: Option<String>,
-    #[serde(default)]
-    pub default_locale: Option<String>,
-    #[serde(default)]
-    pub region: Option<String>,
-    #[serde(default)]
-    pub time_zone: Option<String>,
-    #[serde(default)]
-    pub time_zone_auto: Option<bool>,
-    #[serde(default)]
-    pub keyboard_layout: Option<String>,
-    #[serde(default)]
-    pub keyboard_variant: Option<String>,
-    #[serde(default)]
-    pub color_scheme: Option<String>,
-    #[serde(default)]
-    pub accent_color: Option<String>,
-    #[serde(default)]
-    pub avatar_color: Option<String>,
-    #[serde(default)]
-    pub avatar_path: Option<String>,
-    #[serde(default)]
-    pub auto_login: Option<bool>,
-    #[serde(default)]
-    pub a11y: Option<A11y>,
-}
-
-impl LegacyUser {
-    pub fn read() -> Result<Option<Self>> {
-        let path = legacy_path();
-        match std::fs::read_to_string(&path) {
-            Ok(text) => Ok(Some(
-                serde_json::from_str(&text).wrap_err("user.json no tiene el formato esperado")?,
-            )),
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(err) => Err(err).wrap_err_with(|| format!("no se pudo leer {}", path.display())),
-        }
-    }
-}
-
-pub fn migrate_to_toml() -> Result<usize> {
-    let mut written = 0;
-    if store::migrate_to_toml(&crate::machine::path())? {
-        written += 1;
-    }
-    let dir = users_dir();
-    let Ok(entries) = std::fs::read_dir(&dir) else {
-        return Ok(written);
-    };
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        if !name.ends_with(".json") || name.ends_with(".bak") {
-            continue;
-        }
-        let toml = dir.join(name.replace(".json", ".toml"));
-        if store::migrate_to_toml(&toml)? {
-            written += 1;
-        }
-    }
-    Ok(written)
-}

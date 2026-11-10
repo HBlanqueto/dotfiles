@@ -22,18 +22,6 @@ pub fn load_document(path: &Path) -> Result<DocumentMut> {
     Ok(DocumentMut::new())
 }
 
-pub fn migrate_to_toml(path: &Path) -> Result<bool> {
-    if path.exists() {
-        return Ok(false);
-    }
-    if !json_sibling(path).exists() {
-        return Ok(false);
-    }
-    let doc = load_document(path)?;
-    write_document_atomic(path, &doc)?;
-    Ok(true)
-}
-
 fn parse_toml(path: &Path) -> Result<DocumentMut> {
     let text = std::fs::read_to_string(path)
         .wrap_err_with(|| format!("no se pudo leer {}", path.display()))?;

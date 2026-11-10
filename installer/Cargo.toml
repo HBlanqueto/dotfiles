@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 color-eyre = "0.6.5"
-crossterm = "0.29.0"
 nixcore = { path = "../kits/nixcore" }
 localekit = { path = "../kits/localekit" }
 ratatui = "0.30.2"

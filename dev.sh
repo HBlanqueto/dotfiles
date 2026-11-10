@@ -92,8 +92,8 @@ run_test() {
     ok "flake"
 
     if [ "$build" -eq 1 ]; then
-        say "nix build .#installer"
-        nix build .#installer
+        say "nix build .#install-nixos"
+        nix build .#install-nixos
     fi
 
     installer="$REPO/result/bin/install-nixos"

@@ -8,6 +8,10 @@ usage() {
     sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'
 }
 
+# Usage: dev.sh sim installer [--here]
+#        dev.sh test [--no-build]
+#        dev.sh -h | --help
+
 die() {
     code=$1
     shift
@@ -16,7 +20,7 @@ die() {
 }
 
 require() {
-    command -v "$1" >/dev/null 2>&1 || die 1 "falta $1"
+    command -v "$1" >/dev/null 2>&1 || die 1 "missing $1"
 }
 
 here() {
@@ -30,12 +34,12 @@ run_window() {
     shift 3
 
     if [ -z "${WAYLAND_DISPLAY:-}" ] || [ -z "${XDG_RUNTIME_DIR:-}" ]; then
-        printf 'Sin WAYLAND_DISPLAY/XDG_RUNTIME_DIR; ejecutando en esta terminal.\n' >&2
+        printf 'No WAYLAND_DISPLAY/XDG_RUNTIME_DIR; running in this terminal.\n' >&2
         here "$@"
     fi
 
     if pgrep -f -- "--class $class --cwd $REPO " >/dev/null 2>&1; then
-        printf 'Ya hay una ventana %s de %s abierta (se recarga al guardar).\n' "$class" "$REPO"
+        printf 'A %s window for %s is already open (reloads on save).\n' "$class" "$REPO"
         exit 0
     fi
 
@@ -43,7 +47,7 @@ run_window() {
         --cwd "$REPO" -- nix develop --command \
         watchexec -r -c $watches -e "$exts" -- "$@"
 
-    printf 'Ventana de simulación lanzada (%s).\n' "$class"
+    printf 'Simulation window launched (%s).\n' "$class"
 }
 
 sim_installer() {
@@ -56,33 +60,23 @@ sim_installer() {
         cargo run --manifest-path installer/Cargo.toml -- --repo "$REPO"
 }
 
-sim_setup() {
-    if [ "${1:-}" = "--here" ] || [ "${1:-}" = "-t" ]; then
-        here cargo run --manifest-path welcome/gui/Cargo.toml -- --sim
-    fi
-    run_window keel-setup-sim \
-        "-w welcome/gui/ui -w welcome/gui/src -w welcome/gui/Cargo.toml -w welcome/gui/build.rs -w Cargo.toml" \
-        slint,rs,toml \
-        cargo run --manifest-path welcome/gui/Cargo.toml -- --sim
-}
-
 run_test() {
     build=1
     for arg in "$@"; do
         case "$arg" in
             --no-build) build=0 ;;
             -h | --help)
-                printf 'uso: %s test [--no-build]\n' "$0"
+                printf 'usage: %s test [--no-build]\n' "$0"
                 exit 0
                 ;;
-            *) die 2 "argumento desconocido: $arg" ;;
+            *) die 2 "unknown argument: $arg" ;;
         esac
     done
 
     require python3
 
     say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
-    fail() { printf '\033[31mFALLO: %s\033[0m\n' "$*" >&2; exit 1; }
+    fail() { printf '\033[31mFAIL: %s\033[0m\n' "$*" >&2; exit 1; }
     ok() { printf '\033[32mok\033[0m  %s\n' "$*"; }
 
     say "cargo clippy -D warnings"
@@ -103,10 +97,12 @@ run_test() {
     fi
 
     installer="$REPO/result/bin/nixdots-installer"
-    [ -x "$installer" ] || fail "no se encontró $installer (¿falta --no-build?)"
+    [ -x "$installer" ] || fail "$installer not found (missing --no-build?)"
 
     driver() {
-        python3 - "$1" "$2" <<'PY'
+        binpath=$1
+        repo=$2
+        python3 - "$binpath" "$repo" <<'PY'
 import os, pty, sys, time, fcntl, termios, struct, select
 
 binpath, repo = sys.argv[1], sys.argv[2]
@@ -243,22 +239,22 @@ EOF
         return 1
     }
 
-    say "simulación: recorrido completo"
+    say "simulation: full walkthrough"
     if capture "$installer"; then
-        ok "installer: 17 comprobaciones"
+        ok "installer: 17 checks"
     else
-        fail "installer: no apareció «$MISSING»"
+        fail "installer: missing «$MISSING»"
     fi
 
-    say "paleta en TERM=linux (OSC P / OSC R)"
+    say "palette in TERM=linux (OSC P / OSC R)"
     linux=$(mktemp)
     PTY_TERM=linux driver "$installer" "$REPO" >"$linux"
-    grep -aqU "$(printf '\033]P4')" "$linux" || fail "no se programó el slot OSC P 4 en TERM=linux"
-    grep -aqU "$(printf '\033]R')" "$linux" || fail "no se restauró la paleta (OSC R)"
+    grep -aqU "$(printf '\033]P4')" "$linux" || fail "OSC P slot 4 not programmed in TERM=linux"
+    grep -aqU "$(printf '\033]R')" "$linux" || fail "palette reset (OSC R) not restored"
     rm -f "$linux"
-    ok "TERM=linux: 16 slots + restauración"
+    ok "TERM=linux: 16 slots + reset"
 
-    printf '\n\033[32mTODO OK\033[0m\n'
+    printf '\n\033[32mALL OK\033[0m\n'
 }
 
 cmd=${1:-}
@@ -266,12 +262,11 @@ case "$cmd" in
     sim)
         shift
         what=${1:-}
-        [ -n "$what" ] || die 2 "uso: $0 sim {installer|setup} [--here]"
+        [ -n "$what" ] || die 2 "usage: $0 sim installer [--here]"
         shift
         case "$what" in
             installer) sim_installer "$@" ;;
-            setup) sim_setup "$@" ;;
-            *) die 2 "uso: $0 sim {installer|setup} [--here]" ;;
+            *) die 2 "usage: $0 sim installer [--here]" ;;
         esac
         ;;
     test) shift; run_test "$@" ;;

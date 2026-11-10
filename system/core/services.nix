@@ -9,6 +9,8 @@
   options.system.ssh.enable = lib.mkEnableOption "the SSH server (keys only, persistent host keys)";
 
   config = {
+    programs.ssh.askPassword = "";
+
     networking = {
       networkmanager.enable = true;
     };

@@ -68,7 +68,7 @@ No modifiques nada fuera del repo.
 
 - **Sistema:** nunca `nixos-rebuild switch`, `nixdots-rebuild`,
   `home-manager switch` ni `nixdots-setup apply` sobre el host. Se prueba con
-  `./dev.sh sim …`, `./dev.sh vm` o `nix build`/`nix flake check`.
+  `./dev.sh sim …` o `nix build`/`nix flake check`.
 - **Datos:** no leas ni escribas `/persist`, `/etc/nixdots` ni
   `~/.config/home-manager` reales; las simulaciones usan `NIXDOTS_ROOT`.
 - **Servicios y discos:** no reinicies servicios, no toques la sesión ni

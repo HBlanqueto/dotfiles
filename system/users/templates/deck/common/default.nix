@@ -23,7 +23,7 @@
 
   programs.git = {
     enable = true;
-    extraConfig.credential.helper = "gh auth git-credential";
+    settings.credential.helper = "gh auth git-credential";
   };
 
   xdg = {

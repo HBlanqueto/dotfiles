@@ -22,7 +22,7 @@
     {
       homeConfigurations.default = home-manager.lib.homeManagerConfiguration {
         pkgs = import nixpkgs {
-          inherit arch;
+          system = arch;
 
           config.allowUnfree = true;
 

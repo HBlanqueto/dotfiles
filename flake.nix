@@ -92,14 +92,6 @@
         }
       );
 
-      setupPackages = forAllSystems (
-        { system, pkgs }:
-        import ./welcome {
-          inherit pkgs tablesEnv;
-          mkRustTool = mkRustTool system;
-        }
-      );
-
       systemPackages = forAllSystems (
         { system, pkgs }:
         import ./system/packages.nix {
@@ -144,7 +136,6 @@
       packages = forAllSystems (
         { system, ... }: {
           install-nixos = installerPackages.${system}.install-nixos;
-          setup-nixos = setupPackages.${system}.setup-nixos;
           users-daemon = systemPackages.${system}.users-daemon;
           home-init = systemPackages.${system}.home-init;
           default = installerPackages.${system}.install-nixos;
@@ -172,7 +163,6 @@
         { system, pkgs, ... }:
         import ./kits/nix/devShells.nix {
           inherit pkgs tablesEnv;
-          setup = setupPackages.${system}.setup-nixos;
         }
       );
     };

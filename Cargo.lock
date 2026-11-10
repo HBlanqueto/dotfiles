@@ -1546,18 +1546,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "setup-nixos"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
- "localekit",
- "nixcore",
- "serde",
- "serde_json",
- "zeroize",
-]
-
-[[package]]
 name = "sha2"
 version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"

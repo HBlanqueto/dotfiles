@@ -1,8 +1,7 @@
-# Dev shell for the installer, the wizard and repo tools.
+# Dev shell for the installer and repo tools.
 {
   pkgs,
   tablesEnv,
-  setup,
 }:
 {
   default = pkgs.mkShell (
@@ -19,7 +18,6 @@
         clang
         lld
         pkg-config
-        setup
         nixfmt
         statix
         deadnix

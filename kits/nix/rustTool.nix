@@ -21,7 +21,6 @@ let
       fileset = pkgs.lib.fileset.unions [
         (root + "/Cargo.toml")
         (root + "/Cargo.lock")
-        (root + "/welcome/cli")
         (root + "/installer/Cargo.toml")
         (root + "/installer/src")
         (root + "/installer/assets")

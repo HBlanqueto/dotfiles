@@ -61,8 +61,6 @@ in
       [
         fastfetch
         eza
-        luajit
-        lua51Packages.luacheck
         mpc
         ffmpeg
         poppler-utils

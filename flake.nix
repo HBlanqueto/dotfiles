@@ -123,11 +123,6 @@
           requireImpure = false;
           data = emptyData;
         };
-        keel-aarch64-linux = mkGeneric {
-          system = "aarch64-linux";
-          requireImpure = false;
-          data = emptyData;
-        };
       }
       // nixpkgs.lib.optionalAttrs (data.machine ? hostName) {
         ${data.machine.hostName} = keel;

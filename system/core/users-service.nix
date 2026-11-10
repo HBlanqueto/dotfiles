@@ -6,13 +6,9 @@ let
 
   userd = inputs.self.packages.${system}.crewd;
   homeInit = inputs.self.packages.${system}.home-init;
-  setupGui = inputs.self.packages.${system}.assist-setup;
 
   homeInitSession = pkgs.writeShellScript "steward-home-session" ''
-    if [ -f "$HOME/.config/home-manager/flake.nix" ]; then
-        exec ${homeInit}/bin/nixdots-home-init
-    fi
-    exec ${setupGui}/bin/nixdots-setup-gui --home-init
+    exec ${homeInit}/bin/nixdots-home-init
   '';
 
   polkitPolicy = pkgs.writeTextFile {

@@ -3,9 +3,9 @@ let
   theme = import ../../../kits/neptunia;
 
   gitOptions = { lib, ... }: {
-    imports = [ (lib.mkAliasOptionModule [ "nixdots" "git" ] [ "keel" "git" ]) ];
+    imports = [ (lib.mkAliasOptionModule [ "nixdots" "git" ] [ "system" "git" ]) ];
 
-    options.keel.git = {
+    options.system.git = {
       name = lib.mkOption {
         type = lib.types.str;
         default = "";

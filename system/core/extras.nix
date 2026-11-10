@@ -8,11 +8,11 @@
 }:
 
 let
-  cfg = config.keel.features;
+  cfg = config.system.features;
   extraData = data.machine.extras or { };
 in
 {
-  options.keel.features = {
+  options.system.features = {
     epson = lib.mkEnableOption "the Epson L3250 printer/scanner";
     trezor = lib.mkEnableOption "the Trezor hardware wallet (trezord)";
     chime = lib.mkEnableOption "the boot chime";
@@ -23,14 +23,14 @@ in
     };
   };
 
-  options.keel.chimeCard = lib.mkOption {
+  options.system.chimeCard = lib.mkOption {
     type = lib.types.int;
     default = 1;
     description = "ALSA card used by the boot chime.";
   };
 
   config = {
-    keel.features = {
+    system.features = {
       epson = lib.mkDefault (extraData.epson or false);
       trezor = lib.mkDefault (extraData.trezor or false);
       chime = lib.mkDefault (extraData.chime or false);
@@ -39,7 +39,7 @@ in
       iphoneTethering = lib.mkDefault (extraData.iphoneTethering or true);
     };
 
-    keel.chimeCard = lib.mkDefault (extraData.chimeCard or 1);
+    system.chimeCard = lib.mkDefault (extraData.chimeCard or 1);
 
     services = {
       printing = lib.mkIf cfg.epson {
@@ -64,10 +64,10 @@ in
       serviceConfig = {
         Type = "oneshot";
         ExecStartPre = [
-          "-${pkgs.alsa-utils}/bin/amixer -c ${toString config.keel.chimeCard} sset Master 100% unmute"
-          "-${pkgs.alsa-utils}/bin/amixer -c ${toString config.keel.chimeCard} sset Speaker 100% unmute"
+          "-${pkgs.alsa-utils}/bin/amixer -c ${toString config.system.chimeCard} sset Master 100% unmute"
+          "-${pkgs.alsa-utils}/bin/amixer -c ${toString config.system.chimeCard} sset Speaker 100% unmute"
         ];
-        ExecStart = "${pkgs.alsa-utils}/bin/aplay -c 2 -D plughw:${toString config.keel.chimeCard},0 ${./chime.wav}";
+        ExecStart = "${pkgs.alsa-utils}/bin/aplay -c 2 -D plughw:${toString config.system.chimeCard},0 ${./chime.wav}";
         RemainAfterExit = false;
         SupplementaryGroups = "audio";
       };

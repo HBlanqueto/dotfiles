@@ -11,7 +11,7 @@ let
 
   subvol = name: extra: [ "subvol=${name}" ] ++ btrfsOptions ++ extra;
 
-  m = config.keel.machine;
+  m = config.system.machine;
 in
 {
   fileSystems = {
@@ -66,7 +66,7 @@ in
   assertions = [
     {
       assertion = !m.encrypt || config.boot.initrd.luks.devices ? "cryptroot";
-      message = "keel.machine.encrypt está activo pero no hay boot.initrd.luks.devices.cryptroot";
+      message = "system.machine.encrypt está activo pero no hay boot.initrd.luks.devices.cryptroot";
     }
   ];
 }

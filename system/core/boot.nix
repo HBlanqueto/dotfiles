@@ -8,7 +8,7 @@
 
     initrd.verbose = false;
 
-    initrd.systemd.emergencyAccess = config.keel.machine.encrypt && !config.keel.machine.tpmUnlock;
+    initrd.systemd.emergencyAccess = config.system.machine.encrypt && !config.system.machine.tpmUnlock;
 
     plymouth = {
       enable = true;

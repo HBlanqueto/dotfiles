@@ -1,4 +1,4 @@
-# Bootloader selection driven by `keel.machine.secureBoot`.
+# Bootloader selection driven by `system.machine.secureBoot`.
 {
   config,
   lib,
@@ -7,7 +7,7 @@
 }:
 
 let
-  m = config.keel.machine;
+  m = config.system.machine;
 in
 {
   config = lib.mkMerge [

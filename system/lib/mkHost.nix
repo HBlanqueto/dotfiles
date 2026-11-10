@@ -12,7 +12,7 @@ inputs.nixpkgs.lib.nixosSystem {
   specialArgs = {
     inherit inputs theme;
     data = data // {
-      hostName = data.machine.hostName or "keel";
+      hostName = data.machine.hostName or "system";
     };
   };
 
@@ -28,7 +28,7 @@ inputs.nixpkgs.lib.nixosSystem {
       assertions = [
         {
           assertion = !requireImpure || data.impure;
-          message = "keel necesita evaluación impura para leer /persist/keel: usa nixdots-rebuild sw o añade --impure";
+          message = "system necesita evaluación impura para leer /persist/keel: usa rebuild-nixos sw o añade --impure";
         }
         {
           assertion = data.usersValid;

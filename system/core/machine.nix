@@ -7,7 +7,7 @@
 }:
 
 {
-  options.keel.machine = {
+  options.system.machine = {
     encrypt = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -44,7 +44,7 @@
   };
 
   config = {
-    keel.machine = {
+    system.machine = {
       encrypt = lib.mkDefault (data.machine.encrypt or false);
       luksUuid = lib.mkDefault (data.machine.luksUuid or "");
       espUuid = lib.mkDefault (data.machine.espUuid or "");
@@ -54,8 +54,8 @@
 
     assertions = [
       {
-        assertion = !config.keel.machine.tpmUnlock || config.keel.machine.secureBoot;
-        message = "keel.machine.tpmUnlock requiere keel.machine.secureBoot";
+        assertion = !config.system.machine.tpmUnlock || config.system.machine.secureBoot;
+        message = "system.machine.tpmUnlock requiere system.machine.secureBoot";
       }
     ];
   };

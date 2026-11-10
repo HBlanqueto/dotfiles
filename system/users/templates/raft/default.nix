@@ -27,7 +27,7 @@ in
     git = {
       enable = true;
       settings.user = {
-        inherit (config.keel.git) name email;
+        inherit (config.system.git) name email;
       };
     };
   };

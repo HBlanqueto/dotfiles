@@ -6,7 +6,7 @@
 }:
 
 {
-  config = lib.mkIf config.keel.features.iphoneTethering {
+  config = lib.mkIf config.system.features.iphoneTethering {
     services.usbmuxd.enable = true;
 
     boot.kernelModules = [ "ipheth" ];

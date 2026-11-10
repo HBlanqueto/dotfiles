@@ -8,6 +8,6 @@ _:
     stateVersion = "26.05";
   };
 
-  keel.git.name = "TU NOMBRE";
-  keel.git.email = "tu@correo";
+  system.git.name = "TU NOMBRE";
+  system.git.email = "tu@correo";
 }

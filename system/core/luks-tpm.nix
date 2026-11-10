@@ -7,11 +7,11 @@
 }:
 
 let
-  m = config.keel.machine;
+  m = config.system.machine;
 
   device = config.boot.initrd.luks.devices."cryptroot".device;
 
-  warning = "El desbloqueo con TPM no se completó; el disco está protegido solo por la entrada temporal. Ejecuta nixdots-rebuild sw o revisa auto-cryptenroll.";
+  warning = "El desbloqueo con TPM no se completó; el disco está protegido solo por la entrada temporal. Ejecuta rebuild-nixos sw o revisa auto-cryptenroll.";
 
   tpmBridgeLeft = pkgs.writeShellScript "lookout" ''
     ${pkgs.cryptsetup}/bin/cryptsetup \

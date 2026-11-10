@@ -3,18 +3,18 @@
   impure ? (builtins ? currentSystem),
 }:
 let
-  keelRoot = builtins.getEnv "KEEL_ROOT";
+  systemRoot = builtins.getEnv "SYSTEM_ROOT";
   legacyRoot = builtins.getEnv "NIXDOTS_ROOT";
-  root = if keelRoot != "" then keelRoot else legacyRoot;
+  root = if systemRoot != "" then systemRoot else legacyRoot;
 
-  persistKeel = "${root}/persist/keel";
+  persistSystem = "${root}/persist/keel";
   persistLegacy = "${root}/persist/nixdots";
 
   persist =
-    if impure && !builtins.pathExists persistKeel && builtins.pathExists persistLegacy then
+    if impure && !builtins.pathExists persistSystem && builtins.pathExists persistLegacy then
       persistLegacy
     else
-      persistKeel;
+      persistSystem;
 
   readRaw =
     file:

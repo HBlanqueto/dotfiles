@@ -23,7 +23,7 @@
     };
   };
 
-  system.activationScripts.keelCredentialSecret = {
+  system.activationScripts.systemCredentialSecret = {
     deps = [ "specialfs" ];
     text = ''
       # systemd-creds needs a regular 4112-byte file; let `systemd-creds setup` create it.
@@ -38,5 +38,5 @@
     '';
   };
 
-  system.activationScripts.persist-files.deps = [ "keelCredentialSecret" ];
+  system.activationScripts.persist-files.deps = [ "systemCredentialSecret" ];
 }

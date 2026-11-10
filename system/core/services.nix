@@ -6,7 +6,7 @@
 }:
 
 {
-  options.keel.ssh.enable = lib.mkEnableOption "the SSH server (keys only, persistent host keys)";
+  options.system.ssh.enable = lib.mkEnableOption "the SSH server (keys only, persistent host keys)";
 
   config = {
     networking = {
@@ -27,7 +27,7 @@
     services = {
       bpftune.enable = true;
 
-      openssh = lib.mkIf config.keel.ssh.enable {
+      openssh = lib.mkIf config.system.ssh.enable {
         enable = true;
         settings = {
           PasswordAuthentication = false;
@@ -42,7 +42,7 @@
         ];
       };
 
-      avahi = lib.mkIf config.keel.features.epson {
+      avahi = lib.mkIf config.system.features.epson {
         enable = true;
         nssmdns4 = true;
         publish.enable = false;

@@ -97,7 +97,7 @@ in
     git = {
       enable = true;
       settings.user = {
-        inherit (config.keel.git) name email;
+        inherit (config.system.git) name email;
       };
     };
 
@@ -142,7 +142,7 @@ in
         alias lt "ls --tree"
       '';
       shellAliases = {
-        home-update = "nix flake update --flake $HOME/.config/home-manager keel && home-manager switch -b backup --flake $HOME/.config/home-manager#default";
+        home-update = "nix flake update --flake $HOME/.config/home-manager system && home-manager switch -b backup --flake $HOME/.config/home-manager#default";
 
         g = "git";
         c = "clear";

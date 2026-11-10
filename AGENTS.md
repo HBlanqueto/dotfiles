@@ -12,3 +12,4 @@ This repo keeps documentation minimal: English only, installation instructions o
 - Keep commits small and conventional: `feat(...)`, `fix(...)`, `docs(...)`, etc.
 - Keep `deadnix` and `statix` clean. Delete dead code; don't comment it out.
 - Documentation (this file included) is in English and stays minimal.
+- Keep only NixOS/Nix + Rust. No Slint, HTML, CSS, or QML.

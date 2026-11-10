@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, ... }:
 
 {
   boot = {
@@ -13,7 +13,6 @@
     plymouth = {
       enable = true;
       theme = "spinner";
-      font = "${pkgs.consoleet-darwin}/share/fonts/opentype/consoleet_xnu.otf";
     };
 
     kernelParams = [

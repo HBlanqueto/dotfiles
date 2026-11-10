@@ -1,16 +1,16 @@
 { pkgs, mkRustTool }:
 
 {
-  crewd = mkRustTool {
-    pname = "nixdots-userd";
-    subdir = "system/services/crewd";
-    description = "D-Bus user management service for Keel";
+  users-daemon = mkRustTool {
+    pname = "users-daemon";
+    subdir = "system/services/users-daemon";
+    description = "D-Bus user management service";
   };
 
   home-init = mkRustTool {
-    pname = "nixdots-home-init";
+    pname = "home-init";
     subdir = "system/services/home-init";
-    description = "First-login home setup for Keel";
+    description = "First-login home setup";
     runtimeInputs = [
       pkgs.home-manager
       pkgs.systemd
@@ -19,5 +19,5 @@
     ];
   };
 
-  nixdots-rebuild = pkgs.callPackage ./packages/nixdots-rebuild.nix { };
+  rebuild-nixos = pkgs.callPackage ./packages/rebuild-nixos.nix { };
 }

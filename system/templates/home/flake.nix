@@ -1,33 +1,33 @@
 {
-  description = "Mi home de Keel";
+  description = "My system home";
 
   inputs = {
-    keel.url = "github:HBlanqueto/dotfiles";
+    system.url = "github:HBlanqueto/dotfiles";
 
-    nixpkgs.follows = "keel/nixpkgs";
+    nixpkgs.follows = "system/nixpkgs";
 
-    home-manager.follows = "keel/home";
+    home-manager.follows = "system/home";
   };
 
   outputs =
     {
       home-manager,
       nixpkgs,
-      keel,
+      system,
       ...
     }:
     let
-      system = "SYSTEM";
+      arch = "SYSTEM";
     in
     {
       homeConfigurations.default = home-manager.lib.homeManagerConfiguration {
         pkgs = import nixpkgs {
-          inherit system;
+          inherit arch;
 
           config.allowUnfree = true;
 
           overlays = [
-            keel.overlays.brave
+            system.overlays.brave
             (_final: prev: {
               xorg = prev.xorg // {
                 inherit (prev) libxcb;
@@ -37,7 +37,7 @@
         };
 
         extraSpecialArgs = {
-          inherit keel;
+          inherit system;
           prefs =
             if builtins.pathExists ./prefs.toml then
               builtins.fromTOML (builtins.readFile ./prefs.toml)
@@ -46,7 +46,7 @@
         };
 
         modules = [
-          keel.homeModules.deck
+          system.homeModules.deck
           ./home.nix
         ];
       };

@@ -72,9 +72,10 @@ in
       enable = true;
       shellAliases = {
         delgen = "sudo nix-collect-garbage --delete-older-than 1d";
-        nix-update = "nixdots-rebuild sw";
-        flake-update-rb = "nixdots-rebuild update-rb";
-        flake-update-sw = "nixdots-rebuild update-sw";
+        rebuild-now = "rebuild-nixos sw";
+        rebuild-boot = "rebuild-nixos rb";
+        update-switch = "rebuild-nixos update-sw";
+        update-boot = "rebuild-nixos update-rb";
       };
     };
   };
@@ -112,7 +113,7 @@ in
 
       inputs.home.packages.${pkgs.stdenv.hostPlatform.system}.home-manager
 
-      inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.nixdots-rebuild
+      inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.rebuild-nixos
 
       wget
       curl

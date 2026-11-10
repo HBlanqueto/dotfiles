@@ -36,8 +36,8 @@
 
       theme = import ./kits/neptunia;
 
-      keelSystem = import ./system { inherit inputs theme; };
-      inherit (keelSystem) mkHost genericModules;
+      systemConfig = import ./system { inherit inputs theme; };
+      inherit (systemConfig) mkHost genericModules;
 
       mkGeneric =
         {
@@ -92,7 +92,7 @@
         }
       );
 
-      welcomePackages = forAllSystems (
+      setupPackages = forAllSystems (
         { system, pkgs }:
         import ./welcome {
           inherit pkgs tablesEnv;
@@ -108,7 +108,7 @@
         }
       );
 
-      keel = mkGeneric {
+      nixosSystem = mkGeneric {
         system = if data.impure then builtins.currentSystem else "x86_64-linux";
         requireImpure = true;
         inherit data;
@@ -116,26 +116,26 @@
     in
     {
       nixosConfigurations = {
-        inherit keel;
+        system = nixosSystem;
 
-        keel-x86_64-linux = mkGeneric {
+        system-x86_64-linux = mkGeneric {
           system = "x86_64-linux";
           requireImpure = false;
           data = emptyData;
         };
       }
       // nixpkgs.lib.optionalAttrs (data.machine ? hostName) {
-        ${data.machine.hostName} = keel;
+        ${data.machine.hostName} = nixosSystem;
       };
 
       overlays.brave = inputs.brave-previews.overlays.default;
 
-      inherit (keelSystem) homeModules;
+      inherit (systemConfig) homeModules;
 
       templates = {
         home = {
           path = ./system/templates/home;
-          description = "Standalone Keel home-manager template";
+          description = "Standalone system home-manager template";
         };
       };
 
@@ -143,25 +143,25 @@
 
       packages = forAllSystems (
         { system, ... }: {
-          installer = installerPackages.${system}.installer;
-          setup = welcomePackages.${system}.setup;
-          crewd = systemPackages.${system}.crewd;
+          install-nixos = installerPackages.${system}.install-nixos;
+          setup-nixos = setupPackages.${system}.setup-nixos;
+          users-daemon = systemPackages.${system}.users-daemon;
           home-init = systemPackages.${system}.home-init;
-          default = installerPackages.${system}.installer;
+          default = installerPackages.${system}.install-nixos;
 
-          nixdots-rebuild = systemPackages.${system}.nixdots-rebuild;
+          rebuild-nixos = systemPackages.${system}.rebuild-nixos;
         }
       );
 
       apps = forAllSystems (
         { system, ... }: {
-          installer = {
+          install-nixos = {
             type = "app";
-            program = "${installerPackages.${system}.installer}/bin/nixdots-installer";
+            program = "${installerPackages.${system}.install-nixos}/bin/install-nixos";
           };
           default = {
             type = "app";
-            program = "${installerPackages.${system}.installer}/bin/nixdots-installer";
+            program = "${installerPackages.${system}.install-nixos}/bin/install-nixos";
           };
         }
       );
@@ -172,7 +172,7 @@
         { system, pkgs, ... }:
         import ./kits/nix/devShells.nix {
           inherit pkgs tablesEnv;
-          setup = welcomePackages.${system}.setup;
+          setup = setupPackages.${system}.setup-nixos;
         }
       );
     };

@@ -62,6 +62,7 @@ in
           "Victor Mono"
         ];
         sansSerif = [
+          "Adwaita Sans"
           "Inter"
           "Noto Sans CJK SC"
         ]

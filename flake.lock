@@ -12,17 +12,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1794522047,
-        "narHash": "sha256-aXBV4UYe037/S+q6wbWu+fr2/lhBKms92yro553dtyw=",
+        "lastModified": 1794681083,
+        "narHash": "sha256-DLBztTM5SuDsIkdjdOhmilYNiAuWh+qxA3QankqrPHw=",
         "owner": "HBlanqueto",
         "repo": "barrierkit",
-        "rev": "c77bcef4e1bd34daf9a1b20b6433ce471a0bb24c",
+        "rev": "532a900632449774808e411dbe9d8ccd8f193283",
         "type": "github"
       },
       "original": {
         "owner": "HBlanqueto",
         "repo": "barrierkit",
-        "rev": "c77bcef4e1bd34daf9a1b20b6433ce471a0bb24c",
+        "rev": "532a900632449774808e411dbe9d8ccd8f193283",
         "type": "github"
       }
     },
@@ -203,11 +203,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794522074,
-        "narHash": "sha256-xSxmGRiVyPuDJZ+OHZRNs4I9PVjgDiBK7+ZFIsQ64Xc=",
+        "lastModified": 1794681152,
+        "narHash": "sha256-wQ4Oo0kAeqbEDmqN1XaHw+G/kguYYtgd2gnS8+DCIII=",
         "owner": "HBlanqueto",
         "repo": "malaysia",
-        "rev": "bc8bf8b7c000f48dcbdf796466f53cc753235dd9",
+        "rev": "9ff62cc918c4f5bdd334d9f37bffd299a56d69af",
         "type": "github"
       },
       "original": {
@@ -219,17 +219,17 @@
     "malaysia-icon-theme": {
       "flake": false,
       "locked": {
-        "lastModified": 1794444866,
-        "narHash": "sha256-UkM+8fwucjrsn2tsehGH1RvtTptV3VJWvpbITdpI0sI=",
+        "lastModified": 1794673611,
+        "narHash": "sha256-fytcz/tb7tXYaxwsFoDRP4rDxCUme2YfCbeJVUT+m78=",
         "owner": "HBlanqueto",
         "repo": "malaysia-icon-theme",
-        "rev": "221d2d6d9bd142611c41f2b36f3af6bcfbdb625f",
+        "rev": "d4ca5a63d082e2efcdd1f741b671a74026248523",
         "type": "github"
       },
       "original": {
         "owner": "HBlanqueto",
         "repo": "malaysia-icon-theme",
-        "rev": "221d2d6d9bd142611c41f2b36f3af6bcfbdb625f",
+        "rev": "d4ca5a63d082e2efcdd1f741b671a74026248523",
         "type": "github"
       }
     },

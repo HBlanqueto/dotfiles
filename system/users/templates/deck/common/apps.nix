@@ -8,6 +8,22 @@
 }:
 
 let
+  # Native Wayland + VA-API for Chromium browsers. Chromium keeps only the last
+  # --enable-features, so this list must carry every feature the wrapper sets.
+  chromiumArgs = [
+    "--ozone-platform-hint=auto"
+    "--enable-wayland-ime=true"
+    "--wayland-text-input-version=3"
+    "--enable-features=${
+      lib.concatStringsSep "," [
+        "AcceleratedVideoDecodeLinuxGL"
+        "AcceleratedVideoDecodeLinuxZeroCopyGL"
+        "AcceleratedVideoEncoder"
+        "WaylandWindowDecorations"
+      ]
+    }"
+  ];
+
   starshipPlain = pkgs.runCommand "starship-plain-text-symbols.toml" { } ''
     ${pkgs.starship}/bin/starship preset plain-text-symbols -o $out
   '';
@@ -86,11 +102,15 @@ in
   programs = {
     brave = lib.mkIf pkgs.stdenv.hostPlatform.isx86_64 {
       enable = true;
+      # The overlay's package ignores `.override { commandLineArgs }`; append to its wrapper.
       package = pkgs.brave-origin-beta.overrideAttrs (old: {
-        preFixup =
-          (old.preFixup or "") + "\ngappsWrapperArgs+=(\"--add-flags\" \"--ozone-platform-hint=auto\")\n";
+        preFixup = (old.preFixup or "") + ''
+          gappsWrapperArgs+=(--add-flags ${lib.escapeShellArg (lib.concatStringsSep " " chromiumArgs)})
+        '';
       });
     };
+
+    chromium.commandLineArgs = chromiumArgs;
 
     git = {
       enable = true;

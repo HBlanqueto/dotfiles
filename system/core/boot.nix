@@ -23,8 +23,10 @@
 
     kernel.sysctl = {
       "kernel.nmi_watchdog" = 0;
-      "vm.swappiness" = 100;
+      "vm.swappiness" = 180;
       "vm.page-cluster" = 0;
+      "vm.watermark_boost_factor" = 0;
+      "vm.watermark_scale_factor" = 125;
       "net.core.default_qdisc" = "cake";
       "net.ipv4.tcp_congestion_control" = "bbr";
     };

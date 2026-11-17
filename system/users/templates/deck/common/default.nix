@@ -11,7 +11,7 @@
     sessionVariables = {
       BROWSER =
         if pkgs.stdenv.hostPlatform.isx86_64 then
-          "${config.programs.brave.package}/bin/brave-origin-beta"
+          "${config.programs.brave.finalPackage}/bin/brave-origin-beta"
         else
           "${pkgs.firefox}/bin/firefox";
       TERMINAL = "wezterm";
@@ -20,6 +20,9 @@
       NIXOS_OZONE_WL = "1";
     };
   };
+
+  # GNOME starts apps from the systemd user manager, which never reads hm-session-vars.sh.
+  systemd.user.sessionVariables = config.home.sessionVariables;
 
   programs.git = {
     enable = true;

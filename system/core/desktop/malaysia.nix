@@ -8,14 +8,18 @@ in
 
   programs.malaysia.enable = true;
 
-  environment.sessionVariables.LD_LIBRARY_PATH = [
-    "${inputs.malaysia.packages.${system}.libadwaita-global-menu}/lib"
-  ];
+  environment = {
+    systemPackages = [ inputs.malaysia.packages.${system}.curseterm ];
 
-  environment.etc."firefox/policies/policies.json".text = builtins.toJSON {
-    policies.Preferences = {
-      "widget.gtk.global-menu.enabled" = true;
-      "widget.gtk.global-menu.wayland.enabled" = true;
+    sessionVariables.LD_LIBRARY_PATH = [
+      "${inputs.malaysia.packages.${system}.libadwaita-global-menu}/lib"
+    ];
+
+    etc."firefox/policies/policies.json".text = builtins.toJSON {
+      policies.Preferences = {
+        "widget.gtk.global-menu.enabled" = true;
+        "widget.gtk.global-menu.wayland.enabled" = true;
+      };
     };
   };
 }

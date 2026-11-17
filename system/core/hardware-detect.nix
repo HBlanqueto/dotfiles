@@ -14,6 +14,10 @@ let
   isQemu = detected.virtualisation.qemu.enable;
   hasAmdGpu = detected.graphics.amd.enable;
   hasAmdCpu = lib.any (c: (c.vendor_name or "") == "AuthenticAMD") (report.hardware.cpu or [ ]);
+
+  smbios = report.smbios.system or { };
+  isThinkPadL14 =
+    (smbios.manufacturer or "") == "LENOVO" && lib.hasPrefix "ThinkPad L14" (smbios.version or "");
 in
 {
   config = lib.mkIf config.hardware.facter.enable {
@@ -26,12 +30,19 @@ in
       ucodenix.enable = lib.mkIf (isBaremetal && hasAmdCpu) true;
     };
 
-    boot.kernelParams = lib.mkIf (isBaremetal && hasAmdCpu) [ "microcode.amd_sha_check=off" ];
+    # L14 quirks from nixos-hardware (lenovo/thinkpad/l14/amd).
+    boot.kernelParams =
+      lib.optional (isBaremetal && hasAmdCpu) "microcode.amd_sha_check=off"
+      ++ lib.optional isThinkPadL14 "acpi_backlight=native"
+      ++ lib.optional (isThinkPadL14 && hasAmdCpu) "iommu=soft";
 
     environment = {
       persistence."/persist".directories = lib.optional isBaremetal "/var/lib/fwupd";
 
-      systemPackages = lib.optional hasAmdGpu pkgs.radeontop;
+      systemPackages = lib.optionals hasAmdGpu [
+        pkgs.radeontop
+        pkgs.libva-utils
+      ];
     };
   };
 }

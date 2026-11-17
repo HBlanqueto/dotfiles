@@ -9,7 +9,7 @@ This repo keeps documentation minimal: English only, installation instructions o
 - Don't modify anything outside the repo. Never run `nixos-rebuild switch`, `home-manager switch`, or disk tools on the host.
 - Test with `nix build`, `nix flake check`, or `./dev.sh sim`.
 - Push directly to `master`. Run `git pull --ff-only` before pushing. Never force-push or rewrite published history.
-- Keep commits small and conventional: `feat(...)`, `fix(...)`, `docs(...)`, etc.
+- Keep commits small. Write the whole message in English. The title starts with the change type (`Fix`, `Bug`, `Improvement`, `Feature`…) and only the title carries it: `Fix: dock reappears in focus mode`. The body, if any, has at most two paragraphs. No trailers: no `Co-Authored-By`, no `Claude-Session`, no session links.
 - Keep `deadnix` and `statix` clean. Delete dead code; don't comment it out.
 - Documentation (this file included) is in English and stays minimal.
 - Keep only NixOS/Nix + Rust. No Slint, HTML, CSS, or QML.

@@ -11,7 +11,7 @@ let
   # Native Wayland + VA-API for Chromium browsers. Chromium keeps only the last
   # --enable-features, so this list must carry every feature the wrapper sets.
   chromiumArgs = [
-    "--ozone-platform-hint=auto"
+    "--ozone-platform=wayland"
     "--enable-wayland-ime=true"
     "--wayland-text-input-version=3"
     "--enable-features=${

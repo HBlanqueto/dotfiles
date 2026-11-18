@@ -19,6 +19,7 @@ in
       policies.Preferences = {
         "widget.gtk.global-menu.enabled" = true;
         "widget.gtk.global-menu.wayland.enabled" = true;
+        "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
       };
     };
   };

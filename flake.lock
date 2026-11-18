@@ -234,11 +234,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794964935,
-        "narHash": "sha256-XFpB48UTCuN7KF80nIgW5F99V0ciLKy2FCjI/8b57Gk=",
+        "lastModified": 1794966354,
+        "narHash": "sha256-RBQ6W5cclmyMlmKM+5Gs0kFRESiCIWqZfBCCl0FlErA=",
         "owner": "HBlanqueto",
         "repo": "malaysia",
-        "rev": "d49c2c8605a2015ffec3377038251244fc1c8cef",
+        "rev": "d43c84b92dc6aa4d4c7efa9abf39cca2eb27ed72",
         "type": "github"
       },
       "original": {

@@ -95,12 +95,12 @@ mod tests {
             "system": "aarch64-linux",
             "stateVersion": "26.05",
             "hostName": "utm",
-            "timeZone": "America/Merida",
-            "defaultLocale": "es_MX.UTF-8",
-            "username": "humbe",
-            "userdescription": "H. Blanqueto",
-            "hashedPasswordFile": "/persist/secrets/humbe.hash",
-            "gitName": "H. Blanqueto",
+            "timeZone": "UTC",
+            "defaultLocale": "en_US.UTF-8",
+            "username": "user",
+            "userdescription": "Jane Appleseed",
+            "hashedPasswordFile": "/persist/secrets/user.hash",
+            "gitName": "Jane Appleseed",
             "gitEmail": "a@b.c"
         }"#;
         let s: Settings = serde_json::from_str(json).unwrap();

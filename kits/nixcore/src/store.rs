@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn edit_preserves_comments_order_and_unknown_fields() {
-        let source = "# hola\nusername = \"humbe\"\nunknown = 1\n[git]\nname = \"x\"\n";
+        let source = "# hola\nusername = \"user\"\nunknown = 1\n[git]\nname = \"x\"\n";
         let mut doc: DocumentMut = source.parse().unwrap();
         doc["username"] = value("otro");
         doc["admin"] = value(true);

@@ -50,17 +50,10 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
 
     let box_x = area.x + area.width.saturating_sub(box_w) / 2;
     f.render_widget(
-        Paragraph::new(Line::from(vec![
-            Span::styled(
-                "Este es el sistema NixOS personal de ",
-                Style::default().fg(app.palette.muted),
-            ),
-            Span::styled("HBlanqueto", Style::default().fg(app.palette.highlight)),
-            Span::styled(
-                ". No soy un experto en Nix, así que úsala bajo tu propio riesgo.",
-                Style::default().fg(app.palette.muted),
-            ),
-        ]))
+        Paragraph::new(Line::from(Span::styled(
+            "Este es un sistema NixOS personal. No soy un experto en Nix, así que úsala bajo tu propio riesgo.",
+            Style::default().fg(app.palette.muted),
+        )))
         .alignment(Alignment::Center)
         .wrap(Wrap { trim: true }),
         Rect::new(box_x, y, box_w, 2),

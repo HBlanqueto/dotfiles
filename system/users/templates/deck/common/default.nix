@@ -9,11 +9,7 @@
 
   home = {
     sessionVariables = {
-      BROWSER =
-        if pkgs.stdenv.hostPlatform.isx86_64 then
-          "${config.programs.brave.finalPackage}/bin/brave-origin-beta"
-        else
-          "${pkgs.firefox}/bin/firefox";
+      BROWSER = "${pkgs.firefox}/bin/firefox";
       TERMINAL = "wezterm";
       EDITOR = "code --wait";
       NO_AT_BRIDGE = "1";
@@ -31,6 +27,17 @@
 
   xdg = {
     enable = true;
+
+    mimeApps = {
+      enable = true;
+      defaultApplications = {
+        "text/html" = "firefox.desktop";
+        "x-scheme-handler/http" = "firefox.desktop";
+        "x-scheme-handler/https" = "firefox.desktop";
+        "x-scheme-handler/about" = "firefox.desktop";
+        "x-scheme-handler/unknown" = "firefox.desktop";
+      };
+    };
 
     userDirs = {
       enable = true;

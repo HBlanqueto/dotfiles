@@ -9,8 +9,6 @@ in
   programs.malaysia.enable = true;
 
   environment = {
-    systemPackages = [ inputs.malaysia.packages.${system}.curseterm ];
-
     sessionVariables.LD_LIBRARY_PATH = [
       "${inputs.malaysia.packages.${system}.libadwaita-global-menu}/lib"
     ];

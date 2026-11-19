@@ -30,6 +30,8 @@ in
     extraConfig = builtins.readFile ./wezterm.lua;
   };
 
+  programs.foot.enable = true;
+
   dconf.settings = {
     "org/gnome/desktop/interface" =
       lib.optionalAttrs (on "largeText") { text-scaling-factor = 1.25; }

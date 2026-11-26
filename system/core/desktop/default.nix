@@ -1,10 +1,7 @@
 { pkgs, ... }:
 
 {
-  imports = [
-    ./gnome.nix
-    ./malaysia.nix
-  ];
+  imports = [ ./gnome.nix ];
 
   hardware.graphics.enable = true;
 

@@ -7,6 +7,9 @@
 
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
 
+  # Claude Desktop downloads a generic Claude Code binary into the user profile.
+  programs.nix-ld.enable = true;
+
   environment.systemPackages = with pkgs; [
     libnotify
     playerctl

@@ -38,6 +38,7 @@
     overlays = [
       (import ../overlays { inherit inputs; })
       inputs.brave-previews.overlays.default
+      inputs.claude-desktop.overlays.default
       (_final: prev: {
         xorg = prev.xorg // {
           inherit (prev) libxcb;

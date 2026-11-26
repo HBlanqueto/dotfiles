@@ -15,5 +15,7 @@
     desktop-file-utils
     wayland-utils
     libinput
+
+    claude-desktop
   ];
 }
